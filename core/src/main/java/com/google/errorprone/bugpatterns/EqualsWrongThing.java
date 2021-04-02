@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.errorprone.BugPattern.ProvidesFix.NO_FIX;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -37,6 +36,7 @@ import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
@@ -60,7 +60,6 @@ import javax.lang.model.element.ElementKind;
     summary =
         "Comparing different pairs of fields/getters in an equals implementation is probably "
             + "a mistake.",
-    providesFix = NO_FIX,
     severity = ERROR)
 public final class EqualsWrongThing extends BugChecker implements MethodTreeMatcher {
 
@@ -101,7 +100,8 @@ public final class EqualsWrongThing extends BugChecker implements MethodTreeMatc
           ExpressionTree receiver = getReceiver(node);
           if (receiver != null) {
             // Special-case super, for odd cases like `super.equals(this)`.
-            if (!receiver.toString().equals("super")) {
+            if (!(receiver instanceof IdentifierTree
+                && ((IdentifierTree) receiver).getName().contentEquals("super"))) {
               getDubiousComparison(classSymbol, node, receiver, node.getArguments().get(0))
                   .ifPresent(suspiciousComparisons::add);
             }

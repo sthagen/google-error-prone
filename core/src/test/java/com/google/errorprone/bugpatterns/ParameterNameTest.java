@@ -18,6 +18,7 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Ignore;
@@ -34,13 +35,14 @@ public class ParameterNameTest {
 
   @Test
   public void positive() {
-    BugCheckerRefactoringTestHelper.newInstance(new ParameterName(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(ParameterName.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
             "  void f(int foo, int bar) {}",
             "  {",
             "    f(/* bar= */ 1, /* foo= */ 2);",
+            "    f(/** bar= */ 3, /** foo= */ 4);",
             "  }",
             "}")
         .addOutputLines(
@@ -49,6 +51,7 @@ public class ParameterNameTest {
             "  void f(int foo, int bar) {}",
             "  {",
             "    f(/* foo= */ 1, /* bar= */ 2);",
+            "    f(/* foo= */ 3, /* bar= */ 4);",
             "  }",
             "}")
         .doTest(TEXT_MATCH);
@@ -146,6 +149,21 @@ public class ParameterNameTest {
             "  void test(Object arg1, Object arg2) {",
             "    // BUG: Diagnostic contains: 'target(/* param1= */arg1, arg2);'",
             "    target(/* param2= */arg1, arg2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test // not allowed by Google style guide, but other styles may want this
+  public void namedParametersChecker_findsError_withUnusualIdentifier() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "abstract class Test {",
+            "  abstract void target(Object $param$);",
+            "  void test(Object arg) {",
+            "    // BUG: Diagnostic contains: 'target(/* $param$= */arg);'",
+            "    target(/* param= */arg);",
             "  }",
             "}")
         .doTest();
@@ -290,6 +308,20 @@ public class ParameterNameTest {
             "  abstract void target(Object param);",
             "  void test(Object arg) {",
             "    target(/* some_other_comment */arg);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void namedParametersChecker_ignoresComment_wrongVarargs() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "abstract class Test {",
+            "  abstract void target(Object... param);",
+            "  void test(Object arg) {",
+            "    target(/* param.!.= */arg);",
             "  }",
             "}")
         .doTest();
@@ -443,11 +475,13 @@ public class ParameterNameTest {
   }
 
   /** A test for annotated parameters across compilation boundaries. */
-  public static class AnnotatedParametersTestClass {
+  public static final class AnnotatedParametersTestClass {
     /** An annotation to apply to method parameters. */
     public @interface Annotated {}
 
     public static void target(@Annotated int foo) {}
+
+    private AnnotatedParametersTestClass() {}
   }
 
   @Test
@@ -477,6 +511,263 @@ public class ParameterNameTest {
             "    AnnotatedParametersTestClass.target(/* bar= */ 1);",
             "  }",
             "}")
+        .doTest();
+  }
+
+  @Test
+  public void positiveVarargs() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    // BUG: Diagnostic contains: /* args...= */",
+            "    // /* argh */",
+            "    foo(/* argh...= */ 1, 2, 3);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void emptyVarargs_shouldNotCrash() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int first, int... rest) {}",
+            "",
+            "  void bar() {",
+            "    foo(/* first= */ 1);",
+            " // BUG: Diagnostic contains: /* first= */",
+            "    foo(/* second= */ 1);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void negativeVarargs() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(/* args...= */ 1, 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsCommentAllowedWithArraySyntax() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    int[] myInts = {1, 2, 3};",
+            "    foo(/* args...= */ myInts);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  // TODO(b/144728869): clean up existing usages with non-"..." syntax
+  @Test
+  public void normalCommentNotAllowedWithVarargsArraySyntax() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    int[] myInts = {1, 2, 3};",
+            "    // BUG: Diagnostic contains: /* args...= */",
+            "    foo(/* args= */ myInts);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsCommentAllowedOnOnlyFirstArg() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    // BUG: Diagnostic contains: parameter name comment only allowed on first varargs"
+                + " argument",
+            "    foo(1, /* args...= */ 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsWrongFormat() {
+    BugCheckerRefactoringTestHelper.newInstance(ParameterName.class, getClass())
+        .addInputLines(
+            "in/Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(/* args= */ 1, 2);",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(/* args...= */ 1, 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsTrailing() {
+    BugCheckerRefactoringTestHelper.newInstance(ParameterName.class, getClass())
+        .addInputLines(
+            "in/Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(1, /* foo= */ 2);",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(1, /* foo */ 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsIgnoreNonParameterNameComments() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    foo(/* fake */ 1, 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsWrongNameAndWrongFormat() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int... args) {}",
+            "",
+            "  void bar() {",
+            "    // BUG: Diagnostic contains: /* args...= */",
+            "    // /* argh */",
+            "    foo(/* argh= */ 1, 2);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void varargsCommentNotAllowedOnNormalArg() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void foo(int i) {}",
+            "",
+            "  void bar() {",
+            "    // BUG: Diagnostic contains: /* i= */",
+            "    foo(/* i...= */ 1);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  /** A test input for separate compilation. */
+  public static final class Holder {
+    public static void varargsMethod(int... values) {}
+
+    private Holder() {}
+  }
+
+  /** Regression test for b/147344912. */
+  @Test
+  public void varargsSeparateCompilation() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import " + Holder.class.getCanonicalName() + ";",
+            "class Test {",
+            "  void bar() {",
+            "    Holder.varargsMethod(/* values...= */ 1, 1, 1);",
+            "  }",
+            "}")
+        .withClasspath(Holder.class, ParameterNameTest.class)
+        .doTest();
+  }
+
+  @Test
+  public void exemptPackage() {
+    CompilationTestHelper.newInstance(ParameterName.class, getClass())
+        .addSourceLines(
+            "test/a/A.java",
+            "package test.a;",
+            "public class A {",
+            "  public static void f(int value) {}",
+            "}")
+        .addSourceLines(
+            "test/b/nested/B.java",
+            "package test.b.nested;",
+            "public class B {",
+            "  public static void f(int value) {}",
+            "}")
+        .addSourceLines(
+            "test/c/C.java",
+            "package test.c;",
+            "public class C {",
+            "  public static void f(int value) {}",
+            "}")
+        .addSourceLines(
+            "Test.java",
+            "import test.a.A;",
+            "import test.b.nested.B;",
+            "import test.c.C;",
+            "class Test {",
+            "  void f() {",
+            "    A.f(/* typo= */ 1);",
+            "    B.f(/* typo= */ 1);",
+            "    // BUG: Diagnostic contains: 'C.f(/* value= */ 1);'",
+            "    C.f(/* typo= */ 1);",
+            "  }",
+            "}")
+        .setArgs(ImmutableList.of("-XepOpt:ParameterName:exemptPackagePrefixes=test.a,test.b"))
         .doTest();
   }
 }

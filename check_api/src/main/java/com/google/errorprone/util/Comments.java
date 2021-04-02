@@ -16,6 +16,7 @@
 package com.google.errorprone.util;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
@@ -24,6 +25,7 @@ import com.google.common.collect.Range;
 import com.google.common.collect.TreeRangeSet;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.util.Commented.Position;
+import com.google.errorprone.util.ErrorProneTokens.CommentWithTextAndPosition;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.ExpressionTree;
@@ -31,9 +33,9 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreePath;
+import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.parser.Tokens.Comment;
 import com.sun.tools.javac.parser.Tokens.TokenKind;
-import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Position.LineMap;
 import java.util.Iterator;
 import java.util.List;
@@ -44,7 +46,7 @@ import java.util.Optional;
  *
  * @author andrewrice@google.com (Andrew Rice)
  */
-public class Comments {
+public final class Comments {
 
   /**
    * Attach comments to nodes on arguments of constructor calls. Calls such as {@code new Test(
@@ -59,7 +61,7 @@ public class Comments {
    */
   public static ImmutableList<Commented<ExpressionTree>> findCommentsForArguments(
       NewClassTree newClassTree, VisitorState state) {
-    int startPosition = ((JCTree) newClassTree).getStartPosition();
+    int startPosition = getStartPosition(newClassTree);
     return findCommentsForArguments(
         newClassTree, newClassTree.getArguments(), startPosition, state);
   }
@@ -96,13 +98,17 @@ public class Comments {
         return comment.getText().replaceAll("^\\s*/\\*\\s*(.*?)\\s*\\*/\\s*", "$1");
       case LINE:
         return comment.getText().replaceAll("^\\s*//\\s*", "");
-      default:
-        return comment.getText();
+      case JAVADOC:
+        return comment.getText().replaceAll("^\\s*/\\*\\*\\s*(.*?)\\s*\\*/\\s*", "$1");
     }
+    throw new AssertionError(comment.getStyle());
   }
 
   private static ImmutableList<Commented<ExpressionTree>> findCommentsForArguments(
-      Tree tree, List<? extends ExpressionTree> arguments, int startPosition, VisitorState state) {
+      Tree tree,
+      List<? extends ExpressionTree> arguments,
+      int invocationStart,
+      VisitorState state) {
 
     if (arguments.isEmpty()) {
       return ImmutableList.of();
@@ -114,25 +120,30 @@ public class Comments {
       return noComments(arguments);
     }
 
-    CharSequence source = sourceCode.subSequence(startPosition, endPosition.get());
+    CharSequence source = sourceCode.subSequence(invocationStart, endPosition.get());
 
     if (CharMatcher.is('/').matchesNoneOf(source)) {
       return noComments(arguments);
     }
 
     // The token position of the end of the method invocation
-    int invocationEnd = state.getEndPosition(tree) - startPosition;
+    int invocationEnd = state.getEndPosition(tree) - invocationStart;
 
     // Ignore comments nested inside arguments.
     TreeRangeSet<Integer> exclude = TreeRangeSet.create();
     arguments.forEach(
-        a -> exclude.add(Range.closed(((JCTree) a).getStartPosition(), state.getEndPosition(a))));
+        arg ->
+            exclude.add(
+                Range.closed(
+                    getStartPosition(arg) - invocationStart,
+                    state.getEndPosition(arg) - invocationStart)));
 
     ErrorProneTokens errorProneTokens = new ErrorProneTokens(source.toString(), state.context);
     ImmutableList<ErrorProneToken> tokens = errorProneTokens.getTokens();
     LineMap lineMap = errorProneTokens.getLineMap();
 
-    ArgumentTracker argumentTracker = new ArgumentTracker(arguments, startPosition, state, lineMap);
+    ArgumentTracker argumentTracker =
+        new ArgumentTracker(arguments, invocationStart, state, lineMap);
     TokenTracker tokenTracker = new TokenTracker(lineMap);
 
     argumentTracker.advance();
@@ -142,7 +153,13 @@ public class Comments {
         // if the token is at the start of a line it could still have a comment attached which was
         // on the previous line
         for (Comment c : token.comments()) {
-          if (exclude.intersects(Range.closedOpen(token.pos(), token.endPos()))) {
+          if (!(c instanceof CommentWithTextAndPosition)) {
+            continue;
+          }
+          CommentWithTextAndPosition comment = (CommentWithTextAndPosition) c;
+          int commentStart = comment.getPos();
+          int commentEnd = comment.getEndPos();
+          if (exclude.intersects(Range.closedOpen(commentStart, commentEnd))) {
             continue;
           }
           if (tokenTracker.isCommentOnPreviousLine(c)
@@ -154,8 +171,8 @@ public class Comments {
           } else {
             // if the comment comes after the end of the invocation and its not on the same line
             // as the final argument then we need to ignore it
-            if (c.getSourcePos(0) <= invocationEnd
-                || lineMap.getLineNumber(c.getSourcePos(0))
+            if (commentStart <= invocationEnd
+                || lineMap.getLineNumber(commentStart)
                     <= lineMap.getLineNumber(argumentTracker.currentArgumentEndPosition)) {
               argumentTracker.addCommentToCurrentArgument(c, Position.ANY);
             }
@@ -241,7 +258,35 @@ public class Comments {
       return Optional.of(invocationEnd);
     }
 
-    return Optional.of(nextNodeEnd);
+    MethodScanner scanner = new MethodScanner(invocationEnd, nextNodeEnd);
+    scanner.scan(state.getPath().getParentPath().getLeaf(), null);
+
+    return Optional.of(
+        scanner.startOfNextMethodInvocation == -1
+            ? nextNodeEnd
+            : scanner.startOfNextMethodInvocation);
+  }
+
+  static class MethodScanner extends TreeScanner<Void, Void> {
+    public int startOfNextMethodInvocation = -1;
+    int invocationEnd;
+    int nextNodeEnd;
+
+    MethodScanner(int invocationEnd, int nextNodeEnd) {
+      this.invocationEnd = invocationEnd;
+      this.nextNodeEnd = nextNodeEnd;
+    }
+
+    @Override
+    public Void visitMethodInvocation(MethodInvocationTree methodInvocationTree, Void unused) {
+      int start = ASTHelpers.getStartPosition(methodInvocationTree);
+      if (invocationEnd < start
+          && start < nextNodeEnd
+          && (start < startOfNextMethodInvocation || startOfNextMethodInvocation == -1)) {
+        startOfNextMethodInvocation = start;
+      }
+      return super.visitMethodInvocation(methodInvocationTree, null);
+    }
   }
 
   /**
@@ -375,7 +420,7 @@ public class Comments {
 
       currentArgumentEndPosition = state.getEndPosition(nextArgument) - offset;
       previousArgumentEndPosition = currentArgumentStartPosition;
-      currentArgumentStartPosition = ((JCTree) nextArgument).getStartPosition() - offset;
+      currentArgumentStartPosition = getStartPosition(nextArgument) - offset;
 
       if (previousCommentedResultBuilder != null) {
         resultBuilder.add(previousCommentedResultBuilder.build());
@@ -419,4 +464,6 @@ public class Comments {
       return argumentsIterator.hasNext();
     }
   }
+
+  private Comments() {}
 }

@@ -22,15 +22,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.errorprone.RefactoringCollection.RefactoringResult;
 import com.google.errorprone.scanner.ErrorProneScannerTransformer;
 import com.google.errorprone.scanner.ScannerSupplier;
+import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskEvent.Kind;
 import com.sun.source.util.TaskListener;
-import com.sun.tools.javac.api.JavacTaskImpl;
+import com.sun.tools.javac.api.BasicJavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JavacMessages;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Log.WriterKind;
+import com.sun.tools.javac.util.Options;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -46,10 +48,10 @@ import javax.annotation.Nullable;
 import javax.lang.model.SourceVersion;
 import javax.tools.DiagnosticListener;
 import javax.tools.JavaCompiler;
+import javax.tools.JavaCompiler.CompilationTask;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
-import org.checkerframework.javacutil.AnnotationUtils;
 
 /** An Error Prone compiler that implements {@link javax.tools.JavaCompiler}. */
 public class BaseErrorProneJavaCompiler implements JavaCompiler {
@@ -79,20 +81,25 @@ public class BaseErrorProneJavaCompiler implements JavaCompiler {
     ImmutableList<String> javacOpts = ImmutableList.copyOf(remainingOptions);
     javacOpts = defaultToLatestSupportedLanguageLevel(javacOpts);
     javacOpts = setCompilePolicyToByFile(javacOpts);
-    final JavacTaskImpl task =
-        (JavacTaskImpl)
+    JavacTask task =
+        (JavacTask)
             javacTool.getTask(
                 out, fileManager, diagnosticListener, javacOpts, classes, compilationUnits);
-    setupMessageBundle(task.getContext());
-    RefactoringCollection[] refactoringCollection = {null};
-    task.addTaskListener(
-        createAnalyzer(
-            scannerSupplier, errorProneOptions, task.getContext(), refactoringCollection));
-    if (refactoringCollection[0] != null) {
-      task.addTaskListener(new RefactoringTask(task.getContext(), refactoringCollection[0]));
-    }
-    task.addTaskListener(new CFCacheClearingListener());
+    addTaskListener(task, scannerSupplier, errorProneOptions);
     return task;
+  }
+
+  static void addTaskListener(
+      JavacTask javacTask, ScannerSupplier scannerSupplier, ErrorProneOptions errorProneOptions) {
+    Context context = ((BasicJavacTask) javacTask).getContext();
+    checkCompilePolicy(Options.instance(context).get("compilePolicy"));
+    setupMessageBundle(context);
+    RefactoringCollection[] refactoringCollection = {null};
+    javacTask.addTaskListener(
+        createAnalyzer(scannerSupplier, errorProneOptions, context, refactoringCollection));
+    if (refactoringCollection[0] != null) {
+      javacTask.addTaskListener(new RefactoringTask(context, refactoringCollection[0]));
+    }
   }
 
   @Override
@@ -165,7 +172,7 @@ public class BaseErrorProneJavaCompiler implements JavaCompiler {
     if (compilePolicy == null) {
       throw new InvalidCommandLineOptionException(
           "The default compilation policy (by-todo) is not supported by Error Prone,"
-              + " pass -XDcompilePolicy=byfile instead");
+              + " pass -XDcompilePolicy=simple instead");
     }
     switch (compilePolicy) {
       case "byfile":
@@ -175,7 +182,7 @@ public class BaseErrorProneJavaCompiler implements JavaCompiler {
         throw new InvalidCommandLineOptionException(
             String.format(
                 "-XDcompilePolicy=%s is not supported by Error Prone,"
-                    + " pass -XDcompilePolicy=byfile instead",
+                    + " pass -XDcompilePolicy=simple instead",
                 compilePolicy));
     }
   }
@@ -193,7 +200,7 @@ public class BaseErrorProneJavaCompiler implements JavaCompiler {
         return args; // don't do anything if a valid policy is already set
       }
     }
-    return ImmutableList.<String>builder().addAll(args).add("-XDcompilePolicy=byfile").build();
+    return ImmutableList.<String>builder().addAll(args).add("-XDcompilePolicy=simple").build();
   }
 
   /** Registers our message bundle. */
@@ -265,23 +272,6 @@ public class BaseErrorProneJavaCompiler implements JavaCompiler {
         PrintWriter out = Log.instance(context).getWriter(WriterKind.NOTICE);
         out.println(refactoringResult.message());
         out.flush();
-      }
-    }
-  }
-
-  /**
-   * A listener that clears out a global Checker Framework cache at the end of compilation. This
-   * prevents a memory leak in cases where the compiler is being run in memory as part of a daemon
-   * process.
-   *
-   * <p>See https://github.com/typetools/checker-framework/issues/1482
-   */
-  private static class CFCacheClearingListener implements TaskListener {
-
-    @Override
-    public void finished(TaskEvent e) {
-      if (e.getKind() == Kind.COMPILATION) {
-        AnnotationUtils.clear();
       }
     }
   }

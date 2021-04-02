@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getGeneratedBy;
@@ -25,7 +24,6 @@ import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
@@ -43,22 +41,20 @@ import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import java.util.Collections;
 import java.util.Optional;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ImmutableAnnotationChecker",
     altNames = "Immutable",
-    category = JDK,
     summary = "Annotations should always be immutable",
     severity = WARNING,
-    tags = StandardTags.LIKELY_ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.LIKELY_ERROR)
 public class ImmutableAnnotationChecker extends BugChecker implements ClassTreeMatcher {
 
   public static final String ANNOTATED_ANNOTATION_MESSAGE =
       "annotations are immutable by default; annotating them with"
           + " @com.google.errorprone.annotations.Immutable is unnecessary";
 
-  private static final ImmutableSet<String> PROCESSOR_BLACKLIST =
+  private static final ImmutableSet<String> IGNORED_PROCESSORS =
       ImmutableSet.of(
           "com.google.auto.value.processor.AutoAnnotationProcessor"
           );
@@ -82,7 +78,7 @@ public class ImmutableAnnotationChecker extends BugChecker implements ClassTreeM
         || !WellKnownMutability.isAnnotation(state, symbol.type)) {
       return NO_MATCH;
     }
-    if (!Collections.disjoint(getGeneratedBy(symbol, state), PROCESSOR_BLACKLIST)) {
+    if (!Collections.disjoint(getGeneratedBy(symbol, state), IGNORED_PROCESSORS)) {
       return NO_MATCH;
     }
 

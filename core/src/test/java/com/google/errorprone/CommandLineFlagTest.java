@@ -17,9 +17,9 @@
 package com.google.errorprone;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.errorprone.BugPattern.Category.ONE_OFF;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.FileObjects.forResources;
 import static org.junit.Assert.assertThrows;
 
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -51,7 +51,6 @@ public class CommandLineFlagTest {
       altNames = "foo",
       summary = "Disableable checker that flags all return statements as errors",
       explanation = "Disableable checker that flags all return statements as errors",
-      category = ONE_OFF,
       severity = ERROR)
   public static class DisableableChecker extends BugChecker implements ReturnTreeMatcher {
     @Override
@@ -65,7 +64,6 @@ public class CommandLineFlagTest {
       summary = "NondisableableChecker checker that flags all return statements as errors",
       explanation = "NondisableableChecker checker that flags all return statements as errors",
       disableable = false,
-      category = ONE_OFF,
       severity = ERROR)
   public static class NondisableableChecker extends BugChecker implements ReturnTreeMatcher {
     @Override
@@ -77,8 +75,7 @@ public class CommandLineFlagTest {
   @BugPattern(
       name = "WarningChecker",
       summary = "Checker that flags all return statements as warnings",
-      explanation = "Checker that flags all return statements as warningss",
-      category = ONE_OFF,
+      explanation = "Checker that flags all return statements as warnings",
       severity = WARNING)
   public static class WarningChecker extends BugChecker implements ReturnTreeMatcher {
     @Override
@@ -91,7 +88,6 @@ public class CommandLineFlagTest {
       name = "ErrorChecker",
       summary = "Checker that flags all return statements as errors",
       explanation = "Checker that flags all return statements as errors",
-      category = ONE_OFF,
       severity = ERROR)
   public static class ErrorChecker extends BugChecker implements ReturnTreeMatcher {
     @Override
@@ -143,9 +139,7 @@ public class CommandLineFlagTest {
   public void canEnableWithDefaultSeverity() {
     ErrorProneTestCompiler compiler = builder.build();
     List<JavaFileObject> sources =
-        compiler
-            .fileManager()
-            .forResources(EmptyIfStatement.class, "testdata/EmptyIfStatementPositiveCases.java");
+        forResources(EmptyIfStatement.class, "testdata/EmptyIfStatementPositiveCases.java");
 
     Result exitCode = compiler.compile(sources);
     assertThat(exitCode).isEqualTo(Result.OK);
@@ -159,9 +153,7 @@ public class CommandLineFlagTest {
   public void canEnableWithOverriddenSeverity() {
     ErrorProneTestCompiler compiler = builder.build();
     List<JavaFileObject> sources =
-        compiler
-            .fileManager()
-            .forResources(EmptyIfStatement.class, "testdata/EmptyIfStatementPositiveCases.java");
+        forResources(EmptyIfStatement.class, "testdata/EmptyIfStatementPositiveCases.java");
 
     Result exitCode = compiler.compile(sources);
     assertThat(exitCode).isEqualTo(Result.OK);
@@ -178,8 +170,7 @@ public class CommandLineFlagTest {
   public void canPromoteToError() {
     ErrorProneTestCompiler compiler =
         builder.report(ScannerSupplier.fromBugCheckerClasses(WarningChecker.class)).build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
 
     Result exitCode = compiler.compile(sources);
     assertThat(exitCode).isEqualTo(Result.OK);
@@ -193,8 +184,7 @@ public class CommandLineFlagTest {
   public void canDemoteToWarning() {
     ErrorProneTestCompiler compiler =
         builder.report(ScannerSupplier.fromBugCheckerClasses(ErrorChecker.class)).build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
 
     Result exitCode = compiler.compile(sources);
     assertThat(exitCode).isEqualTo(Result.ERROR);
@@ -209,8 +199,7 @@ public class CommandLineFlagTest {
   public void canDisable() {
     ErrorProneTestCompiler compiler =
         builder.report(ScannerSupplier.fromBugCheckerClasses(DisableableChecker.class)).build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
 
     Result exitCode = compiler.compile(sources);
     assertThat(exitCode).isEqualTo(Result.ERROR);
@@ -225,8 +214,7 @@ public class CommandLineFlagTest {
   public void cantDisableNondisableableCheck() {
     ErrorProneTestCompiler compiler =
         builder.report(ScannerSupplier.fromBugCheckerClasses(NondisableableChecker.class)).build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
 
     InvalidCommandLineOptionException expected =
         assertThrows(
@@ -238,8 +226,7 @@ public class CommandLineFlagTest {
   @Test
   public void cantOverrideNonexistentCheck() {
     ErrorProneTestCompiler compiler = builder.build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
     List<String> badOptions =
         Arrays.asList(
             "-Xep:BogusChecker:ERROR",
@@ -260,8 +247,7 @@ public class CommandLineFlagTest {
   public void cantOverrideByAltname() {
     ErrorProneTestCompiler compiler =
         builder.report(ScannerSupplier.fromBugCheckerClasses(DisableableChecker.class)).build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
 
     InvalidCommandLineOptionException expected =
         assertThrows(
@@ -273,8 +259,7 @@ public class CommandLineFlagTest {
   @Test
   public void ignoreUnknownChecksFlagAllowsOverridingUnknownCheck() {
     ErrorProneTestCompiler compiler = builder.build();
-    List<JavaFileObject> sources =
-        compiler.fileManager().forResources(getClass(), "CommandLineFlagTestFile.java");
+    List<JavaFileObject> sources = forResources(getClass(), "CommandLineFlagTestFile.java");
     List<String> badOptions =
         Arrays.asList(
             "-Xep:BogusChecker:ERROR",

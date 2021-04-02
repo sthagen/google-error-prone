@@ -49,7 +49,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 
 /** Compilation test helpers for ApiDiff tools. */
-public class CompilationBuilderHelpers {
+public final class CompilationBuilderHelpers {
 
   /** A collection of sources to compile. */
   public static class SourceBuilder {
@@ -136,8 +136,8 @@ public class CompilationBuilderHelpers {
     CompilationResult compileOrDie() throws IOException {
       CompilationResult result = compile();
       assertWithMessage("Compilation failed unexpectedly")
+          .withMessage(Joiner.on('\n').join(result.diagnostics()))
           .that(result.ok())
-          .named(Joiner.on('\n').join(result.diagnostics()))
           .isTrue();
       return result;
     }
@@ -186,4 +186,6 @@ public class CompilationBuilderHelpers {
           ok, ImmutableList.copyOf(diagnostics), errorOutput, classOutput);
     }
   }
+
+  private CompilationBuilderHelpers() {}
 }

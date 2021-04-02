@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
@@ -27,7 +26,6 @@ import com.sun.source.tree.Tree;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -35,13 +33,8 @@ import org.junit.runners.JUnit4;
 /** {@link GuardedByLockSetAnalyzer}Test */
 @RunWith(JUnit4.class)
 public class HeldLockAnalyzerTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(GuardedByLockSetAnalyzer.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(GuardedByLockSetAnalyzer.class, getClass());
 
   @Test
   public void testInstance() {
@@ -250,18 +243,12 @@ public class HeldLockAnalyzerTest {
   }
 
   /** A customized {@link GuardedByChecker} that prints more test-friendly diagnostics. */
-  @BugPattern(
-      name = "GuardedByLockSet",
-      summary = "",
-      explanation = "",
-      category = JDK,
-      severity = ERROR)
+  @BugPattern(name = "GuardedByLockSet", summary = "", explanation = "", severity = ERROR)
   public static class GuardedByLockSetAnalyzer extends GuardedByChecker {
-
     @Override
     protected Description checkGuardedAccess(
         Tree tree, GuardedByExpression guard, HeldLockSet live, VisitorState state) {
-      List<String> toSort = new ArrayList<String>();
+      List<String> toSort = new ArrayList<>();
       for (GuardedByExpression node : live.allLocks()) {
         toSort.add(node.debugPrint());
       }

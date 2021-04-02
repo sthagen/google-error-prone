@@ -4,7 +4,7 @@ The GuardedBy analysis checks that fields or methods annotated with
 Example:
 
 ```java
-import javax.annotation.concurrent.GuardedBy;
+import com.google.errorprone.annotations.concurrent.GuardedBy;
 
 class Account {
   @GuardedBy("this")
@@ -70,15 +70,15 @@ The implicit object lock of the enclosing class specified by ClassName.
 'this' reference is intended.)
 
 </td></tr><tr><td><code>
-fieldName
-this.fieldName
+fieldName <br>
+this.fieldName <br>
 ClassName.this.fieldName
 </code></td><td>
 The final instance field specified by fieldName.
 
 </td></tr><tr><td><code>
-methodName()
-this.methodName()
+methodName() <br>
+this.methodName() <br>
 ClassName.this.methodName()
 </code></td><td>
 The instance method specified by methodName(). Methods called to return
@@ -106,7 +106,7 @@ should be deterministic.
 
 #### @GuardedBy
 
-javax.annotation.concurrent.GuardedBy
+com.google.errorprone.annotations.concurrent.GuardedBy
 
 The @GuardedBy annotation is used to document that a member (a field or a
 method) can only be accessed when the specified lock is held.
@@ -129,6 +129,12 @@ void m() {
   }
 }
 ```
+
+Note: there are a couple more annotations called `@GuardedBy`, including
+`javax.annotation.concurrent.GuardedBy` and
+`org.checkerframework.checker.lock.qual.GuardedBy`. The check recognizes those
+versions of the annotation, but we recommend using
+`com.google.errorprone.annotations.concurrent.GuardedBy`.
 
 #### @LockMethod
 
@@ -186,35 +192,43 @@ public void increment() {
 
 #### Limitations
 
-Locks are resolved lexically
+Anonymous classes and lambdas need to re-acquire locks that may be held by an
+enclosing block. For example, consider:
 
 ```java
 class Transaction {
   @GuardedBy("this")
   int x;
 
-  interface Handler {
-    void apply();
-  }
-
-  public void handle() {
-    runHandler(new Handler() {
-      void apply() {
-        x++;  // Error: access of 'x' not guarded by 'Transaction.this'
-      }
+  public synchronized void handle() {
+    doSomething(() -> {
+      x++;  // Error: access of 'x' not guarded by 'Transaction.this'
     });
-  }
-
-  private synchronized void runHandler(Handler handler) {
-    handler.apply();
   }
 }
 ```
 
-In this example, the analysis is unable to guarantee that callers of the Handler
-created in 'handle' will be holding the required lock. The analysis is purely
-intra-procedural, so it is unable to observe that the only caller (runHandler)
-does in fact hold the necessary lock.
+The analysis is intra-procedural, meaning it doesn't consider the implementation
+of `doSomething`.
+
+The checker doesn't know if `doSomething` immediately calls the provided lambda
+while the lock is still held by the enclosing method `handle`, for example:
+
+```java
+private void doSomething(Runnable r) {
+  r.run();
+}
+```
+
+... or whether the lambda could be called later after `handle` has released the
+lock, for example:
+
+```java
+private void doSomething(Runnable r) {
+  // runs `r` at some point in the future
+  someExecutor.execute(r);
+}
+```
 
 #### False negatives with aliasing
 

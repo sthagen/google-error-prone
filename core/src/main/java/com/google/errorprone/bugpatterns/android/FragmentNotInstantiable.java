@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.android;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -50,7 +49,6 @@ import java.util.stream.Collectors;
     summary =
         "Subclasses of Fragment must be instantiable via Class#newInstance():"
             + " the class must be public, static and have a public nullary constructor",
-    category = ANDROID,
     severity = WARNING,
     tags = StandardTags.LIKELY_ERROR)
 public class FragmentNotInstantiable extends BugChecker implements ClassTreeMatcher {
@@ -93,6 +91,9 @@ public class FragmentNotInstantiable extends BugChecker implements ClassTreeMatc
 
   @Override
   public Description matchClass(ClassTree classTree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     if (!fragmentMatcher.matches(classTree, state)) {
       return Description.NO_MATCH;
     }

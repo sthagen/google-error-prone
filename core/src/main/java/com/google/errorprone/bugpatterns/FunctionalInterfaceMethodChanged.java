@@ -17,10 +17,10 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.errorprone.suppliers.Suppliers.JAVA_LANG_VOID_TYPE;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -48,14 +48,12 @@ import javax.lang.model.element.Modifier;
 
 /** @author Louis Wasserman */
 @BugPattern(
-    category = Category.JDK,
     name = "FunctionalInterfaceMethodChanged",
     summary =
         "Casting a lambda to this @FunctionalInterface can cause a behavior change from casting to"
             + " a functional superinterface, which is surprising to users.  Prefer decorator"
             + " methods to this surprising behavior.",
-    severity = SeverityLevel.ERROR,
-    generateExamplesFromTestCases = false)
+    severity = SeverityLevel.ERROR)
 public class FunctionalInterfaceMethodChanged extends BugChecker implements MethodTreeMatcher {
 
   private static final Matcher<Tree> IS_FUNCTIONAL_INTERFACE =
@@ -66,7 +64,7 @@ public class FunctionalInterfaceMethodChanged extends BugChecker implements Meth
     ClassTree enclosingClazz = ASTHelpers.findEnclosingNode(state.getPath(), ClassTree.class);
     if (tree.getModifiers().getFlags().contains(Modifier.DEFAULT)
         && IS_FUNCTIONAL_INTERFACE.matches(enclosingClazz, state)) {
-      Types types = Types.instance(state.context);
+      Types types = state.getTypes();
       Set<Symbol> functionalSuperInterfaceSams =
           enclosingClazz.getImplementsClause().stream()
               .filter(t -> IS_FUNCTIONAL_INTERFACE.matches(t, state))
@@ -107,7 +105,7 @@ public class FunctionalInterfaceMethodChanged extends BugChecker implements Meth
     public Boolean visitMethod(MethodTree node, VisitorState state) {
       boolean prevInBoxedVoidReturningMethod = inBoxedVoidReturningMethod;
       Type returnType = ASTHelpers.getType(node.getReturnType());
-      Type boxedVoidType = state.getTypeFromString("java.lang.Void");
+      Type boxedVoidType = JAVA_LANG_VOID_TYPE.get(state);
       if (ASTHelpers.isSameType(returnType, boxedVoidType, state)) {
         inBoxedVoidReturningMethod = true;
       }
@@ -158,5 +156,5 @@ public class FunctionalInterfaceMethodChanged extends BugChecker implements Meth
     public Boolean visitMethodInvocation(MethodInvocationTree node, VisitorState state) {
       return ASTHelpers.getSymbol(node) == methodToCall;
     }
-  };
+  }
 }

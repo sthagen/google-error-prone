@@ -23,7 +23,7 @@ import com.sun.source.tree.MethodInvocationTree;
 import java.util.regex.Pattern;
 
 /** Matchers for method invocations related to Object.wait() and Condition.await(); */
-public class WaitMatchers {
+public final class WaitMatchers {
 
   private static final String OBJECT_FQN = "java.lang.Object";
   private static final String CONDITION_FQN = "java.util.concurrent.locks.Condition";
@@ -39,11 +39,14 @@ public class WaitMatchers {
   /** Matches wait/await methods that have a timeout. */
   public static final Matcher<MethodInvocationTree> waitMethodWithTimeout =
       anyOf(
-          instanceMethod().onExactClass(OBJECT_FQN).withSignature("wait(long)"),
-          instanceMethod().onExactClass(OBJECT_FQN).withSignature("wait(long,int)"),
+          instanceMethod().onExactClass(OBJECT_FQN).named("wait").withParameters("long"),
+          instanceMethod().onExactClass(OBJECT_FQN).named("wait").withParameters("long", "int"),
           instanceMethod()
               .onDescendantOf(CONDITION_FQN)
-              .withSignature("await(long,java.util.concurrent.TimeUnit)"),
+              .named("await")
+              .withParameters("long", "java.util.concurrent.TimeUnit"),
           instanceMethod().onDescendantOf(CONDITION_FQN).named("awaitNanos"),
           instanceMethod().onDescendantOf(CONDITION_FQN).named("awaitUntil"));
+
+  private WaitMatchers() {}
 }

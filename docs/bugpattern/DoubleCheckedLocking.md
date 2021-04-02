@@ -7,7 +7,7 @@ accessor. For more information, see:
 *   http://jeremymanson.blogspot.com/2008/05/double-checked-locking.html
 *   http://www.cs.umd.edu/~pugh/java/memoryModel/DoubleCheckedLocking.html
 *   Java Concurrency in Practice, §16.2.4
-*   Effective Java, Item 71
+*   [Effective Java 3rd Edition §83][ej3e-83]
 
 The canonical example of *correct* double-checked locking for lazy
 initialization is:
@@ -84,9 +84,9 @@ static Object get() {
 
 If the object being initialized with double-checked locking is
 [immutable](http://jeremymanson.blogspot.com/2008/04/immutability-in-java.html),
-then it is safe for the field to be non-volatile. *However*, the use of
-volatile is still encouraged because it is almost free on x86 and makes the
-code more obviously correct.
+then it is safe for the field to be non-volatile. *However*, the use of volatile
+is still encouraged because it is almost free on x86 and makes the code more
+obviously correct.
 
 Note that immutable has a very specific meaning in this context:
 
@@ -101,3 +101,5 @@ compiler and JVM can re-order code from the object's constructor to occur
 The final modifier prevents that re-ordering from occurring, and guarantees that
 all of the object's final fields have been written to before a reference to that
 object is published.
+
+[ej3e-83]: https://books.google.com/books?id=BIpDDwAAQBAJ

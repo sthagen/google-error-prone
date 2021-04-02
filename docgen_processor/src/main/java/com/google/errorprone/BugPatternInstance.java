@@ -17,7 +17,6 @@
 package com.google.errorprone;
 
 import com.google.common.base.Preconditions;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,8 +39,6 @@ public final class BugPatternInstance {
   public SeverityLevel severity;
   public String[] suppressionAnnotations;
   public boolean documentSuppression = true;
-  public boolean generateExamplesFromTestCases = true;
-  public ProvidesFix providesFix;
 
   public static BugPatternInstance fromElement(Element element) {
     BugPatternInstance instance = new BugPatternInstance();
@@ -55,7 +52,6 @@ public final class BugPatternInstance {
     instance.summary = annotation.summary();
     instance.explanation = annotation.explanation();
     instance.documentSuppression = annotation.documentSuppression();
-    instance.providesFix = annotation.providesFix();
 
     Map<String, Object> keyValues = getAnnotation(element, BugPattern.class.getName());
     Object suppression = keyValues.get("suppressionAnnotations");
@@ -68,10 +64,6 @@ public final class BugPatternInstance {
       instance.suppressionAnnotations =
           resultList.stream().map(AnnotationValue::toString).toArray(String[]::new);
     }
-
-    instance.generateExamplesFromTestCases =
-        !keyValues.containsKey("generateExamplesFromTestCases")
-            || (boolean) keyValues.get("generateExamplesFromTestCases");
 
     return instance;
   }

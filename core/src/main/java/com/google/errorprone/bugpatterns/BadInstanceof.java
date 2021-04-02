@@ -16,11 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.ProvidesFix.REQUIRES_HUMAN_ATTENTION;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.BugPattern.StandardTags.SIMPLIFICATION;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
-import static com.google.errorprone.matchers.Matchers.isNonNull;
+import static com.google.errorprone.matchers.Matchers.isNonNullUsingDataflow;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
@@ -43,8 +42,7 @@ import com.sun.source.tree.Tree.Kind;
     name = "BadInstanceof",
     summary = "instanceof used in a way that is equivalent to a null check.",
     severity = WARNING,
-    tags = SIMPLIFICATION,
-    providesFix = REQUIRES_HUMAN_ATTENTION)
+    tags = SIMPLIFICATION)
 public final class BadInstanceof extends BugChecker implements InstanceOfTreeMatcher {
 
   private static final String NON_NULL =
@@ -58,11 +56,10 @@ public final class BadInstanceof extends BugChecker implements InstanceOfTreeMat
     if (!isSubtype(getType(tree.getExpression()), getType(tree.getType()), state)) {
       return NO_MATCH;
     }
-    String subType =
-        SuggestedFixes.prettyType(state, /* fix= */ null, getType(tree.getExpression()));
+    String subType = SuggestedFixes.prettyType(getType(tree.getExpression()), state);
     String expression = state.getSourceForNode(tree.getExpression());
     String superType = state.getSourceForNode(tree.getType());
-    if (isNonNull().matches(tree.getExpression(), state)) {
+    if (isNonNullUsingDataflow().matches(tree.getExpression(), state)) {
       return buildDescription(tree)
           .setMessage(String.format(NON_NULL, expression, subType, superType))
           .build();

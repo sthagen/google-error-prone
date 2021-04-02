@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.InjectMatchers.IS_APPLICATION_OF_AT_INJECT;
 import static com.google.errorprone.matchers.Matchers.hasAnnotation;
@@ -28,7 +27,6 @@ import static com.sun.source.tree.Tree.Kind.METHOD;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
@@ -44,9 +42,7 @@ import com.sun.source.tree.Tree;
 @BugPattern(
     name = "AutoFactoryAtInject",
     summary = "@AutoFactory and @Inject should not be used in the same type.",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class AutoFactoryAtInject extends BugChecker implements AnnotationTreeMatcher {
 
   private static final Matcher<Tree> HAS_AUTO_FACTORY_ANNOTATION =
@@ -79,7 +75,7 @@ public class AutoFactoryAtInject extends BugChecker implements AnnotationTreeMat
   }
 
   // TODO(ronshapiro): consolidate uses
-  private Tree getCurrentlyAnnotatedNode(VisitorState state) {
+  private static Tree getCurrentlyAnnotatedNode(VisitorState state) {
     return state.getPath().getParentPath().getParentPath().getLeaf();
   }
 }

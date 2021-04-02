@@ -31,11 +31,9 @@ import java.io.ObjectInputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -47,18 +45,23 @@ import java.util.regex.Pattern;
  */
 public class ErrorProneOptions {
 
+  private static final String PREFIX = "-Xep";
   private static final String SEVERITY_PREFIX = "-Xep:";
   private static final String PATCH_CHECKS_PREFIX = "-XepPatchChecks:";
   private static final String PATCH_OUTPUT_LOCATION = "-XepPatchLocation:";
   private static final String PATCH_IMPORT_ORDER_PREFIX = "-XepPatchImportOrder:";
+  private static final String EXCLUDED_PATHS_PREFIX = "-XepExcludedPaths:";
+  private static final String IGNORE_LARGE_CODE_GENERATORS = "-XepIgnoreLargeCodeGenerators:";
+
   private static final String ERRORS_AS_WARNINGS_FLAG = "-XepAllErrorsAsWarnings";
   private static final String ENABLE_ALL_CHECKS = "-XepAllDisabledChecksAsWarnings";
+  private static final String IGNORE_SUPPRESSION_ANNOTATIONS = "-XepIgnoreSuppressionAnnotations";
   private static final String DISABLE_ALL_CHECKS = "-XepDisableAllChecks";
+  private static final String DISABLE_ALL_WARNINGS = "-XepDisableAllWarnings";
   private static final String IGNORE_UNKNOWN_CHECKS_FLAG = "-XepIgnoreUnknownCheckNames";
   private static final String DISABLE_WARNINGS_IN_GENERATED_CODE_FLAG =
       "-XepDisableWarningsInGeneratedCode";
   private static final String COMPILING_TEST_ONLY_CODE = "-XepCompilingTestOnlyCode";
-  private static final String EXCLUDED_PATHS_PREFIX = "-XepExcludedPaths:";
 
   /** see {@link javax.tools.OptionChecker#isSupportedOption(String)} */
   public static int isSupportedOption(String option) {
@@ -73,7 +76,9 @@ public class ErrorProneOptions {
             || option.equals(ERRORS_AS_WARNINGS_FLAG)
             || option.equals(ENABLE_ALL_CHECKS)
             || option.equals(DISABLE_ALL_CHECKS)
-            || option.equals(COMPILING_TEST_ONLY_CODE);
+            || option.equals(IGNORE_SUPPRESSION_ANNOTATIONS)
+            || option.equals(COMPILING_TEST_ONLY_CODE)
+            || option.equals(DISABLE_ALL_WARNINGS);
     return isSupported ? 0 : -1;
   }
 
@@ -101,7 +106,7 @@ public class ErrorProneOptions {
       return inPlace() || !baseDirectory().isEmpty();
     }
 
-    abstract Set<String> namedCheckers();
+    abstract ImmutableSet<String> namedCheckers();
 
     abstract boolean inPlace();
 
@@ -115,14 +120,14 @@ public class ErrorProneOptions {
       return new AutoValue_ErrorProneOptions_PatchingOptions.Builder()
           .baseDirectory("")
           .inPlace(false)
-          .namedCheckers(Collections.emptySet())
+          .namedCheckers(ImmutableSet.of())
           .importOrganizer(ImportOrganizer.STATIC_FIRST_ORGANIZER);
     }
 
     @AutoValue.Builder
     abstract static class Builder {
 
-      abstract Builder namedCheckers(Set<String> checkers);
+      abstract Builder namedCheckers(ImmutableSet<String> checkers);
 
       abstract Builder inPlace(boolean inPlace);
 
@@ -154,6 +159,7 @@ public class ErrorProneOptions {
   private final ImmutableMap<String, Severity> severityMap;
   private final boolean ignoreUnknownChecks;
   private final boolean disableWarningsInGeneratedCode;
+  private final boolean disableAllWarnings;
   private final boolean dropErrorsToWarnings;
   private final boolean enableAllChecksAsWarnings;
   private final boolean disableAllChecks;
@@ -161,23 +167,29 @@ public class ErrorProneOptions {
   private final ErrorProneFlags flags;
   private final PatchingOptions patchingOptions;
   private final Pattern excludedPattern;
+  private final boolean ignoreSuppressionAnnotations;
+  private final boolean ignoreLargeCodeGenerators;
 
   private ErrorProneOptions(
       ImmutableMap<String, Severity> severityMap,
       ImmutableList<String> remainingArgs,
       boolean ignoreUnknownChecks,
       boolean disableWarningsInGeneratedCode,
+      boolean disableAllWarnings,
       boolean dropErrorsToWarnings,
       boolean enableAllChecksAsWarnings,
       boolean disableAllChecks,
       boolean isTestOnlyTarget,
       ErrorProneFlags flags,
       PatchingOptions patchingOptions,
-      Pattern excludedPattern) {
+      Pattern excludedPattern,
+      boolean ignoreSuppressionAnnotations,
+      boolean ignoreLargeCodeGenerators) {
     this.severityMap = severityMap;
     this.remainingArgs = remainingArgs;
     this.ignoreUnknownChecks = ignoreUnknownChecks;
     this.disableWarningsInGeneratedCode = disableWarningsInGeneratedCode;
+    this.disableAllWarnings = disableAllWarnings;
     this.dropErrorsToWarnings = dropErrorsToWarnings;
     this.enableAllChecksAsWarnings = enableAllChecksAsWarnings;
     this.disableAllChecks = disableAllChecks;
@@ -185,6 +197,8 @@ public class ErrorProneOptions {
     this.flags = flags;
     this.patchingOptions = patchingOptions;
     this.excludedPattern = excludedPattern;
+    this.ignoreSuppressionAnnotations = ignoreSuppressionAnnotations;
+    this.ignoreLargeCodeGenerators = ignoreLargeCodeGenerators;
   }
 
   public String[] getRemainingArgs() {
@@ -203,12 +217,24 @@ public class ErrorProneOptions {
     return disableWarningsInGeneratedCode;
   }
 
+  public boolean isDisableAllWarnings() {
+    return disableAllWarnings;
+  }
+
   public boolean isDropErrorsToWarnings() {
     return dropErrorsToWarnings;
   }
 
   public boolean isTestOnlyTarget() {
     return isTestOnlyTarget;
+  }
+
+  public boolean isIgnoreSuppressionAnnotations() {
+    return ignoreSuppressionAnnotations;
+  }
+
+  public boolean ignoreLargeCodeGenerators() {
+    return ignoreLargeCodeGenerators;
   }
 
   public ErrorProneFlags getFlags() {
@@ -225,11 +251,14 @@ public class ErrorProneOptions {
 
   private static class Builder {
     private boolean ignoreUnknownChecks = false;
+    private boolean disableAllWarnings = false;
     private boolean disableWarningsInGeneratedCode = false;
     private boolean dropErrorsToWarnings = false;
     private boolean enableAllChecksAsWarnings = false;
     private boolean disableAllChecks = false;
     private boolean isTestOnlyTarget = false;
+    private boolean ignoreSuppressionAnnotations = false;
+    private boolean ignoreLargeCodeGenerators = true;
     private Map<String, Severity> severityMap = new HashMap<>();
     private final ErrorProneFlags.Builder flagsBuilder = ErrorProneFlags.builder();
     private final PatchingOptions.Builder patchingOptionsBuilder = PatchingOptions.builder();
@@ -261,6 +290,10 @@ public class ErrorProneOptions {
       flagsBuilder.parseFlag(flag);
     }
 
+    public void setIgnoreSuppressionAnnotations(boolean ignoreSuppressionAnnotations) {
+      this.ignoreSuppressionAnnotations = ignoreSuppressionAnnotations;
+    }
+
     public void setIgnoreUnknownChecks(boolean ignoreUnknownChecks) {
       this.ignoreUnknownChecks = ignoreUnknownChecks;
     }
@@ -276,12 +309,23 @@ public class ErrorProneOptions {
       this.dropErrorsToWarnings = dropErrorsToWarnings;
     }
 
+    public void setDisableAllWarnings(boolean disableAllWarnings) {
+      severityMap.entrySet().stream()
+          .filter(e -> e.getValue() == Severity.WARN)
+          .forEach(e -> e.setValue(Severity.OFF));
+      this.disableAllWarnings = disableAllWarnings;
+    }
+
     public void setEnableAllChecksAsWarnings(boolean enableAllChecksAsWarnings) {
       // Checks manually disabled before this flag are reset to warning-level
       severityMap.entrySet().stream()
           .filter(e -> e.getValue() == Severity.OFF)
           .forEach(e -> e.setValue(Severity.WARN));
       this.enableAllChecksAsWarnings = enableAllChecksAsWarnings;
+    }
+
+    public void setIgnoreLargeCodeGenerators(boolean ignoreLargeCodeGenerators) {
+      this.ignoreLargeCodeGenerators = ignoreLargeCodeGenerators;
     }
 
     public void setDisableAllChecks(boolean disableAllChecks) {
@@ -304,13 +348,16 @@ public class ErrorProneOptions {
           remainingArgs,
           ignoreUnknownChecks,
           disableWarningsInGeneratedCode,
+          disableAllWarnings,
           dropErrorsToWarnings,
           enableAllChecksAsWarnings,
           disableAllChecks,
           isTestOnlyTarget,
           flagsBuilder.build(),
           patchingOptionsBuilder.build(),
-          excludedPattern);
+          excludedPattern,
+          ignoreSuppressionAnnotations,
+          ignoreLargeCodeGenerators);
     }
 
     public void setExcludedPattern(Pattern excludedPattern) {
@@ -346,6 +393,9 @@ public class ErrorProneOptions {
     Builder builder = new Builder();
     for (String arg : args) {
       switch (arg) {
+        case IGNORE_SUPPRESSION_ANNOTATIONS:
+          builder.setIgnoreSuppressionAnnotations(true);
+          break;
         case IGNORE_UNKNOWN_CHECKS_FLAG:
           builder.setIgnoreUnknownChecks(true);
           break;
@@ -363,6 +413,9 @@ public class ErrorProneOptions {
           break;
         case COMPILING_TEST_ONLY_CODE:
           builder.setTestOnlyTarget(true);
+          break;
+        case DISABLE_ALL_WARNINGS:
+          builder.setDisableAllWarnings(true);
           break;
         default:
           if (arg.startsWith(SEVERITY_PREFIX)) {
@@ -407,7 +460,11 @@ public class ErrorProneOptions {
           } else if (arg.startsWith(EXCLUDED_PATHS_PREFIX)) {
             String pathRegex = arg.substring(EXCLUDED_PATHS_PREFIX.length());
             builder.setExcludedPattern(Pattern.compile(pathRegex));
+
           } else {
+            if (arg.startsWith(PREFIX)) {
+              throw new InvalidCommandLineOptionException("invalid flag: " + arg);
+            }
             remainingArgs.add(arg);
           }
       }

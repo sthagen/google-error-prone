@@ -22,7 +22,6 @@ import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -35,6 +34,7 @@ import com.sun.source.util.DocTreePath;
 import com.sun.source.util.DocTreePathScanner;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
+import javax.lang.model.element.Element;
 
 /**
  * Matches errors in Javadoc {@literal @}throws tags.
@@ -46,7 +46,7 @@ import com.sun.tools.javac.code.Type;
     summary = "The documented method doesn't actually throw this checked exception.",
     severity = WARNING,
     tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    documentSuppression = false)
 public final class InvalidThrows extends BugChecker implements MethodTreeMatcher {
 
   @Override
@@ -70,17 +70,17 @@ public final class InvalidThrows extends BugChecker implements MethodTreeMatcher
     @Override
     public Void visitThrows(ThrowsTree throwsTree, Void unused) {
       ReferenceTree exName = throwsTree.getExceptionName();
-      Type type =
-          (Type)
-              JavacTrees.instance(state.context)
-                  .getElement(new DocTreePath(getCurrentPath(), exName))
-                  .asType();
-      if (type != null && isCheckedException(type)) {
-        if (methodTree.getThrows().stream().noneMatch(t -> isSubtype(type, getType(t), state))) {
-          state.reportMatch(
-              buildDescription(diagnosticPosition(getCurrentPath(), state))
-                  .addFix(Utils.replace(throwsTree, "", state))
-                  .build());
+      Element element =
+          JavacTrees.instance(state.context).getElement(new DocTreePath(getCurrentPath(), exName));
+      if (element != null) {
+        Type type = (Type) element.asType();
+        if (isCheckedException(type)) {
+          if (methodTree.getThrows().stream().noneMatch(t -> isSubtype(type, getType(t), state))) {
+            state.reportMatch(
+                describeMatch(
+                    diagnosticPosition(getCurrentPath(), state),
+                    Utils.replace(throwsTree, "", state)));
+          }
         }
       }
       return super.visitThrows(throwsTree, null);

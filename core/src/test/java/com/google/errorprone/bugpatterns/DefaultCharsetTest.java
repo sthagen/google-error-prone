@@ -16,10 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static org.junit.Assume.assumeTrue;
+
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.FixChoosers;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,15 +30,11 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DefaultCharsetTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(DefaultCharset.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(DefaultCharset.class, getClass());
 
   private BugCheckerRefactoringTestHelper refactoringTest() {
-    return BugCheckerRefactoringTestHelper.newInstance(new DefaultCharset(), getClass());
+    return BugCheckerRefactoringTestHelper.newInstance(DefaultCharset.class, getClass());
   }
 
   @Test
@@ -445,6 +443,30 @@ public class DefaultCharsetTest {
   }
 
   @Test
+  public void byteStringDefaultCharset_staticImport() {
+    refactoringTest()
+        .addInputLines(
+            "in/Test.java",
+            "import static com.google.protobuf.ByteString.copyFrom;",
+            "class Test {",
+            "  void f() throws Exception {",
+            "    copyFrom(\"hello\".getBytes());",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "import static com.google.protobuf.ByteString.copyFrom;",
+            "import java.nio.charset.Charset;",
+            "class Test {",
+            "  void f() throws Exception {",
+            "    copyFrom(\"hello\", Charset.defaultCharset());",
+            "  }",
+            "}")
+        .setFixChooser(FixChoosers.SECOND)
+        .doTest();
+  }
+
+  @Test
   public void scannerDefaultCharset() {
     refactoringTest()
         .addInputLines(
@@ -476,6 +498,33 @@ public class DefaultCharsetTest {
             "    new Scanner((File) null, UTF_8.name());",
             "    new Scanner((Path) null, UTF_8.name());",
             "    new Scanner((ReadableByteChannel) null, UTF_8.name());",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void withVar() {
+    assumeTrue(RuntimeVersion.isAtLeast15());
+    refactoringTest()
+        .addInputLines(
+            "in/Test.java",
+            "import java.io.File;",
+            "import java.io.FileWriter;",
+            "class Test {",
+            "  void f(File file) throws Exception {",
+            "    var fileWriter = new FileWriter(file);",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "import static java.nio.charset.StandardCharsets.UTF_8;",
+            "import java.io.File;",
+            "import java.io.FileWriter;",
+            "import java.nio.file.Files;",
+            "class Test {",
+            "  void f(File file) throws Exception {",
+            "    var fileWriter = Files.newBufferedWriter(file.toPath(), UTF_8);",
             "  }",
             "}")
         .doTest();

@@ -27,12 +27,11 @@ import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCExpression;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 
 /** @author alexeagle@google.com (Alex Eagle) */
-public class Suppliers {
+public final class Suppliers {
 
   /**
    * Supplies the n'th generic type of the given expression. For example, in {@code Map<A,B> c;} for
@@ -115,12 +114,7 @@ public class Suppliers {
    */
   public static Supplier<Type> typeFromString(final String typeString) {
     requireNonNull(typeString);
-    return new Supplier<Type>() {
-      @Override
-      public Type get(VisitorState state) {
-        return state.getTypeFromString(typeString);
-      }
-    };
+    return VisitorState.memoize(state -> state.getTypeFromString(typeString));
   }
 
   /** Given the class representation of a type, supplies the corresponding type. */
@@ -128,13 +122,7 @@ public class Suppliers {
     return typeFromString(inputClass.getName());
   }
 
-  public static final Supplier<Type> JAVA_LANG_VOID_TYPE =
-      new Supplier<Type>() {
-        @Override
-        public Type get(VisitorState state) {
-          return state.getTypeFromString("java.lang.Void");
-        }
-      };
+  public static final Supplier<Type> JAVA_LANG_VOID_TYPE = typeFromClass(Void.class);
 
   public static final Supplier<Type> VOID_TYPE =
       new Supplier<Type>() {
@@ -149,6 +137,22 @@ public class Suppliers {
         @Override
         public Type get(VisitorState state) {
           return state.getTypeFromString("java.lang.Boolean");
+        }
+      };
+
+  public static final Supplier<Type> JAVA_LANG_INTEGER_TYPE =
+      new Supplier<Type>() {
+        @Override
+        public Type get(VisitorState state) {
+          return state.getTypeFromString("java.lang.Integer");
+        }
+      };
+
+  public static final Supplier<Type> JAVA_LANG_LONG_TYPE =
+      new Supplier<Type>() {
+        @Override
+        public Type get(VisitorState state) {
+          return state.getTypeFromString("java.lang.Long");
         }
       };
 
@@ -181,6 +185,22 @@ public class Suppliers {
         @Override
         public Type get(VisitorState state) {
           return state.getSymtab().intType;
+        }
+      };
+
+  public static final Supplier<Type> LONG_TYPE =
+      new Supplier<Type>() {
+        @Override
+        public Type get(VisitorState state) {
+          return state.getSymtab().longType;
+        }
+      };
+
+  public static final Supplier<Type> DOUBLE_TYPE =
+      new Supplier<Type>() {
+        @Override
+        public Type get(VisitorState state) {
+          return state.getSymtab().doubleType;
         }
       };
 
@@ -242,7 +262,7 @@ public class Suppliers {
       new Supplier<Type>() {
         @Override
         public Type get(VisitorState state) {
-          return ((JCTree) state.findEnclosing(ClassTree.class)).type;
+          return ASTHelpers.getType(state.findEnclosing(ClassTree.class));
         }
       };
 
@@ -266,4 +286,6 @@ public class Suppliers {
               }
             }));
   }
+
+  private Suppliers() {}
 }

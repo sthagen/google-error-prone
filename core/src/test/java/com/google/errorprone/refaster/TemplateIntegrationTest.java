@@ -18,20 +18,21 @@ package com.google.errorprone.refaster;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assert_;
+import static com.google.errorprone.util.RuntimeVersion.isAtLeast9;
+import static com.google.testing.compile.JavaFileObjects.forResource;
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.CodeTransformer;
-import com.google.testing.compile.JavaFileObjects;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -60,7 +61,7 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
     return Iterables.getOnlyElement(RefasterRuleBuilderScanner.extractRules(classTree, context));
   }
 
-  private void expectTransforms(
+  private static void expectTransforms(
       CodeTransformer transformer, JavaFileObject input, JavaFileObject expectedOutput)
       throws IOException {
     JavaFileObject transformedInput =
@@ -80,13 +81,10 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
 
   private void runTest(String testName) throws IOException {
     CodeTransformer transformer =
-        extractRefasterRule(
-            JavaFileObjects.forResource(String.format("%s/%s.java", TEMPLATE_DIR, testName)));
+        extractRefasterRule(forResource(String.format("%s/%s.java", TEMPLATE_DIR, testName)));
 
-    JavaFileObject input =
-        JavaFileObjects.forResource(String.format("%s/%sExample.java", INPUT_DIR, testName));
-    JavaFileObject output =
-        JavaFileObjects.forResource(String.format("%s/%sExample.java", OUTPUT_DIR, testName));
+    JavaFileObject input = forResource(String.format("%s/%sExample.java", INPUT_DIR, testName));
+    JavaFileObject output = forResource(String.format("%s/%sExample.java", OUTPUT_DIR, testName));
     expectTransforms(transformer, input, output);
   }
 
@@ -161,6 +159,16 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
   }
 
   @Test
+  public void expressionForbidsAllowCodeBetweenLines() throws IOException {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> runTest("ExpressionForbidsAllowCodeBetweenLinesTemplate"));
+    assertThat(ex).hasMessageThat().contains("@AllowCodeBetweenLines");
+    assertThat(ex).hasMessageThat().contains("expression templates");
+  }
+
+  @Test
   public void variableDecl() throws IOException {
     runTest("VariableDeclTemplate");
   }
@@ -198,7 +206,7 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
   @Test
   public void freeIdentWildcardCapture() throws IOException {
     // TODO(b/67786978): investigate JDK 9 test failures
-    assumeTrue(isJDK8OrEarlier());
+    assumeFalse(isAtLeast9());
     runTest("WildcardUnificationTemplate");
   }
 
@@ -260,7 +268,7 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
   @Test
   public void returnPlaceholder() throws IOException {
     // TODO(b/67786978): investigate JDK 9 test failures
-    assumeTrue(isJDK8OrEarlier());
+    assumeFalse(isAtLeast9());
     runTest("ReturnPlaceholderTemplate");
   }
 
@@ -282,14 +290,14 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
   @Test
   public void samePackageImports() throws IOException {
     // TODO(b/67786978): investigate JDK 9 test failures
-    assumeTrue(isJDK8OrEarlier());
+    assumeFalse(isAtLeast9());
     runTest("SamePackageImportsTemplate");
   }
 
   @Test
   public void ifFallthrough() throws IOException {
     // TODO(b/67786978): investigate JDK 9 test failures
-    assumeTrue(isJDK8OrEarlier());
+    assumeFalse(isAtLeast9());
     runTest("IfFallthroughTemplate");
   }
 
@@ -338,14 +346,13 @@ public class TemplateIntegrationTest extends CompilerBasedTest {
     runTest("UnnecessaryLambdaParens");
   }
 
-  static boolean isJDK8OrEarlier() {
-    try {
-      Method versionMethod = Runtime.class.getMethod("version");
-      Object version = versionMethod.invoke(null);
-      int majorVersion = (int) version.getClass().getMethod("major").invoke(version);
-      return majorVersion <= 8;
-    } catch (ReflectiveOperationException e) {
-      return true;
-    }
+  @Test
+  public void nonJdkType() throws IOException {
+    runTest("NonJdkTypeTemplate");
+  }
+
+  @Test
+  public void staticImportClassToken() throws IOException {
+    runTest("StaticImportClassTokenTemplate");
   }
 }

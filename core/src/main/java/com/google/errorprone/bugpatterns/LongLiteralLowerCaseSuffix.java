@@ -16,11 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.LiteralTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -31,6 +29,7 @@ import com.sun.source.tree.LiteralTree;
 import com.sun.source.tree.Tree.Kind;
 import com.sun.tools.javac.tree.JCTree.JCLiteral;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 
 /**
  * Matcher for a <code>long</code> literal with a lower-case ell for a suffix (e.g. <code>234l
@@ -41,9 +40,7 @@ import java.util.regex.Pattern;
 @BugPattern(
     name = "LongLiteralLowerCaseSuffix",
     summary = "Prefer 'L' to 'l' for the suffix to long literals",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class LongLiteralLowerCaseSuffix extends BugChecker implements LiteralTreeMatcher {
 
   private static final Matcher<LiteralTree> matcher =
@@ -70,6 +67,7 @@ public class LongLiteralLowerCaseSuffix extends BugChecker implements LiteralTre
    * Extracts the long literal corresponding to a given {@link LiteralTree} node from the source
    * code as a string. Returns null if the source code is not available.
    */
+  @Nullable
   private static String getLongLiteral(LiteralTree literalTree, VisitorState state) {
     JCLiteral longLiteral = (JCLiteral) literalTree;
     CharSequence sourceFile = state.getSourceCode();

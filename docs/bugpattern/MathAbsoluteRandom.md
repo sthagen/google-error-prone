@@ -9,8 +9,12 @@ long veryNegativeLong = Math.abs(Long.MIN_VALUE);
 ```
 
 When trying to generate positive random numbers by using `Math.abs` around a
-random positive-or-negative number, there will be (very infrequent) occasions
-where the random number will be negative.
+random positive-or-negative integer (or long), there will a rare edge case where
+the returned value will be negative.
+
+This is because there is no positive integer with the same magnitude as
+`Integer.MIN_VALUE`, which is equal to `-Integer.MAX_VALUE - 1`. Floating point
+numbers don't suffer from this problem, as the sign is stored in a separate bit.
 
 Instead, one should use random number generation functions that are guaranteed
 to generate positive numbers:
@@ -18,4 +22,11 @@ to generate positive numbers:
 ```java
 Random r = new Random();
 int positiveNumber = r.nextInt(Integer.MAX_VALUE);
+```
+
+or map negative numbers onto the non-negative range:
+
+```java
+long lng = r.nextLong();
+lng = (lng == Long.MIN_VALUE) ? 0 : Math.abs(lng);
 ```

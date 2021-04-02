@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns.inject.dagger;
 
 import static com.google.common.base.Predicates.notNull;
-import static com.google.errorprone.BugPattern.Category.DAGGER;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.enclosingClass;
@@ -36,10 +35,9 @@ import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
-import com.google.errorprone.matchers.method.MethodMatchers.ParameterMatcher;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ExpressionStatementTree;
+import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
@@ -50,7 +48,6 @@ import com.sun.source.util.SimpleTreeVisitor;
     name = "AndroidInjectionBeforeSuper",
     summary =
         "AndroidInjection.inject() should always be invoked before calling super.lifecycleMethod()",
-    category = DAGGER,
     severity = ERROR)
 public final class AndroidInjectionBeforeSuper extends BugChecker implements MethodTreeMatcher {
 
@@ -86,8 +83,8 @@ public final class AndroidInjectionBeforeSuper extends BugChecker implements Met
 
     private final String lifecycleMethod;
     private final Matcher<MethodTree> methodMatcher;
-    private final MethodNameMatcher methodInvocationMatcher;
-    private final ParameterMatcher injectMethodMatcher;
+    private final Matcher<ExpressionTree> methodInvocationMatcher;
+    private final Matcher<ExpressionTree> injectMethodMatcher;
 
     MatchType(
         String componentType,
@@ -129,7 +126,7 @@ public final class AndroidInjectionBeforeSuper extends BugChecker implements Met
     private boolean foundSuper = false;
 
     @Override
-    public Description visitMethodInvocation(MethodInvocationTree node, Void aVoid) {
+    public Description visitMethodInvocation(MethodInvocationTree node, Void unused) {
       if (foundSuper && matchType.injectMethodMatcher.matches(node, state)) {
         return buildDescription(node)
             .setMessage(
@@ -144,7 +141,7 @@ public final class AndroidInjectionBeforeSuper extends BugChecker implements Met
     }
 
     @Override
-    public Description visitMethod(MethodTree node, Void aVoid) {
+    public Description visitMethod(MethodTree node, Void unused) {
       BlockTree methodBody = node.getBody();
       if (methodBody == null) {
         return Description.NO_MATCH;
@@ -158,7 +155,7 @@ public final class AndroidInjectionBeforeSuper extends BugChecker implements Met
     }
 
     @Override
-    public Description visitExpressionStatement(ExpressionStatementTree node, Void aVoid) {
+    public Description visitExpressionStatement(ExpressionStatementTree node, Void unused) {
       return node.getExpression().accept(this, null);
     }
   }

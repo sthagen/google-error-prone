@@ -15,7 +15,6 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.contains;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
@@ -40,7 +39,6 @@ import com.sun.tools.javac.code.Types;
  */
 @BugPattern(
     name = "NestedInstanceOfConditions",
-    category = JDK,
     summary =
         "Nested instanceOf conditions of disjoint types create blocks of code that never execute",
     severity = WARNING)
@@ -90,9 +88,9 @@ public class NestedInstanceOfConditions extends BugChecker implements IfTreeMatc
     @Override
     public boolean matches(Tree tree, VisitorState visitorState) {
       if (tree instanceof AssignmentTree) {
-        return variableExpressionTree
-            .toString()
-            .equals(((AssignmentTree) tree).getVariable().toString());
+        return visitorState
+            .getSourceForNode(variableExpressionTree)
+            .equals(visitorState.getSourceForNode(((AssignmentTree) tree).getVariable()));
       }
 
       return false;

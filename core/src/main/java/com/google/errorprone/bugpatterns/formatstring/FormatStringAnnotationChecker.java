@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns.formatstring;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.matchers.Description.NO_MATCH;
 
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
@@ -43,15 +43,13 @@ import java.util.List;
 @BugPattern(
     name = "FormatStringAnnotation",
     summary = "Invalid format string passed to formatting method.",
-    category = JDK,
-    severity = ERROR
-    )
+    severity = ERROR)
 public final class FormatStringAnnotationChecker extends BugChecker
     implements MethodInvocationTreeMatcher, MethodTreeMatcher, NewClassTreeMatcher {
 
   /**
    * Matches a method or constructor invocation. The input symbol should match the invoked method or
-   * contructor and the args should be the parameters in the invocation.
+   * constructor and the args should be the parameters in the invocation.
    */
   private Description matchInvocation(
       ExpressionTree tree,
@@ -62,24 +60,10 @@ public final class FormatStringAnnotationChecker extends BugChecker
       return Description.NO_MATCH;
     }
 
-    Type stringType = state.getSymtab().stringType;
-
-    List<VarSymbol> params = symbol.getParameters();
-    int firstStringIndex = -1;
-    int formatString = -1;
-    for (int i = 0; i < params.size(); i++) {
-      VarSymbol param = params.get(i);
-      if (ASTHelpers.hasAnnotation(param, FormatString.class, state)) {
-        formatString = i;
-        break;
-      }
-      if (firstStringIndex < 0 && ASTHelpers.isSameType(params.get(i).type, stringType, state)) {
-        firstStringIndex = i;
-      }
-    }
-
-    if (formatString < 0) {
-      formatString = firstStringIndex;
+    int formatString = formatStringIndex(symbol, state);
+    if (formatString == -1) {
+      // will be an error at call site
+      return NO_MATCH;
     }
 
     FormatStringValidation.ValidationResult result =
@@ -91,6 +75,22 @@ public final class FormatStringAnnotationChecker extends BugChecker
     } else {
       return Description.NO_MATCH;
     }
+  }
+
+  private static int formatStringIndex(MethodSymbol symbol, VisitorState state) {
+    Type stringType = state.getSymtab().stringType;
+    List<VarSymbol> params = symbol.getParameters();
+    int firstStringIndex = -1;
+    for (int i = 0; i < params.size(); i++) {
+      VarSymbol param = params.get(i);
+      if (ASTHelpers.hasAnnotation(param, FormatString.class, state)) {
+        return i;
+      }
+      if (firstStringIndex < 0 && ASTHelpers.isSameType(param.type, stringType, state)) {
+        firstStringIndex = i;
+      }
+    }
+    return firstStringIndex;
   }
 
   @Override
@@ -125,7 +125,7 @@ public final class FormatStringAnnotationChecker extends BugChecker
               .setMessage(
                   "A parameter can only be annotated @FormatString in a method annotated "
                       + "@FormatMethod: "
-                      + param)
+                      + state.getSourceForNode(param))
               .build();
         }
         if (!isStringParam) {

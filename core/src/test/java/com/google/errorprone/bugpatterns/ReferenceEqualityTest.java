@@ -16,36 +16,21 @@
 
 package com.google.errorprone.bugpatterns;
 
-import com.google.common.io.ByteStreams;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import org.junit.Ignore;
 
 /** {@link ReferenceEquality}Test */
 @RunWith(JUnit4.class)
 public class ReferenceEqualityTest {
 
-  @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
-
   private final CompilationTestHelper compilationHelper =
       CompilationTestHelper.newInstance(ReferenceEquality.class, getClass());
   private final BugCheckerRefactoringTestHelper refactoringTestHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new ReferenceEquality(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(ReferenceEquality.class, getClass());
 
-  @Ignore("b/74365407 test proto sources are broken")
   @Test
   public void protoGetter_nonnull() {
     compilationHelper
@@ -363,13 +348,7 @@ public class ReferenceEqualityTest {
   }
 
   @Test
-  public void testErroneous() throws Exception {
-    File libJar = tempFolder.newFile("lib.jar");
-    try (FileOutputStream fis = new FileOutputStream(libJar);
-        JarOutputStream jos = new JarOutputStream(fis)) {
-      addClassToJar(jos, MayImplementEquals.class);
-      addClassToJar(jos, ReferenceEqualityTest.class);
-    }
+  public void testErroneous() {
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -380,16 +359,8 @@ public class ReferenceEqualityTest {
             "    return getter() == b;",
             "  }",
             "}")
-        .setArgs(Arrays.asList("-cp", libJar.toString()))
+        .withClasspath(MayImplementEquals.class, ReferenceEqualityTest.class)
         .doTest();
-  }
-
-  static void addClassToJar(JarOutputStream jos, Class<?> clazz) throws IOException {
-    String entryPath = clazz.getName().replace('.', '/') + ".class";
-    try (InputStream is = clazz.getClassLoader().getResourceAsStream(entryPath)) {
-      jos.putNextEntry(new JarEntry(entryPath));
-      ByteStreams.copy(is, jos);
-    }
   }
 
   // regression test for #423
@@ -421,6 +392,35 @@ public class ReferenceEqualityTest {
             "class Test implements Comparable<Test> {",
             "  public int compareTo(Test o) {",
             "    return this == o ? 0 : -1;",
+            "  }",
+            "  public boolean equals(Object obj) {",
+            "    return obj instanceof Test;",
+            "  }",
+            "  public int hashCode() {",
+            "    return 1;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void likeCompareToButDifferentName() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test implements Comparable<Test> {",
+            "  public int compareTo(Test o) {",
+            "    return this == o ? 0 : -1;",
+            "  }",
+            "  public int notCompareTo(Test o) {",
+            "    // BUG: Diagnostic contains:",
+            "    return this == o ? 0 : -1;",
+            "  }",
+            "  public boolean equals(Object obj) {",
+            "    return obj instanceof Test;",
+            "  }",
+            "  public int hashCode() {",
+            "    return 1;",
             "  }",
             "}")
         .doTest();

@@ -18,20 +18,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <repositories>
-    <!-- Added this because the JSR 305 dependency wouldn't download from the
-         default repository.  -->
-    <repository>
-      <id>alt-repo1</id>
-      <name>repo1.maven.org</name>
-      <url>http://repo1.maven.org</url>
-    </repository>
-  </repositories>
-
   <parent>
     <groupId>com.google.errorprone</groupId>
     <artifactId>error_prone_parent</artifactId>
-    <version>2.3.2-SNAPSHOT</version>
+    <version>HEAD-SNAPSHOT</version>
   </parent>
 
   <name>error-prone library</name>
@@ -79,12 +69,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <!-- Apache 2.0 -->
-      <groupId>com.github.stephenc.jcip</groupId>
-      <artifactId>jcip-annotations</artifactId>
-      <version>1.0-1</version>
-    </dependency>
-    <dependency>
       <!-- MIT -->
       <groupId>org.pcollections</groupId>
       <artifactId>pcollections</artifactId>
@@ -117,7 +101,7 @@
     <dependency>
       <!-- GPLv2 with Classpath Exception -->
       <groupId>org.checkerframework</groupId>
-      <artifactId>dataflow</artifactId>
+      <artifactId>dataflow-shaded</artifactId>
       <version>${dataflow.version}</version>
     </dependency>
     <dependency>
@@ -129,9 +113,9 @@
     <dependency>
       <!-- Apache 2.0 -->
       <groupId>com.google.auto.value</groupId>
-      <artifactId>auto-value</artifactId>
+      <artifactId>auto-value-annotations</artifactId>
       <version>${autovalue.version}</version>
-      <scope>provided</scope>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <!-- Apache 2.0 -->
@@ -145,6 +129,13 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- Apache 2.0 -->
+      <groupId>com.google.gwt</groupId>
+      <artifactId>gwt-user</artifactId>
+      <version>${gwt.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -177,23 +168,30 @@
     </dependency>
     <dependency>
       <!-- Apache 2.0 -->
+      <groupId>com.google.truth.extensions</groupId>
+      <artifactId>truth-proto-extension</artifactId>
+      <version>${truth.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- Apache 2.0 -->
       <groupId>com.google.inject</groupId>
       <artifactId>guice</artifactId>
-      <version>4.0-beta5</version>
+      <version>4.2.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <!-- Apache 2.0 -->
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-assistedinject</artifactId>
-      <version>4.0-beta5</version>
+      <version>4.2.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <!-- Apache 2.0 -->
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-servlet</artifactId>
-      <version>4.0-beta5</version>
+      <version>4.2.3</version>
       <scope>test</scope>
     </dependency>
       <!-- Apache 2.0 -->
@@ -214,7 +212,7 @@
       <!-- MIT -->
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>2.0.3-beta</version>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -269,7 +267,14 @@
       <!-- Apache 2.0 -->
       <groupId>com.google.testing.compile</groupId>
       <artifactId>compile-testing</artifactId>
-      <version>0.15</version>
+      <version>${compile.testing.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- BSD -->
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java-util</artifactId>
+      <version>3.7.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -282,15 +287,15 @@
     <dependency>
       <!-- Apache 2.0 -->
       <groupId>com.google.auto.service</groupId>
-      <artifactId>auto-service</artifactId>
-      <version>1.0-rc4</version>
-      <scope>provided</scope>
+      <artifactId>auto-service-annotations</artifactId>
+      <version>${autoservice.version}</version>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <!-- Apache 2.0 -->
       <groupId>io.netty</groupId>
       <artifactId>netty-all</artifactId>
-      <version>4.1.12.Final</version>
+      <version>4.1.42.Final</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -322,6 +327,32 @@
       <version>3.9.0</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <!-- Apache 2.0 -->
+      <groupId>org.easymock</groupId>
+      <artifactId>easymock</artifactId>
+      <version>3.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- Apache 2.0 -->
+      <groupId>pl.pragmatists</groupId>
+      <artifactId>JUnitParams</artifactId>
+      <version>1.0.5</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.threeten</groupId>
+      <artifactId>threeten-extra</artifactId>
+      <version>1.5.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.flogger</groupId>
+      <artifactId>flogger</artifactId>
+      <version>${flogger.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -333,6 +364,24 @@
       </extension>
     </extensions>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.auto.value</groupId>
+              <artifactId>auto-value</artifactId>
+              <version>${autovalue.version}</version>
+            </path>
+            <path>
+              <groupId>com.google.auto.service</groupId>
+              <artifactId>auto-service</artifactId>
+              <version>${autoservice.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
       <!-- Include the @BugPattern annotation in the main distribution
            so users have only one jar to add to their classpath. -->
       <plugin>
@@ -357,10 +406,14 @@
                   <include>com.google.errorprone:error_prone_annotations</include>
                   <include>com.google.errorprone:error_prone_type_annotations</include>
                   <include>com.google.errorprone:error_prone_check_api</include>
-                  <include>com.github.stephenc.jcip:jcip-annotations</include>
                   <include>org.pcollections:pcollections</include>
                   <include>com.google.guava:guava</include>
+                  <include>com.google.guava:failureaccess</include>
+                  <include>com.github.ben-manes.caffeine:caffeine</include>
+                  <include>io.github.java-diff-utils:java-diff-utils</include>
                   <include>com.google.auto:auto-common</include>
+                  <include>com.google.auto.value:auto-value-annotations</include>
+                  <include>com.google.auto.service:auto-service-annotations</include>
                   <include>com.google.code.findbugs:jsr305</include>
                   <include>com.google.protobuf:protobuf-java</include>
                 </includes>
@@ -370,19 +423,12 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.19.1</version>
-        <configuration>
-          <!-- set heap size to work around http://github.com/travis-ci/travis-ci/issues/3396 -->
-          <argLine>-Xmx1g</argLine>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <version>0.5.1</version>
         <configuration>
+          <protoSourceRoot>src/main/proto</protoSourceRoot>
+          <protoTestSourceRoot>src/test/proto</protoTestSourceRoot>
           <protocArtifact>com.google.protobuf:protoc:3.4.0:exe:${os.detected.classifier}</protocArtifact>
           <pluginId>grpc-java</pluginId>
           <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.0.1:exe:${os.detected.classifier}</pluginArtifact>
@@ -392,6 +438,8 @@
             <goals>
               <goal>compile</goal>
               <goal>compile-custom</goal>
+              <goal>test-compile</goal>
+              <goal>test-compile-custom</goal>
             </goals>
           </execution>
         </executions>
@@ -415,22 +463,29 @@
           <version>${guava.version}</version>
         </dependency>
       </dependencies>
-    </profile>
-    <profile>
-      <id>java-8</id>
-      <activation>
-        <jdk>1.8</jdk>
-      </activation>
       <build>
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <version>2.19.1</version>
+            <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
-              <!-- set heap size to work around http://github.com/travis-ci/travis-ci/issues/3396 -->
-              <!-- put javac.jar on bootclasspath when executing tests -->
-              <argLine>-Xmx1g -Xbootclasspath/p:${settings.localRepository}/com/google/errorprone/javac/${javac.version}/javac-${javac.version}.jar</argLine>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>com.google.auto.value</groupId>
+                  <artifactId>auto-value</artifactId>
+                  <version>${autovalue.version}</version>
+                </path>
+                <path>
+                  <groupId>com.google.auto.service</groupId>
+                  <artifactId>auto-service</artifactId>
+                  <version>${autoservice.version}</version>
+                </path>
+                <path>
+                  <groupId>com.google.errorprone</groupId>
+                  <artifactId>error_prone_docgen_processor</artifactId>
+                  <version>${project.version}</version>
+                </path>
+              </annotationProcessorPaths>
             </configuration>
           </plugin>
         </plugins>

@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 
@@ -33,12 +32,11 @@ import com.sun.source.tree.Tree;
 import java.util.ArrayList;
 import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MultipleTopLevelClasses",
     altNames = {"TopLevel"},
     summary = "Source files should not contain multiple top-level class declarations",
-    category = JDK,
     severity = SUGGESTION,
     documentSuppression = false,
     linkType = CUSTOM,

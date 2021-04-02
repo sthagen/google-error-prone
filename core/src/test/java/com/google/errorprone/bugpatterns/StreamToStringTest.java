@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class StreamToStringTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(StreamToString.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(StreamToString.class, getClass());
 
   @Test
   public void positive() {
@@ -69,6 +64,20 @@ public class StreamToStringTest {
             "      .map(String::valueOf).collect(Collectors.joining(\", \")));",
             "    String s = \"\" + Arrays.asList(42).stream()",
             "      .map(String::valueOf).collect(Collectors.joining(\", \"));",
+            "    String.format(\"%s %s\", null, null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void withinStreamClass() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "public abstract class Test implements java.util.stream.Stream {",
+            "  public String s() {",
+            "    return toString();",
             "  }",
             "}")
         .doTest();

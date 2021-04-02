@@ -16,11 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.getAnnotationWithSimpleName;
+import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.Var;
 import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
@@ -43,13 +43,11 @@ import java.util.EnumSet;
 import java.util.Optional;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "Var",
     summary = "Non-constant variable missing @Var annotation",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class VarChecker extends BugChecker implements VariableTreeMatcher {
 
   private static final String UNNECESSARY_FINAL = "Unnecessary 'final' modifier.";
@@ -61,6 +59,17 @@ public class VarChecker extends BugChecker implements VariableTreeMatcher {
       return Description.NO_MATCH;
     }
     if (ASTHelpers.hasAnnotation(sym, Var.class, state)) {
+      if ((sym.flags() & Flags.EFFECTIVELY_FINAL) != 0) {
+        return buildDescription(tree)
+            .setMessage("@Var variable is never modified")
+            .addFix(
+                SuggestedFix.delete(
+                    getAnnotationWithSimpleName(tree.getModifiers().getAnnotations(), "Var")))
+            .build();
+      }
+      return Description.NO_MATCH;
+    }
+    if (!ASTHelpers.getGeneratedBy(state).isEmpty()) {
       return Description.NO_MATCH;
     }
     if (TreeInfo.isReceiverParam((JCTree) tree)) {
@@ -109,7 +118,7 @@ public class VarChecker extends BugChecker implements VariableTreeMatcher {
       // flow information isn't collected for body-less methods
       return Description.NO_MATCH;
     }
-    if ((sym.flags() & (Flags.EFFECTIVELY_FINAL | Flags.FINAL)) != 0) {
+    if (isConsideredFinal(sym)) {
       return Description.NO_MATCH;
     }
     return describeMatch(tree, addVarAnnotation(tree));

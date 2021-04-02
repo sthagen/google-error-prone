@@ -16,19 +16,8 @@
 
 package com.google.errorprone.bugpatterns;
 
-import com.google.common.io.ByteStreams;
 import com.google.errorprone.CompilationTestHelper;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -36,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class CheckReturnValueTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(CheckReturnValue.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(CheckReturnValue.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -104,7 +89,10 @@ public class CheckReturnValueTest {
   @Test
   public void testPackageAnnotation() {
     compilationHelper
-        .addSourceLines("package-info.java", "@javax.annotation.CheckReturnValue", "package lib;")
+        .addSourceLines(
+            "package-info.java", //
+            "@javax.annotation.CheckReturnValue",
+            "package lib;")
         .addSourceLines(
             "lib/Lib.java",
             "package lib;",
@@ -147,14 +135,23 @@ public class CheckReturnValueTest {
   @Test
   public void testVoidReturningMethodInAnnotatedPackage() {
     compilationHelper
-        .addSourceLines("package-info.java", "@javax.annotation.CheckReturnValue", "package lib;")
+        .addSourceLines(
+            "package-info.java", //
+            "@javax.annotation.CheckReturnValue",
+            "package lib;")
         .addSourceLines(
             "lib/Lib.java",
             "package lib;",
             "public class Lib {",
             "  public static void f() {}",
             "}")
-        .addSourceLines("Test.java", "class Test {", "  void m() {", "    lib.Lib.f();", "  }", "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void m() {",
+            "    lib.Lib.f();",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -231,7 +228,13 @@ public class CheckReturnValueTest {
             "  @com.google.errorprone.annotations.CanIgnoreReturnValue",
             "  public static int f() { return 42; }",
             "}")
-        .addSourceLines("Test.java", "class Test {", "  void m() {", "    lib.Lib.f();", "  }", "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void m() {",
+            "    lib.Lib.f();",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -246,7 +249,13 @@ public class CheckReturnValueTest {
             "  @com.google.errorprone.annotations.CanIgnoreReturnValue",
             "  public static int f() { return 42; }",
             "}")
-        .addSourceLines("Test.java", "class Test {", "  void m() {", "    lib.Lib.f();", "  }", "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void m() {",
+            "    lib.Lib.f();",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -326,7 +335,13 @@ public class CheckReturnValueTest {
             "public class Lib {",
             "  public static int f() { return 42; }",
             "}")
-        .addSourceLines("Test.java", "class Test {", "  void m() {", "    lib.Lib.f();", "  }", "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void m() {",
+            "    lib.Lib.f();",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -371,7 +386,13 @@ public class CheckReturnValueTest {
             "    return null;",
             "  }",
             "}")
-        .addSourceLines("Test.java", "class Test {", "  void m() {", "    lib.Lib.f();", "  }", "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void m() {",
+            "    lib.Lib.f();",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -581,32 +602,37 @@ public class CheckReturnValueTest {
         .doTest();
   }
 
-  @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+  @Test
+  public void ignoreVoidReturningMethodReferences() {
+    compilationHelper
+        .addSourceLines(
+            "Lib.java",
+            "@javax.annotation.CheckReturnValue",
+            "public class Lib {",
+            "  public static void consume(Object o) {}",
+            "}")
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void m(java.util.List<Object> xs) {",
+            "    xs.forEach(Lib::consume);",
+            "  }",
+            "}")
+        .doTest();
+  }
 
   /** Test class containing a method annotated with @CRV. */
-  public static class CRVTest {
+  public static final class CRVTest {
     @javax.annotation.CheckReturnValue
     public static int f() {
       return 42;
     }
-  }
 
-  static void addClassToJar(JarOutputStream jos, Class<?> clazz) throws IOException {
-    String entryPath = clazz.getName().replace('.', '/') + ".class";
-    try (InputStream is = clazz.getClassLoader().getResourceAsStream(entryPath)) {
-      jos.putNextEntry(new JarEntry(entryPath));
-      ByteStreams.copy(is, jos);
-    }
+    private CRVTest() {}
   }
 
   @Test
-  public void noCRVonClasspath() throws Exception {
-    File libJar = tempFolder.newFile("lib.jar");
-    try (FileOutputStream fis = new FileOutputStream(libJar);
-        JarOutputStream jos = new JarOutputStream(fis)) {
-      addClassToJar(jos, CRVTest.class);
-      addClassToJar(jos, CheckReturnValueTest.class);
-    }
+  public void noCRVonClasspath() {
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -616,7 +642,7 @@ public class CheckReturnValueTest {
             "    com.google.errorprone.bugpatterns.CheckReturnValueTest.CRVTest.f();",
             "  }",
             "}")
-        .setArgs(Arrays.asList("-cp", libJar.toString()))
+        .withClasspath(CRVTest.class, CheckReturnValueTest.class)
         .doTest();
   }
 }

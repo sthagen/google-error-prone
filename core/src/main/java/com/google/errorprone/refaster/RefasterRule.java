@@ -38,7 +38,6 @@ import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
-import javax.annotation.Nullable;
 import javax.tools.JavaFileManager;
 
 /**
@@ -61,7 +60,7 @@ public abstract class RefasterRule<M extends TemplateMatch, T extends Template<M
         ImmutableList.<UTypeVar>of(),
         beforeTemplates,
         afterTemplates,
-        ImmutableClassToInstanceMap.<Annotation>builder().build());
+        ImmutableClassToInstanceMap.of());
   }
 
   public static RefasterRule<?, ?> create(
@@ -111,7 +110,6 @@ public abstract class RefasterRule<M extends TemplateMatch, T extends Template<M
 
   abstract ImmutableList<T> beforeTemplates();
 
-  @Nullable
   abstract ImmutableList<T> afterTemplates();
 
   @Override
@@ -120,7 +118,8 @@ public abstract class RefasterRule<M extends TemplateMatch, T extends Template<M
   @Override
   public void apply(TreePath path, Context context, DescriptionListener listener) {
     RefasterScanner.create(this, listener)
-        .scan(path, prepareContext(context, (JCCompilationUnit) path.getCompilationUnit()));
+        .scan(
+            path.getLeaf(), prepareContext(context, (JCCompilationUnit) path.getCompilationUnit()));
   }
 
   boolean rejectMatchesWithComments() {
@@ -152,7 +151,7 @@ public abstract class RefasterRule<M extends TemplateMatch, T extends Template<M
   }
 
   @Override
-  public String toString() {
+  public final String toString() {
     return fromSecondLevel(qualifiedTemplateClass());
   }
 }

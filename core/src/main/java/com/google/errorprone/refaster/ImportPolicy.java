@@ -66,13 +66,14 @@ public enum ImportPolicy {
        */
       checkArgument(
           topLevelClazz.length() > 0 && fullyQualifiedClazz.length() > 0,
-          String.format(
-              "either topLevelClass (%s) or fullyQualifiedClazz (%s) is null or empty",
-              topLevelClazz, fullyQualifiedClazz));
+          "either topLevelClass (%s) or fullyQualifiedClazz (%s) is null or empty",
+          topLevelClazz,
+          fullyQualifiedClazz);
       List<String> topLevelPath = Splitter.on('.').splitToList(topLevelClazz);
       String topClazz = Iterables.getLast(topLevelPath);
       List<String> qualifiedPath = Splitter.on('.').splitToList(fullyQualifiedClazz);
-      boolean importTopLevelClazz = false, conflictTopLevelClazz = false;
+      boolean importTopLevelClazz = false;
+      boolean conflictTopLevelClazz = false;
       for (String importName : allImports) {
         if (importName.contentEquals(fullyQualifiedClazz)) {
           // fullyQualifiedClazz already imported
@@ -150,7 +151,7 @@ public enum ImportPolicy {
       PackageSymbol currentPackage = inliner.getContext().get(PackageSymbol.class);
       if (currentPackage == null
           || !currentPackage.getQualifiedName().contentEquals(packge)
-          || !topLevelClazz.equals(fullyQualifiedClazz)) {
+          || !topLevelClazz.toString().contentEquals(fullyQualifiedClazz)) {
         // don't import classes from the same package as the class we're refactoring
         inliner.addImport(fullyQualifiedClazz.toString());
       }
@@ -200,6 +201,11 @@ public enum ImportPolicy {
         return inliner
             .maker()
             .Select(inliner.maker().Ident(inliner.asName("Refaster")), inliner.asName(member));
+      }
+      // Foo.class tokens are considered static members :(.
+      if (member.toString().equals("class")) {
+        return IMPORT_TOP_LEVEL.staticReference(
+            inliner, topLevelClazz, fullyQualifiedClazz, member);
       }
       inliner.addStaticImport(fullyQualifiedClazz + "." + member);
       return inliner.maker().Ident(inliner.asName(member));

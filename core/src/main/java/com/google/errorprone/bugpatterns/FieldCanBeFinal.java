@@ -15,20 +15,16 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
-import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
-import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ClassTree;
@@ -43,24 +39,23 @@ import com.sun.source.tree.Tree.Kind;
 import com.sun.source.tree.UnaryTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
-import com.sun.tools.javac.util.Context;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 
 /** @author Liam Miller-Cushon (cushon@google.com) */
 @BugPattern(
     name = "FieldCanBeFinal",
-    category = JDK,
     summary = "This field is only assigned during initialization; consider making it final",
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMatcher {
 
   /** Annotations that imply a field is non-constant. */
@@ -70,11 +65,6 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
           "javax.inject.Inject",
           "com.google.inject.Inject",
           "com.google.inject.testing.fieldbinder.Bind",
-          "com.googlecode.objectify.v5.annotation.Collection",
-          "com.googlecode.objectify.v5.annotation.Id",
-          "com.googlecode.objectify.v5.annotation.Index",
-          "com.googlecode.objectify.v5.annotation.Parent",
-          "com.googlecode.objectify.v5.annotation.Subclass",
           "com.google.errorprone.annotations.Var",
           "com.google.common.annotations.NonFinalForGwt",
           "org.kohsuke.args4j.Argument",
@@ -86,13 +76,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
           "com.beust.jcommander.Parameter",
           "javax.persistence.Id");
 
-  /** Annotations that imply all fields in the annotated class are non-constant. */
-  private static final ImmutableSet<String> IMPLICIT_VAR_CLASS_ANNOTATIONS =
-      ImmutableSet.of(
-          "com.googlecode.objectify.v4.annotation.Entity",
-          "com.googlecode.objectify.v4.annotation.Embed",
-          "com.googlecode.objectify.v5.annotation.Entity",
-          "com.googlecode.objectify.v5.annotation.Embed");
+  private static final String OBJECTIFY_PREFIX = "com.googlecode.objectify.";
 
   /**
    * Annotations that imply a field is non-constant, and that do not have a canonical
@@ -110,7 +94,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
           Kind.POSTFIX_INCREMENT);
 
   /** The initalization context where an assignment occurred. */
-  enum InitializationContext {
+  private enum InitializationContext {
     /** A class (static) initializer. */
     STATIC,
     /** An instance initializer. */
@@ -120,17 +104,17 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
   }
 
   /** A record of all assignments to variables in the current compilation unit. */
-  static class VariableAssignmentRecords {
+  private static class VariableAssignmentRecords {
 
     private final Map<VarSymbol, VariableAssignments> assignments = new LinkedHashMap<>();
 
     /** Returns all {@link VariableAssignments} in the current compilation unit. */
-    public Iterable<VariableAssignments> getAssignments() {
+    private Iterable<VariableAssignments> getAssignments() {
       return assignments.values();
     }
 
     /** Records an assignment to a variable. */
-    public void recordAssignment(Tree tree, InitializationContext init) {
+    private void recordAssignment(Tree tree, InitializationContext init) {
       Symbol sym = ASTHelpers.getSymbol(tree);
       if (sym != null && sym.getKind() == ElementKind.FIELD) {
         recordAssignment((VarSymbol) sym, init);
@@ -138,48 +122,44 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
     }
 
     /** Records an assignment to a variable. */
-    public void recordAssignment(VarSymbol sym, InitializationContext init) {
+    private void recordAssignment(VarSymbol sym, InitializationContext init) {
       getDeclaration(sym).recordAssignment(init);
     }
 
     private VariableAssignments getDeclaration(VarSymbol sym) {
-      VariableAssignments info = assignments.get(sym);
-      if (info == null) {
-        info = new VariableAssignments(sym);
-        assignments.put(sym, info);
-      }
-      return info;
+      return assignments.computeIfAbsent(sym, VariableAssignments::new);
     }
 
     /** Records a variable declaration. */
-    public void recordDeclaration(VarSymbol sym, VariableTree tree) {
+    private void recordDeclaration(VarSymbol sym, VariableTree tree) {
       getDeclaration(sym).recordDeclaration(tree);
     }
   }
 
   /** A record of all assignments to a specific variable in the current compilation unit. */
-  static class VariableAssignments {
+  private static class VariableAssignments {
 
-    final VarSymbol sym;
-    final EnumSet<InitializationContext> writes = EnumSet.noneOf(InitializationContext.class);
-    VariableTree declaration;
+    private final VarSymbol sym;
+    private final EnumSet<InitializationContext> writes =
+        EnumSet.noneOf(InitializationContext.class);
+    private VariableTree declaration;
 
     VariableAssignments(VarSymbol sym) {
       this.sym = sym;
     }
 
     /** Records an assignment to the variable. */
-    public void recordAssignment(InitializationContext init) {
+    private void recordAssignment(InitializationContext init) {
       writes.add(init);
     }
 
     /** Records that a variable was declared in this compilation unit. */
-    public void recordDeclaration(VariableTree tree) {
+    private void recordDeclaration(VariableTree tree) {
       declaration = tree;
     }
 
     /** Returns true if the variable is effectively final. */
-    boolean isEffectivelyFinal() {
+    private boolean isEffectivelyFinal() {
       if (declaration == null) {
         return false;
       }
@@ -210,7 +190,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       return writes.contains(wanted) || (sym.flags() & Flags.HASINIT) == Flags.HASINIT;
     }
 
-    VariableTree declaration() {
+    private VariableTree declaration() {
       return declaration;
     }
   }
@@ -218,7 +198,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
   @Override
   public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
     VariableAssignmentRecords writes = new VariableAssignmentRecords();
-    new FinalScanner(writes, state.context).scan(state.getPath(), InitializationContext.NONE);
+    new FinalScanner(writes, state).scan(state.getPath(), InitializationContext.NONE);
     outer:
     for (VariableAssignments var : writes.getAssignments()) {
       if (!var.isEffectivelyFinal()) {
@@ -232,12 +212,16 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
           continue outer;
         }
       }
-      VariableTree varDecl = var.declaration();
-      for (AnnotationTree anno : varDecl.getModifiers().getAnnotations()) {
-        if (IMPLICIT_VAR_ANNOTATION_SIMPLE_NAMES.contains(ASTHelpers.getAnnotationName(anno))) {
+      for (Attribute.Compound anno : var.sym.getAnnotationMirrors()) {
+        TypeElement annoElement = (TypeElement) anno.getAnnotationType().asElement();
+        if (IMPLICIT_VAR_ANNOTATION_SIMPLE_NAMES.contains(annoElement.getSimpleName().toString())) {
+          return Description.NO_MATCH;
+        }
+        if (annoElement.getQualifiedName().toString().startsWith(OBJECTIFY_PREFIX)) {
           return Description.NO_MATCH;
         }
       }
+      VariableTree varDecl = var.declaration();
       SuggestedFixes.addModifiers(varDecl, state, Modifier.FINAL)
           .ifPresent(
               f -> {
@@ -253,17 +237,17 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
   private class FinalScanner extends TreePathScanner<Void, InitializationContext> {
 
     private final VariableAssignmentRecords writes;
-    private final Context context;
+    private final VisitorState compilationState;
 
-    public FinalScanner(VariableAssignmentRecords writes, Context context) {
+    private FinalScanner(VariableAssignmentRecords writes, VisitorState compilationState) {
       this.writes = writes;
-      this.context = context;
+      this.compilationState = compilationState;
     }
 
     @Override
     public Void visitVariable(VariableTree node, InitializationContext init) {
       VarSymbol sym = ASTHelpers.getSymbol(node);
-      if (sym.getKind() == ElementKind.FIELD && !isSuppressed(node)) {
+      if (sym != null && sym.getKind() == ElementKind.FIELD && !isSuppressed(node)) {
         writes.recordDeclaration(sym, node);
       }
       return super.visitVariable(node, InitializationContext.NONE);
@@ -297,7 +281,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       return super.visitAssignment(node, init);
     }
 
-    boolean isThisAccess(Tree tree) {
+    private boolean isThisAccess(Tree tree) {
       if (tree.getKind() == Kind.IDENTIFIER) {
         return true;
       }
@@ -314,15 +298,15 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
 
     @Override
     public Void visitClass(ClassTree node, InitializationContext init) {
-      VisitorState state = new VisitorState(context).withPath(getCurrentPath());
+      VisitorState state = compilationState.withPath(getCurrentPath());
 
       if (isSuppressed(node)) {
         return null;
       }
 
-
-      for (String annotation : IMPLICIT_VAR_CLASS_ANNOTATIONS) {
-        if (ASTHelpers.hasAnnotation(getSymbol(node), annotation, state)) {
+      for (Attribute.Compound anno : getSymbol(node).getAnnotationMirrors()) {
+        TypeElement annoElement = (TypeElement) anno.getAnnotationType().asElement();
+        if (annoElement.getQualifiedName().toString().startsWith(OBJECTIFY_PREFIX)) {
           return null;
         }
       }
@@ -338,7 +322,6 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       return super.visitCompoundAssignment(node, init);
     }
 
-
     @Override
     public Void visitUnary(UnaryTree node, InitializationContext init) {
       if (UNARY_ASSIGNMENT.contains(node.getKind())) {
@@ -348,5 +331,4 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       return super.visitUnary(node, init);
     }
   }
-
 }

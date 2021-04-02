@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns.collectionincompatibletype;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.base.Joiner;
@@ -48,8 +48,7 @@ import java.util.Set;
 @BugPattern(
     name = "CompatibleWithAnnotationMisuse",
     summary = "@CompatibleWith's value is not a type argument.",
-    severity = ERROR,
-    category = JDK)
+    severity = ERROR)
 public class CompatibleWithMisuse extends BugChecker implements AnnotationTreeMatcher {
 
   private static final Matcher<AnnotationTree> IS_COMPATIBLE_WITH_ANNOTATION =
@@ -103,7 +102,7 @@ public class CompatibleWithMisuse extends BugChecker implements AnnotationTreeMa
             .collect(toImmutableSet());
     String constValue = valueArgumentFromCompatibleWithAnnotation(annoTree);
 
-    if (constValue == null || constValue.isEmpty()) {
+    if (isNullOrEmpty(constValue)) {
       return describeWithMessage(
           annoTree,
           String.format(
@@ -125,7 +124,7 @@ public class CompatibleWithMisuse extends BugChecker implements AnnotationTreeMa
   // => X
   // This function assumes the the annotation tree will only have one argument, of type String, that
   // is required.
-  private String valueArgumentFromCompatibleWithAnnotation(AnnotationTree tree) {
+  private static String valueArgumentFromCompatibleWithAnnotation(AnnotationTree tree) {
     ExpressionTree argumentValue = Iterables.getOnlyElement(tree.getArguments());
     if (argumentValue.getKind() != Kind.ASSIGNMENT) {
       // :-| Annotation symbol broken. Punt?
@@ -135,7 +134,7 @@ public class CompatibleWithMisuse extends BugChecker implements AnnotationTreeMa
     return ASTHelpers.constValue(((AssignmentTree) argumentValue).getExpression(), String.class);
   }
 
-  private String printTypeArgs(Set<String> validNames) {
+  private static String printTypeArgs(Set<String> validNames) {
     return Joiner.on(", ").join(validNames);
   }
 

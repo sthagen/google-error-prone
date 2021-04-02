@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -33,17 +31,15 @@ import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.Tree;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
 
 /** @author awturner@google.com (Andy Turner) */
 @BugPattern(
     name = "ThreeLetterTimeZoneID",
     summary = ThreeLetterTimeZoneID.SUMMARY,
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class ThreeLetterTimeZoneID extends BugChecker implements MethodInvocationTreeMatcher {
   static final String SUMMARY =
       "Three-letter time zone identifiers are deprecated, may be ambiguous, and might not do what "
@@ -52,12 +48,14 @@ public class ThreeLetterTimeZoneID extends BugChecker implements MethodInvocatio
   private static final Matcher<ExpressionTree> METHOD_MATCHER =
       MethodMatchers.staticMethod()
           .onClass("java.util.TimeZone")
-          .withSignature("getTimeZone(java.lang.String)");
+          .named("getTimeZone")
+          .withParameters("java.lang.String");
 
   private static final Matcher<ExpressionTree> JODATIME_METHOD_MATCHER =
       MethodMatchers.staticMethod()
           .onClass("org.joda.time.DateTimeZone")
-          .withSignature("forTimeZone(java.util.TimeZone)");
+          .named("forTimeZone")
+          .withParameters("java.util.TimeZone");
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, final VisitorState state) {
@@ -77,8 +75,7 @@ public class ThreeLetterTimeZoneID extends BugChecker implements MethodInvocatio
     Description.Builder builder = buildDescription(tree).setMessage(replacement.message);
     for (String r : replacement.replacements) {
       builder.addFix(
-          SuggestedFix.replace(
-              tree.getArguments().get(0), state.getTreeMaker().Literal(r).toString()));
+          SuggestedFix.replace(tree.getArguments().get(0), state.getConstantExpression(r)));
     }
     return builder.build();
   }
@@ -105,8 +102,8 @@ public class ThreeLetterTimeZoneID extends BugChecker implements MethodInvocatio
       if (timeZone.observesDaylightTime()) {
         // Make sure that the offset is a whole number of hours; otherwise, there is no Etc/GMT+X
         // zone. Custom time zones don't need to be handled.
-        long hours = TimeUnit.MILLISECONDS.toHours(timeZone.getRawOffset());
-        long millis = TimeUnit.HOURS.toMillis(hours);
+        long hours = Duration.ofMillis(timeZone.getRawOffset()).toHours();
+        long millis = Duration.ofHours(hours).toMillis();
         if (millis == timeZone.getRawOffset()) {
           // This is a "X Standard Time" zone, but it observes daylight savings.
           // Suggest the equivalent zone, as well as a fixed zone at the non-daylight savings

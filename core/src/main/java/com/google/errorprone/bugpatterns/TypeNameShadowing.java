@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.common.collect.ImmutableList;
@@ -24,13 +23,13 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParameterNamingClassification;
 import com.google.errorprone.fixes.SuggestedFix;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
@@ -40,13 +39,13 @@ import com.sun.source.tree.TypeParameterTree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.PackageSymbol;
+import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.code.Symbol.TypeVariableSymbol;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.JCTree.Tag;
-import com.sun.tools.javac.util.Names;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -60,10 +59,8 @@ import java.util.stream.Collectors;
 @BugPattern(
     name = "TypeNameShadowing",
     summary = "Type parameter declaration shadows another named type",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, ClassTreeMatcher {
 
   @Override
@@ -88,8 +85,9 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
    */
   private static Iterable<Symbol> typesInEnclosingScope(
       Env<AttrContext> env, PackageSymbol javaLang) {
-    // Collect all visible type names declared in this source file by ascending lexical scopes
-    // and excluding TypeVariableSymbols (otherwise, every type parameter spuriously shadows itself)
+    // Collect all visible type names declared in this source file by ascending lexical scopes,
+    // collecting all members, filtering to keep type symbols and exclude TypeVariableSymbols
+    // (otherwise, every type parameter spuriously shadows itself)
     Iterable<Symbol> localSymbolsInScope =
         Streams.stream(env)
             .map(
@@ -99,7 +97,10 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
                         : ctx.info.getLocalElements())
             .flatMap(
                 symbols ->
-                    Streams.stream(symbols).filter(sym -> !(sym instanceof TypeVariableSymbol)))
+                    Streams.stream(symbols)
+                        .filter(
+                            sym ->
+                                sym instanceof TypeSymbol && !(sym instanceof TypeVariableSymbol)))
             .collect(ImmutableList.toImmutableList());
 
     // Concatenate with all visible type names declared in other source files:
@@ -120,8 +121,7 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
             .getEnv(ASTHelpers.getSymbol(state.findEnclosing(ClassTree.class)));
 
     Symtab symtab = state.getSymtab();
-    PackageSymbol javaLang =
-        symtab.enterPackage(symtab.java_base, Names.instance(state.context).java_lang);
+    PackageSymbol javaLang = symtab.enterPackage(symtab.java_base, state.getNames().java_lang);
 
     Iterable<Symbol> enclosingTypes = typesInEnclosingScope(env, javaLang);
 
@@ -156,7 +156,7 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
         .filter(tv -> TypeParameterNamingClassification.classify(tv.name.toString()).isValidName())
         .map(
             tv ->
-                TypeParameterShadowing.renameTypeVariable(
+                SuggestedFixes.renameTypeParameter(
                     TypeParameterShadowing.typeParameterInList(typeParameters, tv),
                     tree,
                     TypeParameterShadowing.replacementTypeVarName(tv.name, visibleNames),

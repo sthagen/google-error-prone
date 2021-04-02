@@ -17,11 +17,10 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.Verify.verify;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
@@ -37,13 +36,11 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.tree.JCTree;
 import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "UnnecessaryTypeArgument",
     summary = "Non-generic methods should not be invoked with type arguments",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class UnnecessaryTypeArgument extends BugChecker
     implements MethodInvocationTreeMatcher, NewClassTreeMatcher {
 
@@ -83,11 +80,11 @@ public class UnnecessaryTypeArgument extends BugChecker
   }
 
   /** Constructor a fix that deletes the set of type arguments. */
-  private Fix buildFix(Tree tree, List<? extends Tree> arguments, VisitorState state) {
+  private static Fix buildFix(Tree tree, List<? extends Tree> arguments, VisitorState state) {
 
     JCTree node = (JCTree) tree;
     int startAbsolute = node.getStartPosition();
-    int lower = ((JCTree) arguments.get(0)).getStartPosition() - startAbsolute;
+    int lower = getStartPosition(arguments.get(0)) - startAbsolute;
     int upper = state.getEndPosition(arguments.get(arguments.size() - 1)) - startAbsolute;
 
     CharSequence source = state.getSourceForNode(node);

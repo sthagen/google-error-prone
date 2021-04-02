@@ -61,7 +61,7 @@ public final class UngroupedOverloadsTest {
   public void ungroupedOverloadsPositiveCasesCoveringOnlyFirstOverload() {
     compilationHelper
         .addSourceFile("UngroupedOverloadsPositiveCasesCoveringOnlyOnFirst.java")
-        .setArgs(ImmutableList.of("-XepOpt:UngroupedOverloads:FindingsOnFirstOverload"))
+        .setArgs(ImmutableList.of("-XepOpt:UngroupedOverloads:BatchFindings"))
         .doTest();
   }
 
@@ -196,10 +196,11 @@ public final class UngroupedOverloadsTest {
         .addOutputLines(
             "out/Test.java",
             "class Test {",
-            "  void foo() {}",
             "",
+            "  void foo() {}",
             "  /** doc */",
             "  void foo(int x) {}",
+            "",
             "  void bar() {}",
             "}")
         .doTest(TestMode.TEXT_MATCH);
@@ -211,17 +212,78 @@ public final class UngroupedOverloadsTest {
         .addSourceLines(
             "Test.java",
             "class Test {",
-            "  // BUG: Diagnostic contains: found ungrouped overloads on line(s): 8, 10, 12",
+            "  // BUG: Diagnostic contains: ungrouped overloads of 'foo' on line(s): 8, 10, 12",
             "  private void foo() {}",
-            "  // BUG: Diagnostic contains: found ungrouped overloads on line(s): 8, 10, 12",
+            "  // BUG: Diagnostic contains: ungrouped overloads of 'foo' on line(s): 8, 10, 12",
             "  private void foo(int a) {}",
             "  private void bar() {}",
-            "  // BUG: Diagnostic contains: found ungrouped overloads on line(s): 3, 5",
+            "  // BUG: Diagnostic contains: ungrouped overloads of 'foo' on line(s): 3, 5",
             "  private void foo(int a, int b) {}",
-            "  // BUG: Diagnostic contains: found ungrouped overloads on line(s): 3, 5",
+            "  // BUG: Diagnostic contains: ungrouped overloads of 'foo' on line(s): 3, 5",
             "  private void foo(int a, int b, int c) {}",
-            "  // BUG: Diagnostic contains: found ungrouped overloads on line(s): 3, 5",
+            "  // BUG: Diagnostic contains: ungrouped overloads of 'foo' on line(s): 3, 5",
             "  private void foo(int a, int b, int c, int d) {}",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void interleavedUngroupedOverloads() {
+    refactoringHelper
+        .addInputLines(
+            "in/Test.java",
+            "class Test {",
+            "  void foo() {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void bar() {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void foo(int x) {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void bar(int x) {",
+            "    System.err.println();",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "class Test {",
+            "",
+            "  void foo() {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void foo(int x) {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void bar() {",
+            "    System.err.println();",
+            "  }",
+            "",
+            "  void bar(int x) {",
+            "    System.err.println();",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:UngroupedOverloads:BatchFindings")
+        .doTest(TestMode.TEXT_MATCH);
+  }
+
+  @Test
+  public void describingConstructors() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  // BUG: Diagnostic contains: constructor overloads",
+            "  Test() {}",
+            "  private void bar() {}",
+            "  // BUG: Diagnostic contains: constructor overloads",
+            "  Test(int i) {}",
             "}")
         .doTest();
   }

@@ -16,20 +16,12 @@
 
 package com.google.errorprone.util;
 
-import static com.google.errorprone.util.ASTHelpers.getSymbol;
-
-import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompoundAssignmentTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
-import com.sun.source.tree.NewArrayTree;
 import com.sun.source.tree.NewClassTree;
-import com.sun.source.tree.Tree.Kind;
 import com.sun.source.tree.UnaryTree;
 import com.sun.source.util.TreeScanner;
-import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
-import com.sun.tools.javac.tree.JCTree.JCIdent;
 import com.sun.tools.javac.tree.JCTree.JCUnary;
 
 /**
@@ -43,42 +35,28 @@ import com.sun.tools.javac.tree.JCTree.JCUnary;
  *   <li>Any function call: toString(), hashCode(), setX(value), etc.
  *   <li>Unary expression: i += 1, i++, --j
  *   <li>New expression: new SomeClass()
- *   <li>New array: new int[10]
  * </ul>
  *
  * <p>Everything besides the above examples is considered side-effect free.
  *
  * <p>The analysis in this class initially assumes that the expression is side-effect free and then
  * tries to prove it wrong.
- *
- * <p>TODO(ghm): augment the logic in this class to ignore side-effect free method calls such as
- * {@link String#toString()} or {@link String#length()} or {@link java.util.List#size()}, etc.
  */
 public final class SideEffectAnalysis extends TreeScanner<Void, Void> {
 
   private boolean hasSideEffect = false;
 
-  private static final ImmutableList<String> SIDE_EFFECT_FREE_CLASSES =
-      ImmutableList.of(
-          Object.class.getName(),
-          String.class.getName(),
-          Integer.class.getName(),
-          Double.class.getName(),
-          Long.class.getName(),
-          Float.class.getName(),
-          Short.class.getName(),
-          Byte.class.getName(),
-          Character.class.getName(),
-          Boolean.class.getName(),
-          Math.class.getName());
-
   private SideEffectAnalysis() {}
 
+  /**
+   * Tries to establish whether {@code expression} is side-effect free. The heuristics here are very
+   * conservative.
+   */
   public static boolean hasSideEffect(ExpressionTree expression) {
-    SideEffectAnalysis analyzer = new SideEffectAnalysis();
     if (expression == null) {
       return false;
     }
+    SideEffectAnalysis analyzer = new SideEffectAnalysis();
     expression.accept(analyzer, null);
     return analyzer.hasSideEffect;
   }
@@ -91,32 +69,12 @@ public final class SideEffectAnalysis extends TreeScanner<Void, Void> {
 
   @Override
   public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
-    MethodSymbol methodSymbol = getSymbol(tree);
-    if (methodSymbol == null
-        || SIDE_EFFECT_FREE_CLASSES.contains(methodSymbol.owner.getQualifiedName().toString())) {
-      return null;
-    }
-    hasSideEffect = true;
-    return null;
-  }
-
-  @Override
-  public Void visitNewArray(NewArrayTree tree, Void unused) {
     hasSideEffect = true;
     return null;
   }
 
   @Override
   public Void visitNewClass(NewClassTree tree, Void unused) {
-    String classFullName = "";
-    if (tree.getIdentifier().getKind() == Kind.MEMBER_SELECT) {
-      classFullName = ((JCFieldAccess) tree.getIdentifier()).sym.getQualifiedName().toString();
-    } else if (tree.getIdentifier().getKind() == Kind.IDENTIFIER) {
-      classFullName = ((JCIdent) tree.getIdentifier()).sym.getQualifiedName().toString();
-    }
-    if (SIDE_EFFECT_FREE_CLASSES.contains(classFullName)) {
-      return null;
-    }
     hasSideEffect = true;
     return null;
   }

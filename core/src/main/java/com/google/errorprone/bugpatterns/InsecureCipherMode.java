@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
@@ -37,8 +36,6 @@ import com.sun.tools.javac.tree.JCTree;
     altNames = {"InsecureCipherMode"},
     summary =
         "A standard cryptographic operation is used in a mode that is prone to vulnerabilities",
-    category = JDK,
-    documentSuppression = false,
     severity = ERROR)
 public class InsecureCipherMode extends BugChecker implements MethodInvocationTreeMatcher {
   private static final String MESSAGE_BASE = "Insecure usage of a crypto API: ";
@@ -51,7 +48,6 @@ public class InsecureCipherMode extends BugChecker implements MethodInvocationTr
           staticMethod().onClass("java.security.KeyPairGenerator").named("getInstance"),
           staticMethod().onClass("java.security.KeyFactory").named("getInstance"),
           staticMethod().onClass("javax.crypto.KeyAgreement").named("getInstance"));
-
 
   private Description buildErrorMessage(MethodInvocationTree tree, String explanation) {
     Description.Builder description = buildDescription(tree);
@@ -135,7 +131,6 @@ public class InsecureCipherMode extends BugChecker implements MethodInvocationTr
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
     Description description = checkInvocation(tree, state);
-
 
     return description;
   }

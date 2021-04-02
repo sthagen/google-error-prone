@@ -21,7 +21,6 @@ import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
@@ -36,12 +35,11 @@ import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Symbol;
 import java.util.Optional;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ImmutableRefactoring",
     summary = "Refactors uses of the JSR 305 @Immutable to Error Prone's annotation",
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class ImmutableRefactoring extends BugChecker implements CompilationUnitTreeMatcher {
 
   @Override
@@ -85,11 +83,9 @@ public class ImmutableRefactoring extends BugChecker implements CompilationUnitT
       }
 
       private VisitorState createVisitorState() {
-        return new VisitorState(
+        return VisitorState.createConfiguredForCompilation(
             state.context,
-            (Description description) -> {
-              ok[0] = false;
-            },
+            description -> ok[0] = false,
             ImmutableMap.of(),
             state.errorProneOptions());
       }

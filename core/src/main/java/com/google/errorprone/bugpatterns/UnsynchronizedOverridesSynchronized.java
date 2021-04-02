@@ -18,8 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
-import static com.google.errorprone.BugPattern.ProvidesFix.REQUIRES_HUMAN_ATTENTION;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
@@ -44,14 +42,12 @@ import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "UnsynchronizedOverridesSynchronized",
     summary = "Unsynchronized method overrides a synchronized method.",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class UnsynchronizedOverridesSynchronized extends BugChecker implements MethodTreeMatcher {
   @Override
   public Description matchMethod(MethodTree methodTree, VisitorState state) {
@@ -118,7 +114,7 @@ public class UnsynchronizedOverridesSynchronized extends BugChecker implements M
           }
 
           @Override
-          public Boolean visitMethodInvocation(MethodInvocationTree node, Void aVoid) {
+          public Boolean visitMethodInvocation(MethodInvocationTree node, Void unused) {
             ExpressionTree receiver = ASTHelpers.getReceiver(node);
             return receiver instanceof IdentifierTree
                 && ((IdentifierTree) receiver).getName().contentEquals("super")

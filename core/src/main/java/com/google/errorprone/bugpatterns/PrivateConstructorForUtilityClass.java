@@ -15,109 +15,99 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Streams.stream;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.fixes.SuggestedFixes.addMembers;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.createPrivateConstructor;
+import static com.google.errorprone.util.ASTHelpers.getSymbol;
+import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
 import static com.google.errorprone.util.ASTHelpers.isGeneratedConstructor;
 import static com.sun.source.tree.Tree.Kind.CLASS;
 import static com.sun.source.tree.Tree.Kind.METHOD;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.STATIC;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
+import com.google.errorprone.fixes.SuggestedFix;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
-import com.sun.source.util.TreePath;
+import javax.lang.model.element.Modifier;
 
 /** @author gak@google.com (Gregory Kick) */
 @BugPattern(
     name = "PrivateConstructorForUtilityClass",
     summary =
-        "Utility classes (only static members) are not designed to be instantiated and should"
-            + " be made noninstantiable with a default constructor.",
-    category = JDK,
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+        "Classes which are not intended to be instantiated should be made non-instantiable with a"
+            + " private constructor. This includes utility classes (classes with only static"
+            + " members), and the main class.",
+    severity = SUGGESTION)
 public final class PrivateConstructorForUtilityClass extends BugChecker
     implements ClassTreeMatcher {
 
   @Override
   public Description matchClass(ClassTree classTree, VisitorState state) {
     if (!classTree.getKind().equals(CLASS)
+        || classTree.getModifiers().getFlags().contains(Modifier.ABSTRACT)
         || classTree.getExtendsClause() != null
         || !classTree.getImplementsClause().isEmpty()
-        || isInPrivateScope(state)) {
+        || isInPrivateScope(state)
+        || hasAnnotation(getSymbol(classTree), "org.junit.runner.RunWith", state)
+        || hasAnnotation(getSymbol(classTree), "org.robolectric.annotation.Implements", state)) {
       return NO_MATCH;
     }
 
-    FluentIterable<? extends Tree> nonSyntheticMembers =
-        FluentIterable.from(classTree.getMembers())
+    ImmutableList<Tree> nonSyntheticMembers =
+        classTree.getMembers().stream()
             .filter(
-                Predicates.not(
-                    new Predicate<Tree>() {
-                      @Override
-                      public boolean apply(Tree tree) {
-                        return tree.getKind().equals(METHOD)
-                            && isGeneratedConstructor((MethodTree) tree);
-                      }
-                    }));
-    if (nonSyntheticMembers.isEmpty()) {
+                tree ->
+                    !(tree.getKind().equals(METHOD) && isGeneratedConstructor((MethodTree) tree)))
+            .collect(toImmutableList());
+    if (nonSyntheticMembers.isEmpty()
+        || nonSyntheticMembers.stream().anyMatch(PrivateConstructorForUtilityClass::isInstance)) {
       return NO_MATCH;
     }
-    boolean isUtilityClass =
-        nonSyntheticMembers.allMatch(
-            new Predicate<Tree>() {
-              @Override
-              public boolean apply(Tree tree) {
-                switch (tree.getKind()) {
-                  case CLASS:
-                    return ((ClassTree) tree).getModifiers().getFlags().contains(STATIC);
-                  case METHOD:
-                    return ((MethodTree) tree).getModifiers().getFlags().contains(STATIC);
-                  case VARIABLE:
-                    return ((VariableTree) tree).getModifiers().getFlags().contains(STATIC);
-                  case BLOCK:
-                    return ((BlockTree) tree).isStatic();
-                  case ENUM:
-                  case ANNOTATION_TYPE:
-                  case INTERFACE:
-                    return true;
-                  default:
-                    throw new AssertionError("unknown member type:" + tree.getKind());
-                }
-              }
-            });
-    if (!isUtilityClass) {
-      return NO_MATCH;
-    }
-    return describeMatch(
-        classTree, addMembers(classTree, state, "private " + classTree.getSimpleName() + "() {}"));
+    SuggestedFix.Builder fix =
+        SuggestedFix.builder()
+            .merge(addMembers(classTree, state, createPrivateConstructor(classTree)));
+    SuggestedFixes.addModifiers(classTree, state, Modifier.FINAL).ifPresent(fix::merge);
+    return describeMatch(classTree, fix.build());
   }
 
   private static boolean isInPrivateScope(VisitorState state) {
-    TreePath treePath = state.getPath();
-    do {
-      Tree currentLeaf = treePath.getLeaf();
-      if (ClassTree.class.isInstance(currentLeaf)) {
-        ClassTree currentClassTree = (ClassTree) currentLeaf;
-        if (currentClassTree.getModifiers().getFlags().contains(PRIVATE)) {
-          return true;
-        }
-      }
-      treePath = treePath.getParentPath();
-    } while (treePath != null);
+    return stream(state.getPath())
+        .anyMatch(
+            currentLeaf ->
+                // Checking instanceof rather than Kind given (e.g.) enums are ClassTrees.
+                currentLeaf instanceof ClassTree
+                    && ((ClassTree) currentLeaf).getModifiers().getFlags().contains(PRIVATE));
+  }
 
-    return false;
+  private static boolean isInstance(Tree tree) {
+    switch (tree.getKind()) {
+      case CLASS:
+        return !((ClassTree) tree).getModifiers().getFlags().contains(STATIC);
+      case METHOD:
+        return !((MethodTree) tree).getModifiers().getFlags().contains(STATIC);
+      case VARIABLE:
+        return !((VariableTree) tree).getModifiers().getFlags().contains(STATIC);
+      case BLOCK:
+        return !((BlockTree) tree).isStatic();
+      case ENUM:
+      case ANNOTATION_TYPE:
+      case INTERFACE:
+        return false;
+      default:
+        throw new AssertionError("unknown member type:" + tree.getKind());
+    }
   }
 }

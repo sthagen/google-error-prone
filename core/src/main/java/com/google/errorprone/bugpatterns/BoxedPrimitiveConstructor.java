@@ -20,12 +20,11 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.toType;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
@@ -47,15 +46,14 @@ import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.util.Context;
+import javax.annotation.Nullable;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "BoxedPrimitiveConstructor",
-    category = Category.JDK,
     summary = "valueOf or autoboxing provides better time and space performance",
     severity = SeverityLevel.WARNING,
-    tags = StandardTags.PERFORMANCE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.PERFORMANCE)
 public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTreeMatcher {
 
   private static final Matcher<Tree> TO_STRING =
@@ -91,7 +89,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     return NO_MATCH;
   }
 
-  private Fix buildFix(NewClassTree tree, VisitorState state) {
+  private static Fix buildFix(NewClassTree tree, VisitorState state) {
     boolean autoboxFix = shouldAutoboxFix(state);
     Types types = state.getTypes();
     Type type = types.unboxedTypeOrType(getType(tree));
@@ -110,10 +108,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     Type argType = getType(arg);
     if (autoboxFix && argType.isPrimitive()) {
       return SuggestedFix.builder()
-          .replace(
-              ((JCTree) tree).getStartPosition(),
-              arg.getStartPosition(),
-              maybeCast(state, type, argType))
+          .replace(getStartPosition(tree), arg.getStartPosition(), maybeCast(state, type, argType))
           .replace(state.getEndPosition(arg), state.getEndPosition(tree), "")
           .build();
     }
@@ -217,7 +212,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     }
 
     return SuggestedFix.builder()
-        .replace(((JCTree) tree).getStartPosition(), arg.getStartPosition(), prefixToArg)
+        .replace(getStartPosition(tree), arg.getStartPosition(), prefixToArg)
         .postfixWith(arg, suffix)
         .build();
   }
@@ -226,7 +221,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     return Source.instance(context).compareTo(Source.lookup("1.7")) <= 0; // 7 or below
   }
 
-  private String maybeCast(VisitorState state, Type type, Type argType) {
+  private static String maybeCast(VisitorState state, Type type, Type argType) {
     if (doubleAndFloatStatus(state, type, argType)
         == DoubleAndFloatStatus.PRIMITIVE_DOUBLE_INTO_FLOAT) {
       // e.g.: new Float(3.0d) => (float) 3.0d
@@ -249,7 +244,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     BOXED_DOUBLE_INTO_FLOAT
   }
 
-  private DoubleAndFloatStatus doubleAndFloatStatus(
+  private static DoubleAndFloatStatus doubleAndFloatStatus(
       VisitorState state, Type recieverType, Type argType) {
     Types types = state.getTypes();
     if (!types.isSameType(recieverType, state.getSymtab().floatType)) {
@@ -264,7 +259,7 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     return DoubleAndFloatStatus.NONE;
   }
 
-  private boolean shouldAutoboxFix(VisitorState state) {
+  private static boolean shouldAutoboxFix(VisitorState state) {
     switch (state.getPath().getParentPath().getLeaf().getKind()) {
       case METHOD_INVOCATION:
         // autoboxing a method argument affects overload resolution
@@ -280,14 +275,15 @@ public class BoxedPrimitiveConstructor extends BugChecker implements NewClassTre
     }
   }
 
-  private String literalFix(boolean value, boolean autoboxFix) {
+  private static String literalFix(boolean value, boolean autoboxFix) {
     if (autoboxFix) {
       return value ? "true" : "false";
     }
     return value ? "Boolean.TRUE" : "Boolean.FALSE";
   }
 
-  private Object literalValue(Tree arg) {
+  @Nullable
+  private static Object literalValue(Tree arg) {
     if (!(arg instanceof LiteralTree)) {
       return null;
     }

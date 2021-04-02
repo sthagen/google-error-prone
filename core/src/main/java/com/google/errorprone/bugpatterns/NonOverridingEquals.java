@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -36,7 +35,6 @@ import static com.google.errorprone.suppliers.Suppliers.OBJECT_TYPE;
 import static com.sun.tools.javac.code.Flags.ENUM;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -58,10 +56,8 @@ import com.sun.tools.javac.util.Name;
 @BugPattern(
     name = "NonOverridingEquals",
     summary = "equals method doesn't override Object.equals",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class NonOverridingEquals extends BugChecker implements MethodTreeMatcher {
 
   private static final String MESSAGE_BASE = "equals method doesn't override Object.equals";
@@ -162,7 +158,7 @@ public class NonOverridingEquals extends BugChecker implements MethodTreeMatcher
             "if (!("
                 + parameterName
                 + " instanceof "
-                + parameterType
+                + state.getSourceForNode(parameterType)
                 + ")) {\n"
                 + "  return false;\n"
                 + "}\n";
@@ -171,7 +167,8 @@ public class NonOverridingEquals extends BugChecker implements MethodTreeMatcher
         // Cast all uses of the parameter name using a recursive TreeScanner.
         new CastScanner()
             .scan(
-                methodTree.getBody(), new CastState(parameterName, parameterType.toString(), fix));
+                methodTree.getBody(),
+                new CastState(parameterName, state.getSourceForNode(parameterType), fix));
       }
 
       return describeMatch(methodTree, fix.build());

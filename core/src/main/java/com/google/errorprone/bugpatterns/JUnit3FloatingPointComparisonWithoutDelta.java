@@ -16,12 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JUNIT;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -50,9 +48,8 @@ import javax.lang.model.type.TypeKind;
     name = "JUnit3FloatingPointComparisonWithoutDelta",
     summary = "Floating-point comparison without error tolerance",
     // First sentence copied directly from JUnit 4.
-    category = JUNIT,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+
+    severity = WARNING)
 public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
     implements MethodInvocationTreeMatcher {
 
@@ -74,7 +71,7 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   }
 
   /** Gets the argument types, excluding the message argument if present. */
-  private List<Type> getArgumentTypesWithoutMessage(
+  private static List<Type> getArgumentTypesWithoutMessage(
       MethodInvocationTree methodInvocationTree, VisitorState state) {
     List<Type> argumentTypes = new ArrayList<>();
     for (ExpressionTree argument : methodInvocationTree.getArguments()) {
@@ -86,7 +83,7 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   }
 
   /** Removes the message argument if it is present. */
-  private void removeMessageArgumentIfPresent(VisitorState state, List<Type> argumentTypes) {
+  private static void removeMessageArgumentIfPresent(VisitorState state, List<Type> argumentTypes) {
     if (argumentTypes.size() == 2) {
       return;
     }
@@ -100,7 +97,7 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   /**
    * Determines if the invocation can be safely converted to JUnit 4 based on its argument types.
    */
-  private boolean canBeConvertedToJUnit4(VisitorState state, List<Type> argumentTypes) {
+  private static boolean canBeConvertedToJUnit4(VisitorState state, List<Type> argumentTypes) {
     // Delta argument is used.
     if (argumentTypes.size() > 2) {
       return true;
@@ -123,7 +120,7 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   }
 
   /** Determines if the type is a floating-point type, including reference types. */
-  private boolean isFloatingPoint(VisitorState state, Type type) {
+  private static boolean isFloatingPoint(VisitorState state, Type type) {
     Type trueType = unboxedTypeOrType(state, type);
     return (trueType.getKind() == TypeKind.DOUBLE) || (trueType.getKind() == TypeKind.FLOAT);
   }
@@ -133,19 +130,19 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
    *
    * <p>Type.isNumeric() does not handle reference types properly.
    */
-  private boolean isNumeric(VisitorState state, Type type) {
+  private static boolean isNumeric(VisitorState state, Type type) {
     Type trueType = unboxedTypeOrType(state, type);
     return trueType.isNumeric();
   }
 
   /** Gets the unboxed type, or the original type if it is not unboxable. */
-  private Type unboxedTypeOrType(VisitorState state, Type type) {
+  private static Type unboxedTypeOrType(VisitorState state, Type type) {
     Types types = state.getTypes();
     return types.unboxedTypeOrType(type);
   }
 
   /** Creates the fix to add a delta argument. */
-  private Fix addDeltaArgument(
+  private static Fix addDeltaArgument(
       MethodInvocationTree methodInvocationTree, VisitorState state, List<Type> argumentTypes) {
     int insertionIndex = getDeltaInsertionIndex(methodInvocationTree, state);
     String deltaArgument = getDeltaArgument(state, argumentTypes);
@@ -153,14 +150,14 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   }
 
   /** Gets the index of where to insert the delta argument. */
-  private int getDeltaInsertionIndex(
+  private static int getDeltaInsertionIndex(
       MethodInvocationTree methodInvocationTree, VisitorState state) {
     JCTree lastArgument = (JCTree) Iterables.getLast(methodInvocationTree.getArguments());
     return state.getEndPosition(lastArgument);
   }
 
   /** Gets the text for the delta argument to be added. */
-  private String getDeltaArgument(VisitorState state, List<Type> argumentTypes) {
+  private static String getDeltaArgument(VisitorState state, List<Type> argumentTypes) {
     Type firstType = argumentTypes.get(0);
     Type secondType = argumentTypes.get(1);
     boolean doublePrecisionUsed = isDouble(state, firstType) || isDouble(state, secondType);
@@ -168,7 +165,7 @@ public class JUnit3FloatingPointComparisonWithoutDelta extends BugChecker
   }
 
   /** Determines if the type is a double, including reference types. */
-  private boolean isDouble(VisitorState state, Type type) {
+  private static boolean isDouble(VisitorState state, Type type) {
     Type trueType = unboxedTypeOrType(state, type);
     return trueType.getKind() == TypeKind.DOUBLE;
   }

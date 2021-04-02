@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.MoreCollectors.toOptional;
-import static com.google.errorprone.BugPattern.ProvidesFix.REQUIRES_HUMAN_ATTENTION;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.BugPattern.StandardTags.FRAGILE_CODE;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
@@ -27,7 +26,6 @@ import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
-import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
@@ -50,17 +48,16 @@ import javax.annotation.Nullable;
 @BugPattern(
     name = "AnnotateFormatMethod",
     summary =
-        "This method passes a pair of parameters through to String.format, but the enclosing "
-            + "method wasn't annotated @FormatMethod. Doing so gives compile-time rather than "
-            + "run-time protection against malformed format strings.",
-    severity = WARNING,
+        "This method passes a pair of parameters through to String.format, but the enclosing"
+            + " method wasn't annotated @FormatMethod. Doing so gives compile-time rather than"
+            + " run-time protection against malformed format strings.",
     tags = FRAGILE_CODE,
-    providesFix = REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public final class AnnotateFormatMethod extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final String REORDER =
-      " The parameters of this method would need to be reordered to make the format string and "
-          + "arguments the final parameters before the @FormatMethod annotation can be used.";
+      " (The parameters of this method would need to be reordered to make the format string and "
+          + "arguments the final parameters before the @FormatMethod annotation can be used.)";
 
   private static final Matcher<ExpressionTree> STRING_FORMAT =
       staticMethod().onClass("java.lang.String").named("format");
@@ -98,18 +95,9 @@ public final class AnnotateFormatMethod extends BugChecker implements MethodInvo
     // We can only generate a fix if the format string is the penultimate parameter.
     boolean fixable =
         formatParameter.get().equals(enclosingParameters.get(enclosingParameters.size() - 2));
-    if (fixable) {
-      return buildDescription(enclosingMethod)
-          .addFix(
-              SuggestedFix.builder()
-                  .prefixWith(enclosingMethod, "@FormatMethod ")
-                  .prefixWith(formatParameter.get(), "@FormatString ")
-                  .addImport("com.google.errorprone.annotations.FormatMethod")
-                  .addImport("com.google.errorprone.annotations.FormatString")
-                  .build())
-          .build();
-    }
-    return buildDescription(enclosingMethod).setMessage(message() + REORDER).build();
+    return buildDescription(enclosingMethod)
+        .setMessage(fixable ? message() : (message() + REORDER))
+        .build();
   }
 
   private static Optional<? extends VariableTree> findParameterWithSymbol(

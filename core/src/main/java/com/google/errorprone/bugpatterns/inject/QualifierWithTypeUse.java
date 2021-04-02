@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.ChildMultiMatcher.MatchType.AT_LEAST_ONE;
 import static com.google.errorprone.matchers.Matchers.allOf;
@@ -29,7 +28,6 @@ import static com.sun.source.tree.Tree.Kind.ANNOTATION_TYPE;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -57,10 +55,8 @@ import java.util.Set;
     summary =
         "Injection frameworks currently don't understand Qualifiers in TYPE_PARAMETER or"
             + " TYPE_USE contexts.",
-    category = INJECT,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class QualifierWithTypeUse extends BugChecker implements ClassTreeMatcher {
 
   private static final MultiMatcher<ClassTree, AnnotationTree> HAS_TARGET_ANNOTATION =
@@ -92,13 +88,13 @@ public class QualifierWithTypeUse extends BugChecker implements ClassTreeMatcher
     return Description.NO_MATCH;
   }
 
-  private boolean hasTypeUseOrTypeParameter(Target targetAnnotation) {
+  private static boolean hasTypeUseOrTypeParameter(Target targetAnnotation) {
     // Should only be in cases where Target is not in the classpath
     return targetAnnotation != null
         && !Collections.disjoint(FORBIDDEN_ELEMENT_TYPES, Arrays.asList(targetAnnotation.value()));
   }
 
-  private Fix removeTypeUse(Target targetAnnotation, AnnotationTree tree) {
+  private static Fix removeTypeUse(Target targetAnnotation, AnnotationTree tree) {
     Set<ElementType> elements = EnumSet.copyOf(Arrays.asList(targetAnnotation.value()));
     elements.removeAll(FORBIDDEN_ELEMENT_TYPES);
     if (elements.isEmpty()) {

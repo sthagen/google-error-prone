@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns;
 
+import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -30,39 +30,34 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class IncompatibleModifiersCheckerTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(IncompatibleModifiersChecker.class, getClass())
-            .addSourceLines(
-                "test/NotPrivateOrFinal.java",
-                "package test;",
-                "import static javax.lang.model.element.Modifier.FINAL;",
-                "import static javax.lang.model.element.Modifier.PRIVATE;",
-                "import com.google.errorprone.annotations.IncompatibleModifiers;",
-                "@IncompatibleModifiers({PRIVATE, FINAL})",
-                "public @interface NotPrivateOrFinal {",
-                "}")
-            .addSourceLines(
-                "test/NotPublicOrFinal.java",
-                "package test;",
-                "import static javax.lang.model.element.Modifier.FINAL;",
-                "import static javax.lang.model.element.Modifier.PUBLIC;",
-                "import com.google.errorprone.annotations.IncompatibleModifiers;",
-                "@IncompatibleModifiers({PUBLIC, FINAL})",
-                "public @interface NotPublicOrFinal {",
-                "}")
-            .addSourceLines(
-                "test/NotAbstract.java",
-                "package test;",
-                "import static javax.lang.model.element.Modifier.ABSTRACT;",
-                "import com.google.errorprone.annotations.IncompatibleModifiers;",
-                "@IncompatibleModifiers(ABSTRACT)",
-                "public @interface NotAbstract {",
-                "}");
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(IncompatibleModifiersChecker.class, getClass())
+          .addSourceLines(
+              "test/NotPrivateOrFinal.java",
+              "package test;",
+              "import static javax.lang.model.element.Modifier.FINAL;",
+              "import static javax.lang.model.element.Modifier.PRIVATE;",
+              "import com.google.errorprone.annotations.IncompatibleModifiers;",
+              "@IncompatibleModifiers({PRIVATE, FINAL})",
+              "public @interface NotPrivateOrFinal {",
+              "}")
+          .addSourceLines(
+              "test/NotPublicOrFinal.java",
+              "package test;",
+              "import static javax.lang.model.element.Modifier.FINAL;",
+              "import static javax.lang.model.element.Modifier.PUBLIC;",
+              "import com.google.errorprone.annotations.IncompatibleModifiers;",
+              "@IncompatibleModifiers({PUBLIC, FINAL})",
+              "public @interface NotPublicOrFinal {",
+              "}")
+          .addSourceLines(
+              "test/NotAbstract.java",
+              "package test;",
+              "import static javax.lang.model.element.Modifier.ABSTRACT;",
+              "import com.google.errorprone.annotations.IncompatibleModifiers;",
+              "@IncompatibleModifiers(ABSTRACT)",
+              "public @interface NotAbstract {",
+              "}");
 
   @Test
   public void testAnnotationWithIncompatibleModifierOnClassFails() {
@@ -134,68 +129,6 @@ public class IncompatibleModifiersCheckerTest {
         .doTest();
   }
 
-  @Test
-  public void testGuavaAnnotation() {
-    compilationHelper
-        .addSourceLines(
-            "com/google/common/annotations/IncompatibleModifiers.java",
-            "package com.google.common.annotations;",
-            "import javax.lang.model.element.Modifier;",
-            "import java.lang.annotation.Target;",
-            "import java.lang.annotation.ElementType;",
-            "@Target(ElementType.ANNOTATION_TYPE)",
-            "public @interface IncompatibleModifiers {",
-            "  Modifier[] value();",
-            "}")
-        .addSourceLines(
-            "test/NotAbstract.java",
-            "package test;",
-            "import static javax.lang.model.element.Modifier.ABSTRACT;",
-            "import com.google.common.annotations.IncompatibleModifiers;",
-            "@IncompatibleModifiers(ABSTRACT)",
-            "public @interface NotAbstract {",
-            "}")
-        .addSourceLines(
-            "test/RequiredModifiersTestCase.java",
-            "package test;",
-            "import test.NotAbstract;",
-            "// BUG: Diagnostic contains: The annotation '@NotAbstract' has specified that it"
-                + " should not be used together with the following modifiers: [abstract]",
-            "@NotAbstract public abstract class RequiredModifiersTestCase {",
-            "}")
-        .doTest();
-  }
-
-  @Test
-  public void testGuavaAnnotationOK() {
-    compilationHelper
-        .addSourceLines(
-            "com/google/common/annotations/IncompatibleModifiers.java",
-            "package com.google.common.annotations;",
-            "import javax.lang.model.element.Modifier;",
-            "import java.lang.annotation.Target;",
-            "import java.lang.annotation.ElementType;",
-            "@Target(ElementType.ANNOTATION_TYPE)",
-            "public @interface IncompatibleModifiers {",
-            "  Modifier[] value();",
-            "}")
-        .addSourceLines(
-            "test/NotAbstract.java",
-            "package test;",
-            "import static javax.lang.model.element.Modifier.ABSTRACT;",
-            "import com.google.common.annotations.IncompatibleModifiers;",
-            "@IncompatibleModifiers(ABSTRACT)",
-            "public @interface NotAbstract {",
-            "}")
-        .addSourceLines(
-            "test/RequiredModifiersTestCase.java",
-            "package test;",
-            "import test.NotAbstract;",
-            "@NotAbstract public class RequiredModifiersTestCase {",
-            "}")
-        .doTest();
-  }
-
   // Regression test for #313
   @Test
   public void negativeNestedAnnotations() {
@@ -226,6 +159,33 @@ public class IncompatibleModifiersCheckerTest {
             "public @interface Anno {",
             "}")
         .addSourceLines("testdata/package-info.java", "@Anno", "package testdata;")
+        .doTest();
+  }
+
+  @Test
+  public void refactoring() {
+    BugCheckerRefactoringTestHelper.newInstance(IncompatibleModifiersChecker.class, getClass())
+        .addInputLines(
+            "test/NotAbstract.java",
+            "package test;",
+            "import static javax.lang.model.element.Modifier.ABSTRACT;",
+            "import com.google.errorprone.annotations.IncompatibleModifiers;",
+            "@IncompatibleModifiers(ABSTRACT)",
+            "public @interface NotAbstract {",
+            "}")
+        .expectUnchanged()
+        .addInputLines(
+            "test/IncompatibleModifiersTestCase.java",
+            "package test;",
+            "import test.NotAbstract;",
+            "@NotAbstract abstract class IncompatibleModifiersTestCase {",
+            "}")
+        .addOutputLines(
+            "test/IncompatibleModifiersTestCase.java",
+            "package test;",
+            "import test.NotAbstract;",
+            "@NotAbstract class IncompatibleModifiersTestCase {",
+            "}")
         .doTest();
   }
 }

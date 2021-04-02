@@ -22,7 +22,6 @@ import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -43,7 +42,7 @@ import com.sun.source.util.DocTreePathScanner;
     summary = "Void methods should not have a @return tag.",
     severity = WARNING,
     tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    documentSuppression = false)
 public final class ReturnFromVoid extends BugChecker implements MethodTreeMatcher {
 
   @Override
@@ -68,9 +67,8 @@ public final class ReturnFromVoid extends BugChecker implements MethodTreeMatche
     public Void visitReturn(ReturnTree returnTree, Void unused) {
       if (isSameType(getType(methodTree.getReturnType()), state.getSymtab().voidType, state)) {
         state.reportMatch(
-            buildDescription(diagnosticPosition(getCurrentPath(), state))
-                .addFix(Utils.replace(returnTree, "", state))
-                .build());
+            describeMatch(
+                diagnosticPosition(getCurrentPath(), state), Utils.replace(returnTree, "", state)));
       }
       return super.visitReturn(returnTree, null);
     }

@@ -16,35 +16,25 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.predicates.TypePredicates.isDescendantOf;
 
-import com.google.common.base.Optional;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.predicates.TypePredicate;
-import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.Tree;
-import com.sun.tools.javac.code.Type;
+import java.util.Optional;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "StreamToString",
     summary = "Calling toString on a Stream does not provide useful information",
-    category = JDK,
     severity = ERROR)
 public class StreamToString extends AbstractToString {
 
-  static final TypePredicate STREAM =
-      new TypePredicate() {
-        @Override
-        public boolean apply(Type type, VisitorState state) {
-          Type stream = state.getTypeFromString("java.util.stream.Stream");
-          return ASTHelpers.isSubtype(type, stream, state);
-        }
-      };
+  private static final TypePredicate STREAM = isDescendantOf("java.util.stream.Stream");
 
   @Override
   protected TypePredicate typePredicate() {
@@ -53,11 +43,11 @@ public class StreamToString extends AbstractToString {
 
   @Override
   protected Optional<Fix> implicitToStringFix(ExpressionTree tree, VisitorState state) {
-    return Optional.absent();
+    return Optional.empty();
   }
 
   @Override
   protected Optional<Fix> toStringFix(Tree parent, ExpressionTree tree, VisitorState state) {
-    return Optional.absent();
+    return Optional.empty();
   }
 }

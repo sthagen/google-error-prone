@@ -16,18 +16,17 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.instanceMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
-import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
+import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.util.TreePath;
@@ -37,16 +36,14 @@ import com.sun.source.util.TreePath;
     name = "MultipleParallelOrSequentialCalls",
     summary =
         "Multiple calls to either parallel or sequential are unnecessary and cause confusion.",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class MultipleParallelOrSequentialCalls extends BugChecker
     implements MethodInvocationTreeMatcher {
 
-  private static final MethodNameMatcher STREAM =
+  private static final Matcher<ExpressionTree> STREAM =
       instanceMethod().onDescendantOf("java.util.Collection").named("stream");
 
-  private static final MethodNameMatcher PARALLELSTREAM =
+  private static final Matcher<ExpressionTree> PARALLELSTREAM =
       instanceMethod().onDescendantOf("java.util.Collection").named("parallelStream");
 
   @Override
@@ -65,8 +62,8 @@ public class MultipleParallelOrSequentialCalls extends BugChecker
         MethodInvocationTree methodInvocationTree = (MethodInvocationTree) pathToMet.getLeaf();
         // this check makes it so that we stop iterating up once it's done
         if (methodInvocationTree.getArguments().stream()
-            .map(m -> m.toString())
-            .anyMatch(m -> m.contains(t.toString()))) {
+            .map(m -> state.getSourceForNode(m))
+            .anyMatch(m -> m.contains(state.getSourceForNode(t)))) {
           break;
         }
         if (methodInvocationTree.getMethodSelect() instanceof MemberSelectTree) {

@@ -16,18 +16,18 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.collect.Multimaps.toMultimap;
-import static com.google.errorprone.BugPattern.Category.JDK;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.BugPattern.StandardTags.STYLE;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static java.util.stream.Collectors.joining;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
-import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
@@ -40,7 +40,6 @@ import com.sun.source.tree.LineMap;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,8 +52,6 @@ import javax.lang.model.element.Name;
     summary =
         "Constructors and methods with the same name should appear sequentially"
             + " with no other code in between. Please re-order or re-name methods.",
-    generateExamplesFromTestCases = false,
-    category = JDK,
     severity = SUGGESTION,
     linkType = CUSTOM,
     tags = STYLE,
@@ -62,11 +59,10 @@ import javax.lang.model.element.Name;
     )
 public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
-  private final Boolean showFindingOnFirstOverloadOnly;
+  private final Boolean batchFindings;
 
   public UngroupedOverloads(ErrorProneFlags flags) {
-    showFindingOnFirstOverloadOnly =
-        flags.getBoolean("UngroupedOverloads:FindingsOnFirstOverload").orElse(false);
+    batchFindings = flags.getBoolean("UngroupedOverloads:BatchFindings").orElse(false);
   }
 
   @AutoValue
@@ -74,9 +70,9 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
     abstract int index();
 
-    abstract Tree tree();
+    abstract MethodTree tree();
 
-    static MemberWithIndex create(int index, Tree tree) {
+    static MemberWithIndex create(int index, MethodTree tree) {
       return new AutoValue_UngroupedOverloads_MemberWithIndex(index, tree);
     }
   }
@@ -99,36 +95,37 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
   @Override
   public Description matchClass(ClassTree classTree, VisitorState state) {
     // collect all member methods and their indices in the list of members, grouped by name
-    LinkedHashMultimap<OverloadKey, MemberWithIndex> methods =
-        Streams.zip(
-                Stream.iterate(0, i -> i + 1),
-                classTree.getMembers().stream(),
-                MemberWithIndex::create)
-            .filter(m -> m.tree() instanceof MethodTree)
-            .collect(
-                toMultimap(
-                    m -> OverloadKey.create((MethodTree) m.tree()),
-                    x -> x,
-                    LinkedHashMultimap::create));
-    methods
-        .asMap()
-        .forEach(
-            (key, overloads) ->
-                checkOverloads(
-                    state, classTree.getMembers(), key.name(), ImmutableList.copyOf(overloads)));
+    LinkedHashMultimap<OverloadKey, MemberWithIndex> methods = LinkedHashMultimap.create();
+    for (int i = 0; i < classTree.getMembers().size(); ++i) {
+      Tree member = classTree.getMembers().get(i);
+      if (member instanceof MethodTree) {
+        MethodTree methodTree = (MethodTree) member;
+        methods.put(OverloadKey.create(methodTree), MemberWithIndex.create(i, methodTree));
+      }
+    }
+    ImmutableList<Description> descriptions =
+        methods.asMap().entrySet().stream()
+            .flatMap(
+                e ->
+                    checkOverloads(
+                        state, classTree.getMembers(), ImmutableList.copyOf(e.getValue())))
+            .collect(toImmutableList());
+    if (batchFindings && !descriptions.isEmpty()) {
+      SuggestedFix.Builder fix = SuggestedFix.builder();
+      descriptions.forEach(d -> fix.merge((SuggestedFix) getOnlyElement(d.fixes)));
+      return describeMatch(descriptions.get(0).position, fix.build());
+    }
+    descriptions.forEach(state::reportMatch);
     return NO_MATCH;
   }
 
-  private void checkOverloads(
-      VisitorState state,
-      List<? extends Tree> members,
-      Name name,
-      ImmutableList<MemberWithIndex> overloads) {
+  private Stream<Description> checkOverloads(
+      VisitorState state, List<? extends Tree> members, ImmutableList<MemberWithIndex> overloads) {
     if (overloads.size() <= 1) {
-      return;
+      return Stream.empty();
     }
     // check if the indices of the overloads in the member list are sequential
-    MemberWithIndex first = overloads.iterator().next();
+    MemberWithIndex first = overloads.get(0);
     int prev = -1;
     int group = 0;
     Map<MemberWithIndex, Integer> groups = new LinkedHashMap<>();
@@ -140,15 +137,15 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
       prev = overload.index();
     }
     if (group == 0) {
-      return;
+      return Stream.empty();
     }
     if (overloads.stream().anyMatch(m -> isSuppressed(m.tree()))) {
-      return;
+      return Stream.empty();
     }
-    // build a fix that deletes all but the first overload, and adds them back immediately after
-    // the first overload
+    // build a fix that replaces the first overload with all the overloads grouped together
     SuggestedFix.Builder fixBuilder = SuggestedFix.builder();
     StringBuilder sb = new StringBuilder("\n");
+    sb.append(state.getSourceForNode(first.tree()));
     overloads.stream()
         .filter(o -> o != first)
         .forEach(
@@ -158,23 +155,21 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
               sb.append(state.getSourceCode(), start, end).append('\n');
               fixBuilder.replace(start, end, "");
             });
-    fixBuilder.postfixWith(first.tree(), sb.toString());
+    fixBuilder.replace(first.tree(), sb.toString());
     SuggestedFix fix = fixBuilder.build();
     LineMap lineMap = state.getPath().getCompilationUnit().getLineMap();
     // emit findings for each overload
-    overloads.stream()
-        .limit(showFindingOnFirstOverloadOnly ? 1 : Long.MAX_VALUE)
-        .forEach(
+    return overloads.stream()
+        .map(
             o ->
-                state.reportMatch(
-                    buildDescription(o.tree())
-                        .addFix(fix)
-                        .setMessage(createMessage(name, overloads, groups, lineMap, o))
-                        .build()));
+                buildDescription(o.tree())
+                    .addFix(fix)
+                    .setMessage(createMessage(o.tree(), overloads, groups, lineMap, o))
+                    .build());
   }
 
   private static String createMessage(
-      Name name,
+      MethodTree tree,
       ImmutableList<MemberWithIndex> overloads,
       Map<MemberWithIndex, Integer> groups,
       LineMap lineMap,
@@ -182,11 +177,16 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
     String ungroupedLines =
         overloads.stream()
             .filter(o -> !groups.get(o).equals(groups.get(current)))
-            .map(t -> lineMap.getLineNumber(((JCTree) t.tree()).getStartPosition()))
+            .map(t -> lineMap.getLineNumber(getStartPosition(t.tree())))
             .map(String::valueOf)
             .collect(joining(", "));
+    MethodSymbol symbol = ASTHelpers.getSymbol(tree);
+    String name =
+        symbol.isConstructor()
+            ? "constructor overloads"
+            : String.format("overloads of '%s'", symbol.getSimpleName());
     return String.format(
-        "Overloads of '%s' are not grouped together; found ungrouped overloads on line(s): %s",
+        "Overloads should be grouped together; found ungrouped %s on line(s): %s",
         name, ungroupedLines);
   }
 }

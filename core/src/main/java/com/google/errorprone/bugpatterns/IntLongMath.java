@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.BugPattern.StandardTags.FRAGILE_CODE;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.AssignmentTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.ReturnTreeMatcher;
@@ -41,14 +39,12 @@ import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Type;
 import javax.lang.model.type.TypeKind;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "IntLongMath",
     summary = "Expression of type int may overflow before being assigned to a long",
     severity = WARNING,
-    category = JDK,
-    tags = FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = FRAGILE_CODE)
 public class IntLongMath extends BugChecker
     implements VariableTreeMatcher, AssignmentTreeMatcher, ReturnTreeMatcher {
 
@@ -87,7 +83,7 @@ public class IntLongMath extends BugChecker
   }
 
   Description check(Type targetType, ExpressionTree init) {
-    if (init == null) {
+    if (init == null || targetType == null) {
       return NO_MATCH;
     }
     if (ASTHelpers.constValue(init) != null) {

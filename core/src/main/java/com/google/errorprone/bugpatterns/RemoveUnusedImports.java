@@ -15,15 +15,16 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
@@ -45,20 +46,20 @@ import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.tree.DCTree.DCReference;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.LinkedHashSet;
 import javax.annotation.Nullable;
 
 /** @author gak@google.com (Gregory Kick) */
 @BugPattern(
     name = "RemoveUnusedImports",
     summary = "Unused imports",
-    category = JDK,
     severity = SUGGESTION,
     documentSuppression = false,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public final class RemoveUnusedImports extends BugChecker implements CompilationUnitTreeMatcher {
+
+  private static final Joiner COMMA_JOINER = Joiner.on(", ");
+
   @Override
   public Description matchCompilationUnit(
       CompilationUnitTree compilationUnitTree, VisitorState state) {
@@ -69,7 +70,7 @@ public final class RemoveUnusedImports extends BugChecker implements Compilation
       return NO_MATCH;
     }
 
-    final Set<ImportTree> unusedImports = new HashSet<>(importedSymbols.keySet());
+    final LinkedHashSet<ImportTree> unusedImports = new LinkedHashSet<>(importedSymbols.keySet());
     new TreeSymbolScanner(JavacTrees.instance(state.context), state.getTypes())
         .scan(
             compilationUnitTree,
@@ -92,7 +93,15 @@ public final class RemoveUnusedImports extends BugChecker implements Compilation
     for (ImportTree unusedImport : unusedImports) {
       fixBuilder.delete(unusedImport);
     }
-    return describeMatch(unusedImports.iterator().next(), fixBuilder.build());
+    ImmutableList<String> unusedImportQualifiedNames =
+        unusedImports.stream()
+            .map(tree -> state.getSourceForNode(tree.getQualifiedIdentifier()))
+            .collect(toImmutableList());
+    return buildDescription(unusedImports.iterator().next())
+        .addFix(fixBuilder.build())
+        .setMessage(
+            String.format("Unused imports: %s", COMMA_JOINER.join(unusedImportQualifiedNames)))
+        .build();
   }
 
   /**

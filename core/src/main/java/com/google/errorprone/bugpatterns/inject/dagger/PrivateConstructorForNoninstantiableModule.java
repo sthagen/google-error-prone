@@ -15,11 +15,11 @@
  */
 package com.google.errorprone.bugpatterns.inject.dagger;
 
-import static com.google.errorprone.BugPattern.Category.DAGGER;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.bugpatterns.inject.dagger.DaggerAnnotations.isBindingDeclarationMethod;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.isStatic;
+import static com.google.errorprone.util.ASTHelpers.createPrivateConstructor;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.isGeneratedConstructor;
 import static com.sun.source.tree.Tree.Kind.CLASS;
@@ -29,7 +29,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
@@ -45,9 +44,7 @@ import com.sun.source.tree.Tree;
 @BugPattern(
     name = "PrivateConstructorForNoninstantiableModule",
     summary = "Add a private constructor to modules that will not be instantiated by Dagger.",
-    category = DAGGER,
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class PrivateConstructorForNoninstantiableModule extends BugChecker
     implements ClassTreeMatcher {
   private static final Predicate<Tree> IS_CONSTRUCTOR =
@@ -106,9 +103,8 @@ public class PrivateConstructorForNoninstantiableModule extends BugChecker
     return NO_MATCH;
   }
 
-  private Fix addPrivateConstructor(ClassTree classTree, VisitorState state) {
-    return SuggestedFixes.addMembers(
-        classTree, state, "private " + classTree.getSimpleName() + "() {}");
+  private static Fix addPrivateConstructor(ClassTree classTree, VisitorState state) {
+    return SuggestedFixes.addMembers(classTree, state, createPrivateConstructor(classTree));
   }
 
   private static <T extends Tree> Predicate<T> matcherAsPredicate(

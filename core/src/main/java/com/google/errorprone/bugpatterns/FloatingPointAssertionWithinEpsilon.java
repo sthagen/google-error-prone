@@ -18,14 +18,12 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.TRUTH;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -33,7 +31,6 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
-import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.LiteralTree;
@@ -55,10 +52,8 @@ import java.util.Optional;
     summary =
         "This fuzzy equality check is using a tolerance less than the gap to the next number. "
             + "You may want a less restrictive tolerance, or to assert equality.",
-    category = TRUTH,
     severity = WARNING,
-    tags = StandardTags.SIMPLIFICATION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.SIMPLIFICATION)
 public final class FloatingPointAssertionWithinEpsilon extends BugChecker
     implements MethodInvocationTreeMatcher {
 
@@ -152,11 +147,16 @@ public final class FloatingPointAssertionWithinEpsilon extends BugChecker
                       .onDescendantOf(subjectClass)
                       .namedAnyOf("isWithin", "isNotWithin")
                       .withParameters(typeName)));
-      MethodNameMatcher junitAssert =
-          staticMethod().onClass("org.junit.Assert").named("assertEquals");
-      junitWithoutMessage = junitAssert.withParameters(typeName, typeName, typeName);
+      junitWithoutMessage =
+          staticMethod()
+              .onClass("org.junit.Assert")
+              .named("assertEquals")
+              .withParameters(typeName, typeName, typeName);
       junitWithMessage =
-          junitAssert.withParameters("java.lang.String", typeName, typeName, typeName);
+          staticMethod()
+              .onClass("org.junit.Assert")
+              .named("assertEquals")
+              .withParameters("java.lang.String", typeName, typeName, typeName);
     }
 
     abstract Number nextNumber(Number actual);

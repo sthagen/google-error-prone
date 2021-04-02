@@ -16,7 +16,6 @@
 
 package com.google.errorprone.scanner;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.HashBiMap;
@@ -25,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.errorprone.BugCheckerInfo;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.ErrorProneFlags;
@@ -76,15 +76,14 @@ public abstract class ScannerSupplier implements Supplier<Scanner> {
 
   /** Returns a {@link ScannerSupplier} built from a list of {@link BugCheckerInfo}s. */
   public static ScannerSupplier fromBugCheckerInfos(Iterable<BugCheckerInfo> checkers) {
-    ImmutableBiMap.Builder<String, BugCheckerInfo> builder = ImmutableBiMap.builder();
-    for (BugCheckerInfo checker : checkers) {
-      builder.put(checker.canonicalName(), checker);
-    }
-    ImmutableBiMap<String, BugCheckerInfo> allChecks = builder.build();
+    ImmutableBiMap<String, BugCheckerInfo> allChecks =
+        Streams.stream(checkers)
+            .collect(
+                ImmutableBiMap.toImmutableBiMap(BugCheckerInfo::canonicalName, checker -> checker));
     return new ScannerSupplierImpl(
         allChecks,
         defaultSeverities(allChecks.values()),
-        ImmutableSet.<String>of(),
+        ImmutableSet.of(),
         ErrorProneFlags.empty());
   }
 
@@ -103,7 +102,6 @@ public abstract class ScannerSupplier implements Supplier<Scanner> {
    * Returns a map of check name to {@link BugCheckerInfo} for all {@link BugCheckerInfo}s in this
    * {@link ScannerSupplier}, including disabled ones.
    */
-  @VisibleForTesting
   public abstract ImmutableBiMap<String, BugCheckerInfo> getAllChecks();
 
   /**
@@ -139,8 +137,7 @@ public abstract class ScannerSupplier implements Supplier<Scanner> {
    *     may not be disabled
    */
   @CheckReturnValue
-  public ScannerSupplier applyOverrides(ErrorProneOptions errorProneOptions)
-      throws InvalidCommandLineOptionException {
+  public ScannerSupplier applyOverrides(ErrorProneOptions errorProneOptions) {
     Map<String, Severity> severityOverrides = errorProneOptions.getSeverityMap();
     if (severityOverrides.isEmpty()
         && errorProneOptions.getFlags().isEmpty()
@@ -167,6 +164,11 @@ public abstract class ScannerSupplier implements Supplier<Scanner> {
           .forEach(c -> severities.put(c.canonicalName(), SeverityLevel.WARNING));
     }
 
+    if (errorProneOptions.isDisableAllWarnings()) {
+      getAllChecks().values().stream()
+          .filter(c -> c.defaultSeverity() == SeverityLevel.WARNING)
+          .forEach(c -> disabled.add(c.canonicalName()));
+    }
     if (errorProneOptions.isDisableAllChecks()) {
       getAllChecks().values().stream()
           .filter(c -> c.disableable())
@@ -280,12 +282,11 @@ public abstract class ScannerSupplier implements Supplier<Scanner> {
    */
   @CheckReturnValue
   public ScannerSupplier filter(Predicate<? super BugCheckerInfo> predicate) {
-    ImmutableSet.Builder<String> disabled = ImmutableSet.builder();
-    for (BugCheckerInfo check : getAllChecks().values()) {
-      if (!predicate.apply(check)) {
-        disabled.add(check.canonicalName());
-      }
-    }
-    return new ScannerSupplierImpl(getAllChecks(), severities(), disabled.build(), getFlags());
+    ImmutableSet<String> disabled =
+        getAllChecks().values().stream()
+            .filter(predicate.negate())
+            .map(BugCheckerInfo::canonicalName)
+            .collect(ImmutableSet.toImmutableSet());
+    return new ScannerSupplierImpl(getAllChecks(), severities(), disabled, getFlags());
   }
 }

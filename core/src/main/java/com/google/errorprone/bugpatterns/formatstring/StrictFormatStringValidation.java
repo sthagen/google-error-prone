@@ -17,6 +17,7 @@
 package com.google.errorprone.bugpatterns.formatstring;
 
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
+import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
@@ -31,15 +32,12 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.tree.JCTree.JCExpression;
 import java.util.List;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.lang.model.element.ElementKind;
 
@@ -49,23 +47,24 @@ import javax.lang.model.element.ElementKind;
  */
 public class StrictFormatStringValidation {
 
-  private static final Matcher<ExpressionTree> MOCKITO_ARGUMENT_MATCHER =
-      staticMethod().onClass("org.mockito.Matchers");
+  private static final Matcher<ExpressionTree> MOCKITO_MATCHERS =
+      staticMethod().onClassAny("org.mockito.Matchers", "org.mockito.ArgumentMatchers");
 
   @Nullable
   public static ValidationResult validate(
       ExpressionTree formatStringTree, List<? extends ExpressionTree> args, VisitorState state) {
-    if (MOCKITO_ARGUMENT_MATCHER.matches(formatStringTree, state)) {
+    if (MOCKITO_MATCHERS.matches(formatStringTree, state)) {
       // Mockito matchers do not pass standard @FormatString requirements, but we allow them so
       // that people can verify @FormatMethod methods.
       return null;
     }
 
-    Stream<String> formatStringValues = FormatStringValidation.constValues(formatStringTree);
+    boolean hasConstantValue =
+        FormatStringValidation.constValues(formatStringTree).findAny().isPresent();
 
     // If formatString has a constant value, then it couldn't have been an @FormatString parameter,
     // so don't bother with annotations and just check if the parameters match the format string.
-    if (formatStringValues != null) {
+    if (hasConstantValue) {
       return FormatStringValidation.validate(
           /* formatMethodSymbol= */ null,
           ImmutableList.<ExpressionTree>builder().add(formatStringTree).addAll(args).build(),
@@ -85,7 +84,7 @@ public class StrictFormatStringValidation {
               formatStringTree));
     }
 
-    if ((formatStringSymbol.flags() & (Flags.FINAL | Flags.EFFECTIVELY_FINAL)) == 0) {
+    if (!isConsideredFinal(formatStringSymbol)) {
       return ValidationResult.create(
           null, "All variables passed as @FormatString must be final or effectively final");
     }
@@ -128,7 +127,7 @@ public class StrictFormatStringValidation {
     Types types = state.getTypes();
     ImmutableList.Builder<Type> calleeFormatArgTypesBuilder = ImmutableList.builder();
     for (ExpressionTree formatArgExpression : args) {
-      calleeFormatArgTypesBuilder.add(types.erasure(((JCExpression) formatArgExpression).type));
+      calleeFormatArgTypesBuilder.add(types.erasure(ASTHelpers.getType(formatArgExpression)));
     }
     ImmutableList<Type> calleeFormatArgTypes = calleeFormatArgTypesBuilder.build();
 
@@ -152,7 +151,7 @@ public class StrictFormatStringValidation {
                       + "with an @FormatString must match the types of the format arguments in "
                       + "the @FormatMethod header where the format string was declared.\n\t"
                       + "Format arg types passed: %s\n\tFormat arg types expected: %s",
-                  calleeFormatArgTypes.toArray(), ownerFormatArgTypes.toArray()));
+                  calleeFormatArgTypes, ownerFormatArgTypes));
         }
       }
     }

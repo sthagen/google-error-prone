@@ -16,7 +16,7 @@
 
 package com.google.errorprone.matchers;
 
-import static org.junit.Assert.assertTrue;
+import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.scanner.Scanner;
@@ -53,8 +53,8 @@ public class MethodReturnsNonNullToStringTest extends CompilerBasedAbstractTest 
         "    return toString();",
         "  }",
         "  public String testInstanceToString() {",
-        "    Boolean b = new Boolean(true);",
-        "    return b.toString();",
+        "    Object o = new Object();",
+        "    return o.toString();",
         "  }",
         "  public String testStringToString() {",
         "    String str = \"a string\";",
@@ -117,7 +117,9 @@ public class MethodReturnsNonNullToStringTest extends CompilerBasedAbstractTest 
       public Void visitMethodInvocation(MethodInvocationTree node, VisitorState visitorState) {
         ExpressionTree methodSelect = node.getMethodSelect();
         if (!methodSelect.toString().equals("super")) {
-          assertTrue(methodSelect.toString(), !shouldMatch ^ toMatch.matches(node, visitorState));
+          assertWithMessage(methodSelect.toString())
+              .that(!shouldMatch ^ toMatch.matches(node, visitorState))
+              .isTrue();
         }
         return super.visitMethodInvocation(node, visitorState);
       }

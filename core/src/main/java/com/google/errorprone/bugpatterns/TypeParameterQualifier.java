@@ -16,30 +16,25 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MemberSelectTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
-import com.sun.tools.javac.tree.JCTree.JCExpression;
-import com.sun.tools.javac.tree.TreeMaker;
 import javax.lang.model.element.ElementKind;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "TypeParameterQualifier",
     summary = "Type parameter used as type qualifier",
-    category = JDK,
     severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    suppressionAnnotations = {})
 public class TypeParameterQualifier extends BugChecker implements MemberSelectTreeMatcher {
 
   @Override
@@ -48,10 +43,8 @@ public class TypeParameterQualifier extends BugChecker implements MemberSelectTr
     if (baseSym == null || baseSym.getKind() != ElementKind.TYPE_PARAMETER) {
       return Description.NO_MATCH;
     }
-    TreeMaker make =
-        TreeMaker.instance(state.context)
-            .forToplevel((JCCompilationUnit) state.getPath().getCompilationUnit());
-    JCExpression qual = make.QualIdent(ASTHelpers.getSymbol(tree));
-    return describeMatch(tree, SuggestedFix.replace(tree, qual.toString()));
+    SuggestedFix.Builder fix = SuggestedFix.builder();
+    fix.replace(tree, SuggestedFixes.qualifyType(state, fix, ASTHelpers.getSymbol(tree)));
+    return describeMatch(tree, fix.build());
   }
 }

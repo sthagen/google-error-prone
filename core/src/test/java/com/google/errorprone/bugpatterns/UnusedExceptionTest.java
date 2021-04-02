@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
-import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,6 +31,9 @@ import org.junit.runners.JUnit4;
 public final class UnusedExceptionTest {
   private final CompilationTestHelper compilationHelper =
       CompilationTestHelper.newInstance(UnusedException.class, getClass());
+
+  private final BugCheckerRefactoringTestHelper refactoringHelper =
+      BugCheckerRefactoringTestHelper.newInstance(UnusedException.class, getClass());
 
   @Test
   public void positiveCase() {
@@ -52,7 +54,7 @@ public final class UnusedExceptionTest {
 
   @Test
   public void refactoring() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnusedException(), getClass())
+    refactoringHelper
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -81,7 +83,7 @@ public final class UnusedExceptionTest {
             "    }",
             "  }",
             "}")
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   @Test
@@ -172,8 +174,57 @@ public final class UnusedExceptionTest {
   }
 
   @Test
+  public void suppressible() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  @SuppressWarnings(\"UnusedException\")",
+            "  void test() {",
+            "    try {",
+            "    } catch (Exception e) {",
+            "      throw new RuntimeException(\"foo\");",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void suppressibleViaCatchBlock() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void test() {",
+            "    try {",
+            "    } catch (@SuppressWarnings(\"UnusedException\") Exception e) {",
+            "      throw new RuntimeException(\"foo\");",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void suppressibleByCallingExceptionUnused() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void test() {",
+            "    try {",
+            "    } catch (Exception unusedException) {",
+            "      throw new RuntimeException(\"foo\");",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void anonymousClass() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnusedException(), getClass())
+    refactoringHelper
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -199,7 +250,7 @@ public final class UnusedExceptionTest {
 
   @Test
   public void replacementNotVisible() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnusedException(), getClass())
+    refactoringHelper
         .addInputLines(
             "in/MyException.java",
             "class MyException extends RuntimeException {",
@@ -219,6 +270,23 @@ public final class UnusedExceptionTest {
             "  }",
             "}")
         .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void interruptedException_noFinding() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void test() {",
+            "    try {",
+            "      throw new InterruptedException();",
+            "    } catch (InterruptedException e) {",
+            "      throw new IllegalStateException(\"foo\");",
+            "    }",
+            "  }",
+            "}")
         .doTest();
   }
 }

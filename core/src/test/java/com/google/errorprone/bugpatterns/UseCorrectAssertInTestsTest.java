@@ -17,6 +17,7 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
+import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -32,24 +33,16 @@ public final class UseCorrectAssertInTestsTest {
   private static final String INPUT = "in/FooTest.java";
   private static final String OUTPUT = "out/FooTest.java";
 
-  private static final String[] INPUT_SRC_NO_TEST =
-      new String[] {
-        "import org.junit.runner.RunWith;",
-        "import org.junit.runners.JUnit4;",
-        "@RunWith(JUnit4.class)",
-        "public class FooTest {",
-        "  void foo() {",
-        "    assert true;",
-        "  }",
-        "}"
-      };
+  private static final String TEST_ONLY = "-XepCompilingTestOnlyCode";
 
-  private final BugCheckerRefactoringTestHelper helper =
-      BugCheckerRefactoringTestHelper.newInstance(new UseCorrectAssertInTests(), getClass());
+  private final BugCheckerRefactoringTestHelper refactoringHelper =
+      BugCheckerRefactoringTestHelper.newInstance(UseCorrectAssertInTests.class, getClass());
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(UseCorrectAssertInTests.class, getClass());
 
   @Test
   public void correctAssertInTest() {
-    helper
+    refactoringHelper
         .addInputLines(
             INPUT, inputWithExpressionAndImport("assertThat(true).isTrue();", ASSERT_THAT_IMPORT))
         .expectUnchanged()
@@ -58,17 +51,97 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void noAssertInTestsFound() {
-    helper.addInputLines(INPUT, inputWithExpression("int a = 1;")).expectUnchanged().doTest();
+    refactoringHelper
+        .addInputLines(INPUT, inputWithExpression("int a = 1;"))
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void diagnosticIssuedAtFirstAssert() {
+    compilationHelper
+        .addSourceLines(
+            INPUT,
+            "import org.junit.runner.RunWith;",
+            "import org.junit.runners.JUnit4;",
+            "@RunWith(JUnit4.class)",
+            "public class FooTest {",
+            "  void foo() {",
+            "    int x = 1;",
+            "    // BUG: Diagnostic contains: UseCorrectAssertInTests",
+            "    assert true;",
+            "    assert true;",
+            "  }",
+            "}")
+        .doTest();
   }
 
   @Test
   public void assertInNonTestMethod() {
-    helper.addInputLines(INPUT, INPUT_SRC_NO_TEST).expectUnchanged().doTest();
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            "import org.junit.runner.RunWith;",
+            "import org.junit.runners.JUnit4;",
+            "@RunWith(JUnit4.class)",
+            "public class FooTest {",
+            "  void foo() {",
+            "    assert true;",
+            "  }",
+            "}")
+        .addOutputLines(
+            OUTPUT,
+            "import static com.google.common.truth.Truth.assertThat;",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.runners.JUnit4;",
+            "@RunWith(JUnit4.class)",
+            "public class FooTest {",
+            "  void foo() {",
+            "    assertThat(true).isTrue();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void assertInTestOnlyCode() {
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            "public class FooTest {", //
+            "  void foo() {",
+            "    assert true;",
+            "  }",
+            "}")
+        .addOutputLines(
+            OUTPUT,
+            "import static com.google.common.truth.Truth.assertThat;",
+            "public class FooTest {",
+            "  void foo() {",
+            "    assertThat(true).isTrue();",
+            "  }",
+            "}")
+        .setArgs(TEST_ONLY)
+        .doTest();
+  }
+
+  @Test
+  public void assertInNonTestCode() {
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            "public class FooTest {", //
+            "  void foo() {",
+            "    assert true;",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
   }
 
   @Test
   public void wrongAssertInTestWithParentheses() {
-    helper
+    refactoringHelper
         .addInputLines(INPUT, inputWithExpression("assert (true);"))
         .addOutputLines(
             OUTPUT, inputWithExpressionAndImport("assertThat(true).isTrue();", ASSERT_THAT_IMPORT))
@@ -77,7 +150,7 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertInTestWithoutParentheses() {
-    helper
+    refactoringHelper
         .addInputLines(INPUT, inputWithExpression("assert true;"))
         .addOutputLines(
             OUTPUT, inputWithExpressionAndImport("assertThat(true).isTrue();", ASSERT_THAT_IMPORT))
@@ -86,7 +159,7 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertInTestWithDetailString() {
-    helper
+    refactoringHelper
         .addInputLines(INPUT, inputWithExpression("assert (true) : \"description\";"))
         .addOutputLines(
             OUTPUT,
@@ -98,7 +171,7 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertInTestWithDetailStringVariable() {
-    helper
+    refactoringHelper
         .addInputLines(
             INPUT, inputWithExpressions("String desc = \"description\";", "assert (true) : desc;"))
         .addOutputLines(
@@ -112,7 +185,7 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertInTestWithDetailNonStringVariable() {
-    helper
+    refactoringHelper
         .addInputLines(INPUT, inputWithExpressions("Integer desc = 1;", "assert (true) : desc;"))
         .addOutputLines(
             OUTPUT,
@@ -125,8 +198,12 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertFalseCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("boolean a = false;", "assert (!a);"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "boolean a = false;", //
+                "assert (!a);"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
@@ -136,9 +213,12 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertEqualsCase() {
-    helper
+    refactoringHelper
         .addInputLines(
-            INPUT, inputWithExpressions("String a = \"test\";", "assert a.equals(\"test\");"))
+            INPUT,
+            inputWithExpressions(
+                "String a = \"test\";", //
+                "assert a.equals(\"test\");"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
@@ -148,31 +228,46 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertEqualsNullCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = null;", "assert a == null;"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = null;", //
+                "assert a == null;"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = null;", "assertThat(a).isNull();", ASSERT_THAT_IMPORT))
+                "Integer a = null;", //
+                "assertThat(a).isNull();",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertEqualsNullCaseLeftSide() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = null;", "assert null == a;"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = null;", //
+                "assert null == a;"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = null;", "assertThat(a).isNull();", ASSERT_THAT_IMPORT))
+                "Integer a = null;", //
+                "assertThat(a).isNull();",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertEqualsNullCaseWithDetail() {
-    helper
+    refactoringHelper
         .addInputLines(
-            INPUT, inputWithExpressions("Integer a = null;", "assert a == null : \"detail\";"))
+            INPUT,
+            inputWithExpressions(
+                "Integer a = null;", //
+                "assert a == null : \"detail\";"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
@@ -184,57 +279,85 @@ public final class UseCorrectAssertInTestsTest {
 
   @Test
   public void wrongAssertNotEqualsNullCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = 1;", "assert a != null;"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = 1;", //
+                "assert a != null;"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = 1;", "assertThat(a).isNotNull();", ASSERT_THAT_IMPORT))
+                "Integer a = 1;", //
+                "assertThat(a).isNotNull();",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertReferenceSameCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = 1;", "assert a == 1;"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = 1;", //
+                "assert a == 1;"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = 1;", "assertThat(a).isSameAs(1);", ASSERT_THAT_IMPORT))
+                "Integer a = 1;", //
+                "assertThat(a).isSameInstanceAs(1);",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertReferenceWithParensCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = 1;", "assert (a == 1);"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = 1;", //
+                "assert (a == 1);"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = 1;", "assertThat(a).isSameAs(1);", ASSERT_THAT_IMPORT))
+                "Integer a = 1;", //
+                "assertThat(a).isSameInstanceAs(1);",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertReferenceNotSameCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("Integer a = 1;", "assert a != 1;"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "Integer a = 1;", //
+                "assert a != 1;"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
-                "Integer a = 1;", "assertThat(a).isNotSameAs(1);", ASSERT_THAT_IMPORT))
+                "Integer a = 1;", //
+                "assertThat(a).isNotSameInstanceAs(1);",
+                ASSERT_THAT_IMPORT))
         .doTest();
   }
 
   @Test
   public void wrongAssertReferenceSameCaseWithDetailCase() {
-    helper
-        .addInputLines(INPUT, inputWithExpressions("int a = 1;", "assert a == 1 : \"detail\";"))
+    refactoringHelper
+        .addInputLines(
+            INPUT,
+            inputWithExpressions(
+                "int a = 1;", //
+                "assert a == 1 : \"detail\";"))
         .addOutputLines(
             OUTPUT,
             inputWithExpressionsAndImport(
                 "int a = 1;",
-                "assertWithMessage(\"detail\").that(a).isSameAs(1);",
+                "assertWithMessage(\"detail\").that(a).isSameInstanceAs(1);",
                 ASSERT_WITH_MESSAGE_IMPORT))
         .doTest();
   }

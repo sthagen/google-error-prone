@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns.inject;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,14 +27,9 @@ import org.junit.runners.JUnit4;
 public class InjectOnMemberAndConstructorTest {
 
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new InjectOnMemberAndConstructor(), getClass());
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(InjectOnMemberAndConstructor.class, getClass());
-  }
+      BugCheckerRefactoringTestHelper.newInstance(InjectOnMemberAndConstructor.class, getClass());
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(InjectOnMemberAndConstructor.class, getClass());
 
   @Test
   public void testPositiveCase() {

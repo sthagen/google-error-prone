@@ -17,15 +17,14 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.TRUTH;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
+import com.google.common.base.Ascii;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -34,13 +33,16 @@ import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
-import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
 import com.google.errorprone.suppliers.Suppliers;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MethodInvocationTree;
+import com.sun.source.tree.NewClassTree;
+import com.sun.source.util.SimpleTreeVisitor;
+import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -53,19 +55,17 @@ import javax.annotation.Nullable;
     summary =
         "The actual and expected values appear to be swapped, which results in poor assertion "
             + "failure messages. The actual value should come first.",
-    category = TRUTH,
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public final class TruthAssertExpected extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final String TRUTH = "com.google.common.truth.Truth";
   private static final String PROTOTRUTH = "com.google.common.truth.extensions.proto.ProtoTruth";
 
-  private static final MethodNameMatcher TRUTH_ASSERTTHAT =
+  private static final Matcher<ExpressionTree> TRUTH_ASSERTTHAT =
       staticMethod().onClassAny(TRUTH, PROTOTRUTH).named("assertThat");
 
-  private static final MethodNameMatcher TRUTH_VERB =
+  private static final Matcher<ExpressionTree> TRUTH_VERB =
       instanceMethod()
           .onDescendantOf("com.google.common.truth.StandardSubjectBuilder")
           .named("that");
@@ -79,23 +79,22 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
    * assertThat(expectedBar.id())}, but not if the identifier extends {@link Throwable} (as this is
    * often named {@code expectedException} or similar).
    */
-  private static final Matcher<ExpressionTree> EXPECTED_VALUE =
-      (tree, state) -> {
-        if (!(tree instanceof MethodInvocationTree)) {
-          return false;
-        }
-        MethodInvocationTree methodTree = (MethodInvocationTree) tree;
-        IdentifierTree identifier = getRootIdentifier(getOnlyElement(methodTree.getArguments()));
-        if (identifier == null) {
-          return false;
-        }
-        Type throwable = Suppliers.typeFromClass(Throwable.class).get(state);
-        return identifier.getName().toString().toLowerCase().contains("expected")
-            && !ASTHelpers.isSubtype(ASTHelpers.getType(identifier), throwable, state);
-      };
+  private static boolean expectedValue(ExpressionTree tree, VisitorState state) {
+    if (!(tree instanceof MethodInvocationTree)) {
+      return false;
+    }
+    MethodInvocationTree methodTree = (MethodInvocationTree) tree;
+    IdentifierTree identifier = getRootIdentifier(getOnlyElement(methodTree.getArguments()));
+    if (identifier == null) {
+      return false;
+    }
+    Type throwable = Suppliers.typeFromClass(Throwable.class).get(state);
+    return Ascii.toLowerCase(identifier.getName().toString()).contains("expected")
+        && !ASTHelpers.isSubtype(ASTHelpers.getType(identifier), throwable, state);
+  }
 
   private static final Matcher<ExpressionTree> ASSERT_ON_EXPECTED =
-      allOf(ASSERTION, EXPECTED_VALUE);
+      allOf(ASSERTION, TruthAssertExpected::expectedValue);
 
   /** Truth assertion chains which are commutative. Many are not, such as {@code containsAny}. */
   private static final Matcher<ExpressionTree> REVERSIBLE_TERMINATORS =
@@ -122,14 +121,29 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
    * Matches expressions that look like they should be considered constant, i.e. {@code
    * ImmutableList.of(1, 2)}, {@code Long.valueOf(10L)}.
    */
-  private static final Matcher<ExpressionTree> CONSTANT_CREATOR =
-      allOf(
-          anyOf(staticMethod(), Matchers.constructor()),
-          (tree, state) -> {
-            MethodInvocationTree methodTree = (MethodInvocationTree) tree;
-            return methodTree.getArguments().stream()
-                .allMatch(argument -> ASTHelpers.constValue(argument) != null);
-          });
+  static boolean isConstantCreator(ExpressionTree tree, VisitorState state) {
+    List<? extends ExpressionTree> arguments =
+        tree.accept(
+            new SimpleTreeVisitor<List<? extends ExpressionTree>, Void>() {
+              @Override
+              public List<? extends ExpressionTree> visitNewClass(NewClassTree node, Void unused) {
+                return node.getArguments();
+              }
+
+              @Override
+              public List<? extends ExpressionTree> visitMethodInvocation(
+                  MethodInvocationTree node, Void unused) {
+                MethodSymbol symbol = ASTHelpers.getSymbol(node);
+                if (symbol == null || !symbol.isStatic()) {
+                  return null;
+                }
+                return node.getArguments();
+              }
+            },
+            null);
+    return arguments != null
+        && arguments.stream().allMatch(argument -> ASTHelpers.constValue(argument) != null);
+  }
 
   /** Matcher for a reversible assertion that appears to be the wrong way around. */
   private static final Matcher<ExpressionTree> MATCH =
@@ -140,11 +154,11 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
     if (!MATCH.matches(tree, state)) {
       return Description.NO_MATCH;
     }
-    if (EXPECTED_VALUE.matches(tree, state)) {
+    if (expectedValue(tree, state)) {
       return Description.NO_MATCH;
     }
     ExpressionTree assertion = findReceiverMatching(tree, state, ASSERT_ON_EXPECTED);
-    if (!(assertion instanceof MethodInvocationTree) || !(tree instanceof MethodInvocationTree)) {
+    if (!(assertion instanceof MethodInvocationTree)) {
       return Description.NO_MATCH;
     }
     ExpressionTree assertedArgument =
@@ -154,7 +168,7 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
     // compile-time constant.
     if (ASTHelpers.constValue(terminatingArgument) != null
         || Matchers.staticFieldAccess().matches(terminatingArgument, state)
-        || CONSTANT_CREATOR.matches(terminatingArgument, state)) {
+        || isConstantCreator(terminatingArgument, state)) {
       return Description.NO_MATCH;
     }
     SuggestedFix fix = SuggestedFix.swap(assertedArgument, terminatingArgument);

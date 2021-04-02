@@ -34,7 +34,7 @@ public final class EqualsUnsafeCastTest {
 
   @Test
   public void fixes() {
-    BugCheckerRefactoringTestHelper.newInstance(new EqualsUnsafeCast(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(EqualsUnsafeCast.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -59,7 +59,7 @@ public final class EqualsUnsafeCastTest {
 
   @Test
   public void fixesInlineCheck() {
-    BugCheckerRefactoringTestHelper.newInstance(new EqualsUnsafeCast(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(EqualsUnsafeCast.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -98,7 +98,7 @@ public final class EqualsUnsafeCastTest {
   }
 
   @Test
-  public void negative() {
+  public void negative_classEquality() {
     helper
         .addSourceLines(
             "Test.java",
@@ -110,7 +110,10 @@ public final class EqualsUnsafeCastTest {
             "  }",
             "}")
         .doTest();
+  }
 
+  @Test
+  public void negative_instanceOf() {
     helper
         .addSourceLines(
             "Test.java",

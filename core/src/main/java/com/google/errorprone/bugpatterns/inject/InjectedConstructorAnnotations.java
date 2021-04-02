@@ -16,8 +16,7 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
-import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_BINDING_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_INJECT_ANNOTATION;
 import static com.google.errorprone.matchers.Matchers.allOf;
@@ -29,7 +28,6 @@ import static com.google.errorprone.matchers.Matchers.methodIsConstructor;
 import static com.google.errorprone.matchers.Matchers.symbolHasAnnotation;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -43,9 +41,7 @@ import com.sun.source.tree.MethodTree;
 @BugPattern(
     name = "InjectedConstructorAnnotations",
     summary = "Injected constructors cannot be optional nor have binding annotations",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class InjectedConstructorAnnotations extends BugChecker implements MethodTreeMatcher {
 
   // A matcher of @Inject{optional=true}
@@ -94,7 +90,7 @@ public class InjectedConstructorAnnotations extends BugChecker implements Method
     }
   }
 
-  private boolean isInjectedConstructor(MethodTree methodTree, VisitorState state) {
+  private static boolean isInjectedConstructor(MethodTree methodTree, VisitorState state) {
     return allOf(methodIsConstructor(), hasAnnotation(GUICE_INJECT_ANNOTATION))
         .matches(methodTree, state);
   }

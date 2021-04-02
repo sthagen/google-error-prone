@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.android;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -46,7 +45,6 @@ import com.sun.tools.javac.code.Types;
 @BugPattern(
     name = "BundleDeserializationCast",
     summary = "Object serialized in Bundle may have been flattened to base type.",
-    category = ANDROID,
     severity = ERROR)
 public class BundleDeserializationCast extends BugChecker implements TypeCastTreeMatcher {
 
@@ -56,6 +54,9 @@ public class BundleDeserializationCast extends BugChecker implements TypeCastTre
 
   @Override
   public Description matchTypeCast(TypeCastTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     if (!BUNDLE_DESERIALIZATION_CAST_EXPRESSION.matches(tree, state)) {
       return NO_MATCH;
     }
@@ -127,7 +128,7 @@ public class BundleDeserializationCast extends BugChecker implements TypeCastTre
   }
 
   private Description getDescriptionForType(TypeCastTree tree, String baseType) {
-    String targetType = tree.getType().toString();
+    String targetType = getType(tree.getType()).toString();
     return buildDescription(tree)
         .setMessage(
             String.format(

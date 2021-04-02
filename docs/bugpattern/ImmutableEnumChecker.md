@@ -16,6 +16,11 @@ To make enums immutable, ensure:
         that are built in to Error Prone (e.g. `java.lang.String`,
         `java.util.UUID`), or are annotated with
         `com.google.errorprone.annotations.Immutable`.
+
+        Other versions of the annotation, such as
+        `javax.annotation.concurrent.Immutable`, are currently *not* recognized.
+        See https://errorprone.info/bugpattern/Immutable for additional discussion.
+
     *   If the type you're using inside the enum can be annotated with
         `@Immutable`, you should do that:
 
@@ -35,9 +40,9 @@ To make enums immutable, ensure:
 
     *   If the type you're using inside the enum is not considered immutable,
         and you can't annotate the type because it's outside the project,
-        consider using an immutable replacement of the type, or [suppress this
-        check on the enum](#suppression) with a comment about why the fields in
-        question are immutable.
+        consider using an immutable replacement of the type, or
+        [suppress this check on the enum](#suppression) with a comment about why
+        the fields in question are immutable.
 
 TIP: annotating the declaration of the enum class with `@Immutable` is
 unnecessary -- Error Prone assumes enums are immutable by default.
@@ -91,7 +96,7 @@ TIP: Instead of creating an enum with functional interface fields (`Predicate`,
 `Function`, etc.), declare abstract methods that are overridden by each
 constant. For example, do this:
 
-```java {.good}
+```java
 enum Types {
   STRING {
     @Override public boolean hasCompatibleType(Object o) {
@@ -111,7 +116,7 @@ enum Types {
 
 ... not this:
 
-```java {.bad}
+```java
 enum Types {
   STRING(o -> o instanceof String),
   NUMBER(o -> o instanceof Number),
@@ -129,4 +134,3 @@ This has several advantages on top of sidestepping this checker, e.g. not tying
 you to a particular functional interface type -- your callers should e.g. use
 `STRING::hasCompatibleType` instead of `STRING.hasCompatibleType` which only
 works for one interface type.
-

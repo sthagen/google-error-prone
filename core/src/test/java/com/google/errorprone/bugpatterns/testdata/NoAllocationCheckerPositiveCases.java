@@ -467,7 +467,7 @@ public class NoAllocationCheckerPositiveCases {
     return clone();
   }
 
-  // Throwing doesn't whitelist through method declarations.
+  // Throwing doesn't exempt through method declarations.
   @NoAllocation
   public String throwForeach(final Iterable<Object> a) {
     throw new RuntimeException() {
@@ -482,5 +482,39 @@ public class NoAllocationCheckerPositiveCases {
         }
       }
     };
+  }
+
+  public interface NoAllocationInterface {
+    @NoAllocation
+    void method();
+  }
+
+  public static class NoAllocationImplementingClass implements NoAllocationInterface {
+    @Override
+    // BUG: Diagnostic contains: @NoAllocation
+    public void method() {}
+  }
+
+  public abstract static class NoAllocationAbstractClass {
+    @NoAllocation
+    abstract void method();
+  }
+
+  public static class NoAllocationConcreteClass extends NoAllocationAbstractClass {
+    @Override
+    // BUG: Diagnostic contains: @NoAllocation
+    void method() {}
+  }
+
+  public static class NoAllocationParentClass implements NoAllocationInterface {
+    @Override
+    @NoAllocation
+    public void method() {}
+  }
+
+  public static class NoAllocationSubclass extends NoAllocationParentClass {
+    @Override
+    // BUG: Diagnostic contains: @NoAllocation
+    public void method() {}
   }
 }

@@ -15,8 +15,7 @@
 package com.google.errorprone.bugpatterns.inject;
 
 import static com.google.common.collect.Sets.immutableEnumSet;
-import static com.google.errorprone.BugPattern.Category.INJECT;
-import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.ChildMultiMatcher.MatchType.AT_LEAST_ONE;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_SCOPE_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_SCOPE_ANNOTATION;
@@ -34,13 +33,11 @@ import static java.lang.annotation.ElementType.TYPE;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.fixes.SuggestedFix;
-import com.google.errorprone.fixes.SuggestedFix.Builder;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.MultiMatcher;
@@ -57,9 +54,7 @@ import java.util.Set;
 @BugPattern(
     name = "InjectInvalidTargetingOnScopingAnnotation",
     summary = "A scoping annotation's Target should include TYPE and METHOD.",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class InvalidTargetingOnScopingAnnotation extends BugChecker implements ClassTreeMatcher {
 
   private static final String TARGET_ANNOTATION = "java.lang.annotation.Target";
@@ -106,7 +101,7 @@ public class InvalidTargetingOnScopingAnnotation extends BugChecker implements C
   }
 
   static Fix replaceTargetAnnotation(AnnotationTree targetAnnotationTree, Set<ElementType> types) {
-    Builder builder =
+    SuggestedFix.Builder builder =
         SuggestedFix.builder()
             .replace(targetAnnotationTree, "@Target({" + Joiner.on(", ").join(types) + "})");
 

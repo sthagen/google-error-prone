@@ -21,35 +21,39 @@ import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.equalsMethodDeclaration;
+import static com.google.errorprone.matchers.Matchers.instanceEqualsInvocation;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.matchers.Matchers;
 import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.IfTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.ParenthesizedTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
+import com.sun.source.tree.TypeCastTree;
+import com.sun.source.tree.UnaryTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
-import com.sun.tools.javac.tree.JCTree;
 import javax.lang.model.element.Modifier;
 
 /**
@@ -60,12 +64,9 @@ import javax.lang.model.element.Modifier;
  */
 @BugPattern(
     name = "EqualsGetClass",
-    summary =
-        "Overriding Object#equals in a non-final class by using getClass rather than instanceof "
-            + "breaks substitutability of subclasses.",
+    summary = "Prefer instanceof to getClass when implementing Object#equals.",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public final class EqualsGetClass extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> GET_CLASS =
@@ -118,15 +119,22 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
             allOf(GET_CLASS, (tree, unused) -> matchesThis(tree)),
             (tree, unused) -> matchesClass(tree));
 
-    private static final Matcher<ExpressionTree> EQUALS =
-        instanceMethod()
-            .onDescendantOf("java.lang.Object")
-            .named("equals")
-            .withParameters("java.lang.Object");
-
     private static boolean matchesThis(ExpressionTree tree) {
       ExpressionTree receiver = getReceiver(tree);
-      return receiver == null || getSymbol(receiver).getSimpleName().contentEquals("this");
+      if (receiver == null) {
+        return true;
+      }
+      while (!(receiver instanceof IdentifierTree)) {
+        if (receiver instanceof ParenthesizedTree) {
+          receiver = ((ParenthesizedTree) receiver).getExpression();
+        } else if (receiver instanceof TypeCastTree) {
+          receiver = ((TypeCastTree) receiver).getExpression();
+        } else {
+          return false;
+        }
+      }
+      Symbol symbol = getSymbol(receiver);
+      return symbol != null && symbol.getSimpleName().contentEquals("this");
     }
 
     private static boolean matchesClass(ExpressionTree tree) {
@@ -136,10 +144,6 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
       }
       VarSymbol varSymbol = (VarSymbol) symbol;
       return varSymbol.getSimpleName().contentEquals("class");
-    }
-
-    private static boolean matchesNull(ExpressionTree tree) {
-      return tree.getKind() == Kind.NULL_LITERAL;
     }
 
     private final Symbol parameter;
@@ -171,7 +175,7 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
       if (binaryTree.getKind() != Kind.NOT_EQUAL_TO && binaryTree.getKind() != Kind.EQUAL_TO) {
         return super.visitBinary(binaryTree, null);
       }
-      if (matchesEitherWay(binaryTree, isParameter, (tree, s) -> matchesNull(tree))) {
+      if (matchesEitherWay(binaryTree, isParameter, Matchers.nullLiteral())) {
         if (binaryTree.getKind() == Kind.NOT_EQUAL_TO) {
           makeAlwaysTrue();
         }
@@ -184,8 +188,7 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
         matchedGetClass = true;
         String instanceOf =
             String.format(
-                "%s instanceof %s",
-                parameter.getSimpleName().toString(), classSymbol.getSimpleName().toString());
+                "%s instanceof %s", parameter.getSimpleName(), classSymbol.getSimpleName());
         if (binaryTree.getKind() == Kind.EQUAL_TO) {
           fix.replace(binaryTree, instanceOf);
         }
@@ -198,7 +201,7 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void unused) {
-      if (!EQUALS.matches(node, state)) {
+      if (!instanceEqualsInvocation().matches(node, state)) {
         return null;
       }
       ExpressionTree argument = getOnlyElement(node.getArguments());
@@ -208,11 +211,13 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
       }
       if (matchesEitherWay(argument, receiver, THIS_CLASS, otherClass)) {
         matchedGetClass = true;
-        fix.replace(
-            node,
+        String replacement =
             String.format(
-                "%s instanceof %s",
-                parameter.getSimpleName().toString(), classSymbol.getSimpleName().toString()));
+                "%s instanceof %s", parameter.getSimpleName(), classSymbol.getSimpleName());
+        if (getCurrentPath().getParentPath().getLeaf() instanceof UnaryTree) {
+          replacement = String.format("(%s)", replacement);
+        }
+        fix.replace(node, replacement);
       }
       return super.visitMethodInvocation(node, null);
     }
@@ -249,8 +254,8 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
         } else {
           int stripExtra = ifTree.getElseStatement() instanceof BlockTree ? 1 : 0;
           fix.replace(
-                  ((JCTree) ifTree).getStartPosition(),
-                  ((JCTree) ifTree.getElseStatement()).getStartPosition() + stripExtra,
+                  getStartPosition(ifTree),
+                  getStartPosition(ifTree.getElseStatement()) + stripExtra,
                   "")
               .replace(
                   state.getEndPosition(ifTree.getElseStatement()) - stripExtra,
@@ -284,8 +289,8 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
 
     private void removeLeftOperand(BinaryTree superBinary) {
       fix.replace(
-          ((JCTree) superBinary.getLeftOperand()).getStartPosition(),
-          ((JCTree) superBinary.getRightOperand()).getStartPosition(),
+          getStartPosition(superBinary.getLeftOperand()),
+          getStartPosition(superBinary.getRightOperand()),
           "");
     }
 
@@ -297,7 +302,7 @@ public final class EqualsGetClass extends BugChecker implements MethodInvocation
     }
 
     private SuggestedFix getFix() {
-      return matchedGetClass && !failed ? fix.build() : SuggestedFix.builder().build();
+      return matchedGetClass && !failed ? fix.build() : SuggestedFix.emptyFix();
     }
   }
 }

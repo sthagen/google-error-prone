@@ -28,30 +28,34 @@ public class RestrictedApiMethods implements IFaceWithRestriction {
   }
 
   @RestrictedApi(
-    explanation = "lorem",
-    whitelistAnnotations = {Whitelist.class},
-    whitelistWithWarningAnnotations = {WhitelistWithWarning.class},
-    link = ""
-  )
+      explanation = "lorem",
+      allowlistAnnotations = {Allowlist.class},
+      allowlistWithWarningAnnotations = {AllowlistWithWarning.class},
+      link = "")
+  public RestrictedApiMethods() {}
+
+  @RestrictedApi(
+      explanation = "lorem",
+      allowlistAnnotations = {Allowlist.class},
+      allowlistWithWarningAnnotations = {AllowlistWithWarning.class},
+      link = "")
   public RestrictedApiMethods(int restricted) {}
 
   @RestrictedApi(
-    explanation = "lorem",
-    whitelistAnnotations = {Whitelist.class},
-    whitelistWithWarningAnnotations = {WhitelistWithWarning.class},
-    link = "",
-    allowedOnPath = ".*testsuite/.*"
-  )
+      explanation = "lorem",
+      allowlistAnnotations = {Allowlist.class},
+      allowlistWithWarningAnnotations = {AllowlistWithWarning.class},
+      link = "",
+      allowedOnPath = ".*testsuite/.*")
   public int restrictedMethod() {
     return 1;
   }
 
   @RestrictedApi(
-    explanation = "lorem",
-    whitelistAnnotations = {Whitelist.class},
-    whitelistWithWarningAnnotations = {WhitelistWithWarning.class},
-    link = ""
-  )
+      explanation = "lorem",
+      allowlistAnnotations = {Allowlist.class},
+      allowlistWithWarningAnnotations = {AllowlistWithWarning.class},
+      link = "")
   public static int restrictedStaticMethod() {
     return 2;
   }
@@ -60,7 +64,7 @@ public class RestrictedApiMethods implements IFaceWithRestriction {
   public void dontCallMe() {}
 
   public static class Subclass extends RestrictedApiMethods {
-    @Whitelist
+    @Allowlist
     public Subclass(int restricted) {
       super(restricted);
     }
@@ -70,6 +74,8 @@ public class RestrictedApiMethods implements IFaceWithRestriction {
       return 42;
     }
   }
+
+  public static void accept(Runnable r) {}
 }
 
 interface IFaceWithRestriction {
@@ -78,7 +84,4 @@ interface IFaceWithRestriction {
 }
 
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
-@interface Whitelist {}
-
-@Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
-@interface WhitelistWithWarning {}
+@interface AllowlistWithWarning {}

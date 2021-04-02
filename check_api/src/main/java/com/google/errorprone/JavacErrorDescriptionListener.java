@@ -17,7 +17,11 @@
 package com.google.errorprone;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.fixes.AppliedFix;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.matchers.Description;
@@ -29,11 +33,10 @@ import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.util.Log;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.tools.JavaFileObject;
 
 /**
@@ -54,6 +57,18 @@ public class JavacErrorDescriptionListener implements DescriptionListener {
 
   // The suffix for properties in src/main/resources/com/google/errorprone/errors.properties
   private static final String MESSAGE_BUNDLE_KEY = "error.prone";
+
+  // DiagnosticFlag.MULTIPLE went away in JDK13, so we want to load it if it's available.
+  private static final Supplier<EnumSet<JCDiagnostic.DiagnosticFlag>> diagnosticFlags =
+      Suppliers.memoize(
+          () -> {
+            try {
+              return EnumSet.of(JCDiagnostic.DiagnosticFlag.valueOf("MULTIPLE"));
+            } catch (IllegalArgumentException iae) {
+              // JDK 13 and above
+              return EnumSet.noneOf(JCDiagnostic.DiagnosticFlag.class);
+            }
+          });
 
   private JavacErrorDescriptionListener(
       Log log,
@@ -76,12 +91,12 @@ public class JavacErrorDescriptionListener implements DescriptionListener {
 
   @Override
   public void onDescribed(Description description) {
-    List<AppliedFix> appliedFixes =
+    ImmutableList<AppliedFix> appliedFixes =
         description.fixes.stream()
             .filter(f -> !shouldSkipImportTreeFix(description.position, f))
             .map(fixToAppliedFix)
             .filter(Objects::nonNull)
-            .collect(Collectors.toCollection(ArrayList::new));
+            .collect(toImmutableList());
 
     String message = messageForFixes(description, appliedFixes);
     // Swap the log's source and the current file's source; then be sure to swap them back later.
@@ -105,7 +120,15 @@ public class JavacErrorDescriptionListener implements DescriptionListener {
           type = JCDiagnostic.DiagnosticType.NOTE;
           break;
       }
-      log.report(factory.create(type, log.currentSource(), pos, MESSAGE_BUNDLE_KEY, message));
+      log.report(
+          factory.create(
+              type,
+              /* lintCategory */ null,
+              diagnosticFlags.get(),
+              log.currentSource(),
+              pos,
+              MESSAGE_BUNDLE_KEY,
+              message));
     } finally {
       if (originalSource != null) {
         log.useSource(originalSource);

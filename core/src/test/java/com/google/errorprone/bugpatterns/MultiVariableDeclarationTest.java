@@ -47,7 +47,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positive() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java", //
             "package a;",
@@ -65,7 +65,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positiveWithNeighbours() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java",
             "package a;",
@@ -87,7 +87,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positiveWithNeighbouringScopes() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java",
             "package a;",
@@ -117,7 +117,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positiveCinit() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java", //
             "package a;",
@@ -162,7 +162,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positiveAnnotation() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java", //
             "package a;",
@@ -173,19 +173,15 @@ public class MultiVariableDeclarationTest {
             "out/A.java",
             "package a;",
             "public class A {",
-            // javac's pretty printer uses the system line separator
-            "  @Deprecated()"
-                + System.lineSeparator()
-                + "int x = 1; @Deprecated()"
-                + System.lineSeparator()
-                + "int y = 2;",
+            "  @Deprecated int x = 1;",
+            "  @Deprecated int y = 2;",
             "}")
         .doTest(TEXT_MATCH);
   }
 
   @Test
   public void positiveArrayDimensions() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java", //
             "package a;",
@@ -203,7 +199,7 @@ public class MultiVariableDeclarationTest {
 
   @Test
   public void positiveNoInitializer() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultiVariableDeclaration(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultiVariableDeclaration.class, getClass())
         .addInputLines(
             "in/A.java", //
             "package a;",

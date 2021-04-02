@@ -16,14 +16,12 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_BINDING_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_QUALIFIER_ANNOTATION;
-import static com.google.errorprone.matchers.Matchers.hasAnnotation;
+import static com.google.errorprone.matchers.Matchers.symbolHasAnnotation;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
@@ -39,14 +37,13 @@ import java.util.List;
 @BugPattern(
     name = "InjectMoreThanOneQualifier",
     summary = "Using more than one qualifier annotation on the same element is not allowed.",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class MoreThanOneQualifier extends BugChecker implements AnnotationTreeMatcher {
 
   private static final Matcher<AnnotationTree> QUALIFIER_ANNOTATION_MATCHER =
       Matchers.anyOf(
-          hasAnnotation(GUICE_BINDING_ANNOTATION), hasAnnotation(JAVAX_QUALIFIER_ANNOTATION));
+          symbolHasAnnotation(GUICE_BINDING_ANNOTATION),
+          symbolHasAnnotation(JAVAX_QUALIFIER_ANNOTATION));
 
   @Override
   public Description matchAnnotation(AnnotationTree annotationTree, VisitorState state) {
@@ -64,7 +61,7 @@ public class MoreThanOneQualifier extends BugChecker implements AnnotationTreeMa
     return Description.NO_MATCH;
   }
 
-  private List<? extends AnnotationTree> getSiblingAnnotations(VisitorState state) {
+  private static List<? extends AnnotationTree> getSiblingAnnotations(VisitorState state) {
     return ((ModifiersTree) state.getPath().getParentPath().getLeaf()).getAnnotations();
   }
 }

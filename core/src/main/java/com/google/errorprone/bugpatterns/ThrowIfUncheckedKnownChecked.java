@@ -14,7 +14,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.GUAVA;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.fixes.SuggestedFix.delete;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
@@ -25,17 +24,16 @@ import static com.google.errorprone.matchers.Matchers.argumentCount;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.tree.JCTree;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.UnionType;
 
@@ -43,9 +41,7 @@ import javax.lang.model.type.UnionType;
 @BugPattern(
     name = "ThrowIfUncheckedKnownChecked",
     summary = "throwIfUnchecked(knownCheckedException) is a no-op.",
-    category = GUAVA,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class ThrowIfUncheckedKnownChecked extends BugChecker
     implements MethodInvocationTreeMatcher {
 
@@ -62,7 +58,7 @@ public class ThrowIfUncheckedKnownChecked extends BugChecker
       new Matcher<ExpressionTree>() {
         @Override
         public boolean matches(ExpressionTree tree, VisitorState state) {
-          Type type = ((JCTree) tree).type;
+          Type type = ASTHelpers.getType(tree);
           if (type.isUnion()) {
             for (TypeMirror alternative : ((UnionType) type).getAlternatives()) {
               if (!isKnownCheckedException(state, (Type) alternative)) {

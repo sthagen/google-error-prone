@@ -14,7 +14,6 @@
 
 package com.google.errorprone.bugpatterns.inject.guice;
 
-import static com.google.errorprone.BugPattern.Category.GUICE;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.InjectMatchers.ASSISTED_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.ASSISTED_INJECT_ANNOTATION;
@@ -28,6 +27,7 @@ import static com.google.errorprone.matchers.Matchers.methodIsConstructor;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedListMultimap;
@@ -55,7 +55,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import javax.lang.model.element.TypeElement;
 
 /** @author sgoldfeder@google.com (Steven Goldfeder) */
@@ -64,7 +63,6 @@ import javax.lang.model.element.TypeElement;
     summary =
         "A constructor cannot have two @Assisted parameters of the same type unless they are "
             + "disambiguated with named @Assisted annotations.",
-    category = GUICE,
     severity = ERROR)
 public class AssistedParameters extends BugChecker implements MethodTreeMatcher {
 
@@ -126,14 +124,14 @@ public class AssistedParameters extends BugChecker implements MethodTreeMatcher 
       ImmutableListMultimap<String, VariableTree> keyForAssistedVariable =
           Multimaps.index(parametersForThisType, VALUE_FROM_ASSISTED_ANNOTATION);
 
-      for (Entry<String, List<VariableTree>> assistedValueToParameters :
+      for (Map.Entry<String, List<VariableTree>> assistedValueToParameters :
           Multimaps.asMap(keyForAssistedVariable).entrySet()) {
         if (assistedValueToParameters.getValue().size() > 1) {
           conflicts.add(
               ConflictResult.create(
                   typeAndParameters.getKey(),
                   assistedValueToParameters.getKey(),
-                  assistedValueToParameters.getValue()));
+                  ImmutableList.copyOf(assistedValueToParameters.getValue())));
         }
       }
     }
@@ -145,7 +143,7 @@ public class AssistedParameters extends BugChecker implements MethodTreeMatcher 
     return buildDescription(constructor).setMessage(buildErrorMessage(conflicts)).build();
   }
 
-  private String buildErrorMessage(List<ConflictResult> conflicts) {
+  private static String buildErrorMessage(List<ConflictResult> conflicts) {
     StringBuilder sb =
         new StringBuilder(
             " Assisted parameters of the same type need to have distinct values for the @Assisted"
@@ -180,16 +178,16 @@ public class AssistedParameters extends BugChecker implements MethodTreeMatcher 
 
     abstract String value();
 
-    abstract List<VariableTree> parameters();
+    abstract ImmutableList<VariableTree> parameters();
 
-    static ConflictResult create(Type t, String v, List<VariableTree> p) {
+    static ConflictResult create(Type t, String v, ImmutableList<VariableTree> p) {
       return new AutoValue_AssistedParameters_ConflictResult(t, v, p);
     }
   }
 
   // Since Type doesn't have strong equality semantics, we have to use Types.isSameType to
   // determine which parameters are conflicting with each other.
-  private Multimap<Type, VariableTree> partitionParametersByType(
+  private static Multimap<Type, VariableTree> partitionParametersByType(
       List<VariableTree> parameters, VisitorState state) {
 
     Types types = state.getTypes();

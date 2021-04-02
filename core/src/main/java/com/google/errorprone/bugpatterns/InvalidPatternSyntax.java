@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -25,15 +24,14 @@ import static com.google.errorprone.matchers.method.MethodMatchers.instanceMetho
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
-import com.sun.tools.javac.tree.JCTree.JCExpression;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -41,9 +39,7 @@ import java.util.regex.PatternSyntaxException;
 @BugPattern(
     name = "InvalidPatternSyntax",
     summary = "Invalid syntax used for a regular expression",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class InvalidPatternSyntax extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final String MESSAGE_BASE = "Invalid syntax used for a regular expression: ";
@@ -53,8 +49,8 @@ public class InvalidPatternSyntax extends BugChecker implements MethodInvocation
       new Matcher<ExpressionTree>() {
         @Override
         public boolean matches(ExpressionTree tree, VisitorState state) {
-          Object value = ((JCExpression) tree).type.constValue();
-          return value instanceof String && !isValidSyntax((String) value);
+          String value = ASTHelpers.constValue(tree, String.class);
+          return value != null && !isValidSyntax(value);
         }
 
         private boolean isValidSyntax(String regex) {
@@ -82,20 +78,17 @@ public class InvalidPatternSyntax extends BugChecker implements MethodInvocation
       allOf(
           anyOf(
               instanceMethod()
-                  .onDescendantOf("java.lang.String")
-                  .withSignature("matches(java.lang.String)"),
+                  .onExactClass("java.lang.String")
+                  .namedAnyOf("matches", "split")
+                  .withParameters("java.lang.String"),
               instanceMethod()
-                  .onDescendantOf("java.lang.String")
-                  .withSignature("replaceAll(java.lang.String,java.lang.String)"),
+                  .onExactClass("java.lang.String")
+                  .named("split")
+                  .withParameters("java.lang.String", "int"),
               instanceMethod()
-                  .onDescendantOf("java.lang.String")
-                  .withSignature("replaceFirst(java.lang.String,java.lang.String)"),
-              instanceMethod()
-                  .onDescendantOf("java.lang.String")
-                  .withSignature("split(java.lang.String)"),
-              instanceMethod()
-                  .onDescendantOf("java.lang.String")
-                  .withSignature("split(java.lang.String,int)"),
+                  .onExactClass("java.lang.String")
+                  .namedAnyOf("replaceFirst", "replaceAll")
+                  .withParameters("java.lang.String", "java.lang.String"),
               staticMethod().onClass("java.util.regex.Pattern").named("matches"),
               staticMethod().onClass("com.google.common.base.Splitter").named("onPattern")),
           argument(0, BAD_REGEX_LITERAL));
@@ -110,7 +103,7 @@ public class InvalidPatternSyntax extends BugChecker implements MethodInvocation
     // TODO: Suggest fixes for more situations.
     Description.Builder descriptionBuilder = buildDescription(methodInvocationTree);
     ExpressionTree arg = methodInvocationTree.getArguments().get(0);
-    String value = (String) ((JCExpression) arg).type.constValue();
+    String value = ASTHelpers.constValue(arg, String.class);
     String reasonInvalid = "";
 
     if (".".equals(value)) {

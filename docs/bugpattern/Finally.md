@@ -1,13 +1,12 @@
-Terminating a finally block abruptly preempts the outcome of the try and
-catch blocks, and will cause the result of any previously executed return or
-throw statements to be ignored. Finally blocks should be written so they always
+Terminating a finally block abruptly preempts the outcome of the try and catch
+blocks, and will cause the result of any previously executed return or throw
+statements to be ignored. Finally blocks should be written so they always
 complete normally.
 
-Consider the following code. In the case where `doWork` throws
-`SomeException`, the finally block will still be executed. If closing the
-input stream *also* fails, then the exception that was thrown in the catch
-block will be prempted by the exception thrown by `close()`, and the first
-exception will be lost.
+Consider the following code. In the case where `doWork` throws `SomeException`,
+the finally block will still be executed. If closing the input stream *also*
+fails, then the exception that was thrown in the catch block will be prempted by
+the exception thrown by `close()`, and the first exception will be lost.
 
 ```java
 InputStream in = openInputStream();
@@ -34,7 +33,7 @@ try (InputStream in = openInputStream()) {
 ```
 
 If Java 7 is not available, we recommend Guava's
-[Closer API](http://google.github.io/guava/releases/snapshot/api/docs/com/google/common/io/Closer.html).
+[Closer API](https://guava.dev/releases/snapshot/api/docs/com/google/common/io/Closer.html).
 
 ```java
 Closer closer = Closer.create();
@@ -47,4 +46,3 @@ try {
   closer.close();
 }
 ```
-

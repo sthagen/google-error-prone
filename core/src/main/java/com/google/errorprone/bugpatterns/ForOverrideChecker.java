@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.GUAVA;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
@@ -41,6 +40,7 @@ import com.sun.tools.javac.code.Type;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Modifier;
 
 /**
@@ -55,7 +55,6 @@ import javax.lang.model.element.Modifier;
     summary =
         "Method annotated @ForOverride must be protected or package-private and only invoked from "
             + "declaring class, or from an override of the method",
-    category = GUAVA,
     severity = ERROR)
 public class ForOverrideChecker extends BugChecker
     implements MethodInvocationTreeMatcher, MethodTreeMatcher {
@@ -93,8 +92,8 @@ public class ForOverrideChecker extends BugChecker
     List<MethodSymbol> overriddenMethods = getOverriddenMethods(state, method);
 
     for (Symbol overriddenMethod : overriddenMethods) {
-      Type declaringClass = overriddenMethod.outermostClass().asType();
-      if (!declaringClass.equals(currentClass)) {
+      Type declaringClass = ASTHelpers.outermostClass(overriddenMethod).asType();
+      if (!ASTHelpers.isSameType(declaringClass, currentClass, state)) {
         String customMessage =
             MESSAGE_BASE
                 + "must not be invoked directly "
@@ -121,7 +120,19 @@ public class ForOverrideChecker extends BugChecker
       List<MethodSymbol> overriddenMethods = getOverriddenMethods(state, method);
 
       if (!overriddenMethods.isEmpty()) {
-        String customMessage = MESSAGE_BASE + "must have protected or package-private visibility";
+        MethodSymbol nearestForOverrideMethod = overriddenMethods.get(0);
+        String customMessage = "must have protected or package-private visibility";
+        if (nearestForOverrideMethod.equals(method)) {
+          // The method itself is @ForOverride but is too visible
+          customMessage = MESSAGE_BASE + customMessage;
+
+        } else {
+          // The method overrides an @ForOverride method and expands its visibility
+          customMessage =
+              String.format(
+                  "Method overrides @ForOverride method %s.%s, so it %s",
+                  nearestForOverrideMethod.enclClass(), nearestForOverrideMethod, customMessage);
+        }
         return buildDescription(tree).setMessage(customMessage).build();
       }
     }
@@ -135,6 +146,7 @@ public class ForOverrideChecker extends BugChecker
    * <p>By 'direct', we mean that if the leaf is part of a field initializer of a class, then it is
    * considered to not be part of any method.
    */
+  @Nullable
   private static MethodTree findDirectMethod(TreePath path) {
     while (true) {
       path = path.getParentPath();
@@ -178,7 +190,7 @@ public class ForOverrideChecker extends BugChecker
    * @return a list of methods annotated @ForOverride that the method overrides, including the
    *     method itself if it has the annotation
    */
-  private List<MethodSymbol> getOverriddenMethods(VisitorState state, MethodSymbol method) {
+  private static List<MethodSymbol> getOverriddenMethods(VisitorState state, MethodSymbol method) {
     // Static methods cannot override, only overload.
     if (method.isStatic()) {
       throw new IllegalArgumentException(
@@ -194,8 +206,9 @@ public class ForOverrideChecker extends BugChecker
     // package-private visibility, but interface methods have implicit public visibility.
     Type currType = state.getTypes().supertype(method.owner.type);
     while (currType != null
-        && !currType.equals(state.getSymtab().objectType)
-        && !currType.equals(Type.noType)) {
+        && currType.tsym != null
+        && !currType.tsym.equals(state.getSymtab().objectType.tsym)
+        && !ASTHelpers.isSameType(currType, Type.noType, state)) {
       Symbol sym = currType.tsym.members().findFirst(method.name);
       if (sym instanceof MethodSymbol) {
         list.add((MethodSymbol) sym);
@@ -221,7 +234,7 @@ public class ForOverrideChecker extends BugChecker
   }
 
   /** Get the outermost class/interface/enum of an element, or null if none. */
-  private Type getOutermostClass(VisitorState state) {
+  private static Type getOutermostClass(VisitorState state) {
     TreePath path = state.getPath();
     Type type = null;
 
@@ -236,7 +249,7 @@ public class ForOverrideChecker extends BugChecker
     return type;
   }
 
-  private boolean hasAnnotation(String annotation, Symbol member) {
+  private static boolean hasAnnotation(String annotation, Symbol member) {
     for (Attribute.Compound attribute : member.getAnnotationMirrors()) {
       if (annotation.equals(attribute.type.toString())) {
         return true;

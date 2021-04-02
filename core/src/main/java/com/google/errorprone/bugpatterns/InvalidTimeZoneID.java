@@ -16,18 +16,15 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.matchers.method.MethodMatchers;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
@@ -41,18 +38,16 @@ import java.util.regex.Pattern;
     summary =
         "Invalid time zone identifier. TimeZone.getTimeZone(String) will silently return GMT"
             + " instead of the time zone you intended.",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class InvalidTimeZoneID extends BugChecker implements MethodInvocationTreeMatcher {
   private static final ImmutableSet<String> AVAILABLE_IDS =
       ImmutableSet.copyOf(TimeZone.getAvailableIDs());
 
   private static final Matcher<ExpressionTree> METHOD_MATCHER =
-      Matchers.methodInvocation(
-          MethodMatchers.staticMethod()
-              .onClass("java.util.TimeZone")
-              .withSignature("getTimeZone(java.lang.String)"));
+      MethodMatchers.staticMethod()
+          .onClass("java.util.TimeZone")
+          .named("getTimeZone")
+          .withParameters("java.lang.String");
 
   // https://docs.oracle.com/javase/8/docs/api/java/util/TimeZone.html
   // "a custom time zone ID can be specified to produce a TimeZone".

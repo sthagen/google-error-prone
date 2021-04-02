@@ -179,11 +179,12 @@ class RefactoringCollection implements DescriptionListener.Factory {
           throw new UncheckedIOException(e);
         }
       }
+      Files.createDirectories(patchFilePatch.getParent());
       Files.write(patchFilePatch, patchFile.getBytes(UTF_8), APPEND, CREATE);
     }
   }
 
-  private void doApplyProcess(
+  private static void doApplyProcess(
       FileDestination fileDestination,
       FileSource fileSource,
       Collection<DelegatingDescriptionListener> listeners) {
@@ -201,7 +202,7 @@ class RefactoringCollection implements DescriptionListener.Factory {
     }
   }
 
-  private final class DelegatingDescriptionListener implements DescriptionListener {
+  private static final class DelegatingDescriptionListener implements DescriptionListener {
     final DescriptionBasedDiff base;
     final DescriptionListener listener;
 

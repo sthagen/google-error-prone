@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns.android;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.sun.source.tree.Tree.Kind.STRING_LITERAL;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.LiteralTreeMatcher;
@@ -33,18 +31,13 @@ import com.sun.source.tree.LiteralTree;
 import java.util.Map;
 
 /**
- * TODO(avenet): Restrict this check to Android code once the capability is available in Error
- * Prone. See b/27967984.
- *
  * @author avenet@google.com (Arnaud J. Venet)
  */
 @BugPattern(
     name = "HardCodedSdCardPath",
     altNames = {"SdCardPath"},
     summary = "Hardcoded reference to /sdcard",
-    category = ANDROID,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class HardCodedSdCardPath extends BugChecker implements LiteralTreeMatcher {
   // The proper ways of retrieving the "/sdcard" and "/data/data" directories.
   static final String SDCARD = "Environment.getExternalStorageDirectory().getPath()";
@@ -65,6 +58,9 @@ public class HardCodedSdCardPath extends BugChecker implements LiteralTreeMatche
 
   @Override
   public Description matchLiteral(LiteralTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     if (tree.getKind() != STRING_LITERAL) {
       return Description.NO_MATCH;
     }

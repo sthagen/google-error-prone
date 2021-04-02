@@ -55,8 +55,8 @@ Both Truth and JUnit provide clearer ways to assert this.
 Truth:
 
 ```
-assertThat(a).isSameAs(b);
-assertThat(a).isNotSameAs(b);
+assertThat(a).isSameInstanceAs(b);
+assertThat(a).isNotSameInstanceAs(b);
 ```
 
 JUnit:
@@ -80,4 +80,3 @@ using the normal `equals` method.
 ### So how can I put a special "nothing" value in my map?
 
 Use `Optional<V>` as the value type of your map instead.
-

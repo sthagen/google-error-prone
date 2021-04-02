@@ -22,7 +22,6 @@ import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TypeCastTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -42,19 +41,18 @@ import java.util.EnumSet;
 import java.util.Set;
 import javax.lang.model.type.TypeKind;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "FloatCast",
     summary = "Use parentheses to make the precedence explicit",
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class FloatCast extends BugChecker implements TypeCastTreeMatcher {
 
   static final Set<TypeKind> FLOATING_POINT = EnumSet.of(TypeKind.FLOAT, TypeKind.DOUBLE);
 
   static final Set<TypeKind> INTEGRAL = EnumSet.of(TypeKind.LONG, TypeKind.INT);
 
-  static final Matcher<ExpressionTree> BLACKLIST =
+  static final Matcher<ExpressionTree> IGNORED_METHODS =
       staticMethod().onClass("java.lang.Math").namedAnyOf("floor", "ceil", "signum", "rint");
 
   static final Matcher<ExpressionTree> POW = staticMethod().onClass("java.lang.Math").named("pow");
@@ -101,7 +99,7 @@ public class FloatCast extends BugChecker implements TypeCastTreeMatcher {
       default:
         return NO_MATCH;
     }
-    if (BLACKLIST.matches(tree.getExpression(), state)) {
+    if (IGNORED_METHODS.matches(tree.getExpression(), state)) {
       return NO_MATCH;
     }
     if (POW.matches(tree.getExpression(), state)) {

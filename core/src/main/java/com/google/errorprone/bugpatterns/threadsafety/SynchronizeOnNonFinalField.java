@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
@@ -35,13 +34,12 @@ import com.sun.tools.javac.code.Symbol.VarSymbol;
 import java.util.stream.Stream;
 import javax.lang.model.element.Name;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "SynchronizeOnNonFinalField",
     summary =
         "Synchronizing on non-final fields is not safe: if the field is ever updated,"
             + " different threads may end up locking on different objects.",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.FRAGILE_CODE)
 public class SynchronizeOnNonFinalField extends BugChecker
@@ -57,7 +55,9 @@ public class SynchronizeOnNonFinalField extends BugChecker
     // TODO(cushon): check that the receiver doesn't contain mutable state.
     // Currently 'this.locks[i].mu' is accepted if 'mu' is final but 'locks' is non-final.
     VarSymbol varSymbol = (VarSymbol) symbol;
-    if (varSymbol.isLocal() || varSymbol.isStatic() || (varSymbol.flags() & Flags.FINAL) != 0) {
+    if (ASTHelpers.isLocal(varSymbol)
+        || varSymbol.isStatic()
+        || (varSymbol.flags() & Flags.FINAL) != 0) {
       return NO_MATCH;
     }
     if (ASTHelpers.hasAnnotation(varSymbol, LazyInit.class, state)) {

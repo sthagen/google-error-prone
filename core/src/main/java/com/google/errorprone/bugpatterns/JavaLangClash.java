@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getFirst;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -38,12 +37,10 @@ import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.tree.JCTree.JCClassDecl;
 import com.sun.tools.javac.tree.JCTree.JCTypeParameter;
 import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "JavaLangClash",
-    category = JDK,
     summary = "Never reuse class names from java.lang",
     severity = WARNING,
     tags = StandardTags.STYLE)
@@ -63,14 +60,18 @@ public class JavaLangClash extends BugChecker
 
   private Description check(Tree tree, Name simpleName, VisitorState state) {
     Symtab symtab = state.getSymtab();
-    PackageSymbol javaLang =
-        symtab.enterPackage(symtab.java_base, Names.instance(state.context).java_lang);
+    PackageSymbol javaLang = symtab.enterPackage(symtab.java_base, state.getNames().java_lang);
     Symbol other =
         getFirst(
             javaLang.members().getSymbolsByName(simpleName, s -> s.getModifiers().contains(PUBLIC)),
             null);
     Symbol symbol = ASTHelpers.getSymbol(tree);
     if (other == null || other.equals(symbol)) {
+      return NO_MATCH;
+    }
+    if (simpleName.contentEquals("Compiler")) {
+      // java.lang.Compiler is deprecated for removal in 9 and should not be used, so we don't care
+      // if other types named 'Compiler' are declared
       return NO_MATCH;
     }
     return buildDescription(tree)

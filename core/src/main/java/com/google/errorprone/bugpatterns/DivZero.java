@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.kindIs;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.CompoundAssignmentTreeMatcher;
@@ -46,9 +44,7 @@ import com.sun.source.tree.Tree.Kind;
     name = "DivZero",
     altNames = "divzero",
     summary = "Division by integer literal zero",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class DivZero extends BugChecker
     implements BinaryTreeMatcher, CompoundAssignmentTreeMatcher {
 

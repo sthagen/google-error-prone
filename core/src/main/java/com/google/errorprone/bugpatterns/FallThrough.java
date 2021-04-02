@@ -18,9 +18,9 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
@@ -30,15 +30,18 @@ import com.google.errorprone.bugpatterns.BugChecker.SwitchTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.Reachability;
 import com.sun.source.tree.BlockTree;
+import com.sun.source.tree.CaseTree;
+import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.SwitchTree;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Position;
+import java.util.List;
 import java.util.regex.Pattern;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "FallThrough",
     altNames = "fallthrough",
-    category = JDK,
     summary = "Switch case may fall through",
     severity = WARNING)
 public class FallThrough extends BugChecker implements SwitchTreeMatcher {
@@ -48,25 +51,29 @@ public class FallThrough extends BugChecker implements SwitchTreeMatcher {
 
   @Override
   public Description matchSwitch(SwitchTree tree, VisitorState state) {
-    PeekingIterator<JCTree.JCCase> it =
-        Iterators.peekingIterator(((JCTree.JCSwitch) tree).cases.iterator());
+    PeekingIterator<CaseTree> it = Iterators.peekingIterator(tree.getCases().iterator());
     while (it.hasNext()) {
-      JCTree.JCCase caseTree = it.next();
+      CaseTree caseTree = it.next();
       if (!it.hasNext()) {
         break;
       }
-      JCTree.JCCase next = it.peek();
-      if (caseTree.stats.isEmpty()) {
+      CaseTree next = it.peek();
+      List<? extends StatementTree> statements = caseTree.getStatements();
+      if (statements == null || statements.isEmpty()) {
         continue;
       }
       // We only care whether the last statement completes; javac would have already
       // reported an error if that statement wasn't reachable, and the answer is
       // independent of any preceding statements.
-      boolean completes = Reachability.canCompleteNormally(getLast(caseTree.stats));
+      boolean completes = Reachability.canCompleteNormally(getLast(statements));
+      int endPos = caseEndPosition(state, caseTree);
+      if (endPos == Position.NOPOS) {
+        break;
+      }
       String comments =
           state
               .getSourceCode()
-              .subSequence(caseEndPosition(state, caseTree), next.getStartPosition())
+              .subSequence(endPos, ((JCTree) next).getStartPosition())
               .toString()
               .trim();
       if (completes && !FALL_THROUGH_PATTERN.matcher(comments).find()) {
@@ -88,15 +95,15 @@ public class FallThrough extends BugChecker implements SwitchTreeMatcher {
     return NO_MATCH;
   }
 
-  private static int caseEndPosition(VisitorState state, JCTree.JCCase caseTree) {
+  private static int caseEndPosition(VisitorState state, CaseTree caseTree) {
     // if the statement group is a single block statement, handle fall through comments at the
     // end of the block
-    if (caseTree.stats.size() == 1) {
-      JCTree.JCStatement only = getOnlyElement(caseTree.stats);
-      if (only.hasTag(JCTree.Tag.BLOCK)) {
+    if (caseTree.getStatements().size() == 1) {
+      StatementTree only = getOnlyElement(caseTree.getStatements());
+      if (only instanceof BlockTree) {
         BlockTree blockTree = (BlockTree) only;
         return blockTree.getStatements().isEmpty()
-            ? ((JCTree) blockTree).getStartPosition()
+            ? getStartPosition(blockTree)
             : state.getEndPosition(getLast(blockTree.getStatements()));
       }
     }

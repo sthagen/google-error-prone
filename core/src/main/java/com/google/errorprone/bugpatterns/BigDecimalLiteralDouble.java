@@ -17,11 +17,9 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -45,9 +43,7 @@ import java.util.Optional;
 @BugPattern(
     name = "BigDecimalLiteralDouble",
     summary = "new BigDecimal(double) loses precision in this case.",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class BigDecimalLiteralDouble extends BugChecker implements NewClassTreeMatcher {
 
   private static final String ACTUAL_VALUE = " The exact value here is `new BigDecimal(\"%s\")`.";
@@ -63,13 +59,12 @@ public class BigDecimalLiteralDouble extends BugChecker implements NewClassTreeM
   // Matches literals and unary +/- followed by a literal, since most people conceptually think of
   // -1.0 as a literal. Doesn't handle nested unary operators as new BigDecimal(String) doesn't
   // accept multiple unary prefixes.
-  private static final Matcher<ExpressionTree> FLOATING_POINT_ARGUMENT =
-      (tree, state) -> {
-        if (tree.getKind() == Kind.UNARY_PLUS || tree.getKind() == Kind.UNARY_MINUS) {
-          tree = ((UnaryTree) tree).getExpression();
-        }
-        return tree.getKind() == Kind.DOUBLE_LITERAL || tree.getKind() == Kind.FLOAT_LITERAL;
-      };
+  private static boolean floatingPointArgument(ExpressionTree tree) {
+    if (tree.getKind() == Kind.UNARY_PLUS || tree.getKind() == Kind.UNARY_MINUS) {
+      tree = ((UnaryTree) tree).getExpression();
+    }
+    return tree.getKind() == Kind.DOUBLE_LITERAL || tree.getKind() == Kind.FLOAT_LITERAL;
+  }
 
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
@@ -78,7 +73,7 @@ public class BigDecimalLiteralDouble extends BugChecker implements NewClassTreeM
     }
 
     ExpressionTree arg = getOnlyElement(tree.getArguments());
-    if (!FLOATING_POINT_ARGUMENT.matches(arg, state)) {
+    if (!floatingPointArgument(arg)) {
       return Description.NO_MATCH;
     }
 
@@ -91,7 +86,7 @@ public class BigDecimalLiteralDouble extends BugChecker implements NewClassTreeM
     if (literalNumber == null) {
       return Description.NO_MATCH;
     }
-    Double literal = literalNumber.doubleValue();
+    double literal = literalNumber.doubleValue();
 
     // Strip off 'd', 'f' suffixes and _ separators from the source.
     String literalString = state.getSourceForNode(arg).replaceAll("[_dDfF]", "");

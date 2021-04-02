@@ -63,7 +63,7 @@ import com.sun.tools.javac.code.Types;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "JdkObsolete",
     summary = "Suggests alternatives to obsolete JDK classes.",
@@ -144,17 +144,21 @@ public class JdkObsolete extends BugChecker
           // a pre-JDK-8039124 concession
           instanceMethod()
               .onExactClass("java.util.regex.Matcher")
-              .withSignature("appendTail(java.lang.StringBuffer)"),
+              .named("appendTail")
+              .withParameters("java.lang.StringBuffer"),
           instanceMethod()
               .onExactClass("java.util.regex.Matcher")
-              .withSignature("appendReplacement(java.lang.StringBuffer,java.lang.String)"),
+              .named("appendReplacement")
+              .withParameters("java.lang.StringBuffer", "java.lang.String"),
           // TODO(cushon): back this out if https://github.com/google/re2j/pull/44 happens
           instanceMethod()
               .onExactClass("com.google.re2j.Matcher")
-              .withSignature("appendTail(java.lang.StringBuffer)"),
+              .named("appendTail")
+              .withParameters("java.lang.StringBuffer"),
           instanceMethod()
               .onExactClass("com.google.re2j.Matcher")
-              .withSignature("appendReplacement(java.lang.StringBuffer,java.lang.String)"));
+              .named("appendReplacement")
+              .withParameters("java.lang.StringBuffer", "java.lang.String"));
 
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
@@ -208,9 +212,11 @@ public class JdkObsolete extends BugChecker
 
   @Override
   public Description matchMemberReference(MemberReferenceTree tree, VisitorState state) {
-    MethodSymbol symbol = ASTHelpers.getSymbol(tree);
-    return describeIfObsolete(
-        tree.getQualifierExpression(), ImmutableList.of(symbol.owner.asType()), state);
+    Type type = ASTHelpers.getType(tree.getQualifierExpression());
+    if (type == null) {
+      return NO_MATCH;
+    }
+    return describeIfObsolete(tree.getQualifierExpression(), ImmutableList.of(type), state);
   }
 
   private Description describeIfObsolete(
@@ -233,6 +239,7 @@ public class JdkObsolete extends BugChecker
     return NO_MATCH;
   }
 
+  @Nullable
   private static Type getMethodOrLambdaReturnType(VisitorState state) {
     for (Tree tree : state.getPath()) {
       switch (tree.getKind()) {
@@ -248,6 +255,7 @@ public class JdkObsolete extends BugChecker
     return null;
   }
 
+  @Nullable
   static Type getTargetType(VisitorState state) {
     Tree parent = state.getPath().getParentPath().getLeaf();
     Type type;

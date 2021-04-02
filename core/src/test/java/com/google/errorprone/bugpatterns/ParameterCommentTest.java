@@ -31,7 +31,7 @@ public class ParameterCommentTest {
       CompilationTestHelper.newInstance(ParameterComment.class, getClass());
 
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new ParameterComment(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(ParameterComment.class, getClass());
 
   @Test
   public void positive() {
@@ -191,5 +191,50 @@ public class ParameterCommentTest {
             "  }",
             "}")
         .doTest(TestMode.TEXT_MATCH);
+  }
+
+  @Test
+  public void negative_multiLineTernary() {
+    compilationTestHelper
+        .addSourceLines(
+            "Test.java",
+            "public class Test {",
+            "  public static int foo(int x) {",
+            "    int y = true ? ",
+            "      foo(/* x= */ x) : foo(/* x= */ x);",
+            "    int z = true ? ",
+            "      foo(/* x= */ x) :",
+            "      foo(/* x= */ x);",
+            "    return 0;",
+            "  }",
+            "}")
+        .expectNoDiagnostics()
+        .doTest();
+  }
+
+  @Test
+  public void negative_nestedLambda() {
+    compilationTestHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.function.Consumer;",
+            "public class Test {",
+            "  private void testcase(String s, Consumer<Boolean> c) {",
+            "    outer(",
+            "        p -> {",
+            "          System.out.println(s);",
+            "          inner(",
+            "              /* myFunc= */ c,",
+            "              /* i1= */ 200,",
+            "              /* i2= */ 300);",
+            "        },",
+            "        /* b1= */ true,",
+            "        /* b2= */ false);",
+            "  }",
+            "  private void outer(Consumer<Boolean> myFunc, boolean b1, boolean b2) {}",
+            "  private void inner(Consumer<Boolean> myFunc, int i1, int i2) {}",
+            "}")
+        .expectNoDiagnostics()
+        .doTest();
   }
 }

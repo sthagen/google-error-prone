@@ -16,17 +16,16 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.LinkType.NONE;
-import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.RequiredModifiers;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotationTree;
@@ -42,9 +41,7 @@ import javax.lang.model.element.Modifier;
         "This annotation is missing required modifiers as specified by its "
             + "@RequiredModifiers annotation",
     linkType = NONE,
-    category = JDK,
-    severity = WARNING,
-    tags = StandardTags.LIKELY_ERROR)
+    severity = ERROR)
 public class RequiredModifiersChecker extends BugChecker implements AnnotationTreeMatcher {
 
   private static final String MESSAGE_TEMPLATE =
@@ -78,7 +75,15 @@ public class RequiredModifiersChecker extends BugChecker implements AnnotationTr
         annotationName != null
             ? String.format("The annotation '@%s'", annotationName)
             : "This annotation";
-    String customMessage = String.format(MESSAGE_TEMPLATE, nameString, missing.toString());
-    return buildDescription(tree).setMessage(customMessage).build();
+    String customMessage = String.format(MESSAGE_TEMPLATE, nameString, missing);
+    return buildDescription(tree)
+        .addFix(
+            SuggestedFixes.addModifiers(
+                state.getPath().getParentPath().getParentPath().getLeaf(),
+                (ModifiersTree) parent,
+                state,
+                missing))
+        .setMessage(customMessage)
+        .build();
   }
 }

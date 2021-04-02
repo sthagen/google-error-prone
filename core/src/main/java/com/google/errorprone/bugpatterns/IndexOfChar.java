@@ -16,20 +16,17 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.method.MethodMatchers;
-import com.google.errorprone.predicates.TypePredicates;
 import com.google.errorprone.suppliers.Suppliers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
@@ -37,19 +34,17 @@ import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Types;
 import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "IndexOfChar",
-    category = JDK,
     summary =
         "The first argument to indexOf is a Unicode code point, and the second is the index to"
             + " start the search from",
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class IndexOfChar extends BugChecker implements MethodInvocationTreeMatcher {
   private static final Matcher<ExpressionTree> MATCHER =
       MethodMatchers.instanceMethod()
-          .onClass(TypePredicates.isExactType(Suppliers.STRING_TYPE))
+          .onExactClass(Suppliers.STRING_TYPE)
           .named("indexOf")
           .withParameters("int", "int");
 

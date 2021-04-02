@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getType;
@@ -25,7 +24,6 @@ import static com.google.errorprone.util.ASTHelpers.isSameType;
 import com.google.common.math.IntMath;
 import com.google.common.math.LongMath;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -48,15 +46,14 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.util.SimpleTreeVisitor;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Type;
+import javax.annotation.Nullable;
 import javax.lang.model.type.TypeKind;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ConstantOverflow",
     summary = "Compile-time constant expression overflows",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class ConstantOverflow extends BugChecker implements BinaryTreeMatcher {
 
   @Override
@@ -85,7 +82,8 @@ public class ConstantOverflow extends BugChecker implements BinaryTreeMatcher {
   /**
    * If the left operand of an int binary expression is an int literal, suggest making it a long.
    */
-  private Fix longFix(ExpressionTree expr, VisitorState state) {
+  @Nullable
+  private static Fix longFix(ExpressionTree expr, VisitorState state) {
     BinaryTree binExpr = null;
     while (expr instanceof BinaryTree) {
       binExpr = (BinaryTree) expr;

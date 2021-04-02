@@ -21,17 +21,17 @@ import static org.junit.Assume.assumeTrue;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
-import java.lang.reflect.Method;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** {@link StringSplitter}Test */
+/** Unit tests for {@link StringSplitter} check. */
 @RunWith(JUnit4.class)
 public class StringSplitterTest {
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new StringSplitter(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(StringSplitter.class, getClass());
 
   @Test
   public void positive() {
@@ -57,7 +57,7 @@ public class StringSplitterTest {
   // Regression test for issue #1124
   @Test
   public void positive_localVarTypeInference() {
-    assumeTrue(isJdk10OrGreater());
+    assumeTrue(RuntimeVersion.isAtLeast10());
     testHelper
         .addInputLines(
             "Test.java",
@@ -406,14 +406,14 @@ public class StringSplitterTest {
   @Test
   public void testStringSplitPositive() {
     CompilationTestHelper.newInstance(StringSplitter.class, getClass())
-        .addSourceFile("StringSplitPositiveCases.java")
+        .addSourceFile("StringSplitterPositiveCases.java")
         .doTest();
   }
 
   @Test
   public void testStringSplitNegative() {
     CompilationTestHelper.newInstance(StringSplitter.class, getClass())
-        .addSourceFile("StringSplitNegativeCases.java")
+        .addSourceFile("StringSplitterNegativeCases.java")
         .doTest();
   }
 
@@ -439,14 +439,43 @@ public class StringSplitterTest {
         .doTest(TestMode.TEXT_MATCH);
   }
 
-  private static boolean isJdk10OrGreater() {
-    try {
-      Method versionMethod = Runtime.class.getMethod("version");
-      Object version = versionMethod.invoke(null);
-      int majorVersion = (int) version.getClass().getMethod("major").invoke(version);
-      return majorVersion >= 10;
-    } catch (ReflectiveOperationException e) {
-      return false;
-    }
+  @Test
+  public void patternSplit() {
+    testHelper
+        .addInputLines(
+            "Test.java",
+            "import java.util.regex.Pattern;",
+            "class Test {",
+            "  void f() {",
+            "    String x = Pattern.compile(\"\").split(\"c\")[0];",
+            "    for (String s : Pattern.compile(\"\").split(\":\")) {}",
+            "    String[] xs = Pattern.compile(\"c\").split(\"\");",
+            "    xs[0] = null;",
+            "    System.err.println(xs[0]);",
+            "    String[] pieces = Pattern.compile(\":\").split(\"\");",
+            "    for (int i = 0; i < pieces.length; i++) {}",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "import com.google.common.base.Splitter;",
+            "import com.google.common.collect.Iterables;",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "import java.util.regex.Pattern;",
+            "",
+            "class Test {",
+            "  void f() {",
+            "    String x = Iterables.get(Splitter.on(Pattern.compile(\"\")).split(\"c\"), 0);",
+            "    for (String s : Splitter.on(Pattern.compile(\"\")).split(\":\")) {}",
+            "    List<String> xs ="
+                + " new ArrayList<>(Splitter.on(Pattern.compile(\"c\")).splitToList(\"\"));",
+            "    xs.set(0, null);",
+            "    System.err.println(xs.get(0));",
+            "    List<String> pieces = Splitter.on(Pattern.compile(\":\")).splitToList(\"\");",
+            "    for (int i = 0; i < pieces.size(); i++) {}",
+            "  }",
+            "}")
+        .doTest(TestMode.TEXT_MATCH);
   }
 }

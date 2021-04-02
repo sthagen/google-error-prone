@@ -16,13 +16,10 @@
 
 package com.google.errorprone.bugpatterns.collectionincompatibletype;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
-import com.google.errorprone.bugpatterns.collectionincompatibletype.CollectionIncompatibleType.FixType;
-import com.google.errorprone.scanner.ErrorProneScanner;
-import com.google.errorprone.scanner.ScannerSupplier;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,14 +28,11 @@ import org.junit.runners.JUnit4;
 /** @author alexeagle@google.com (Alex Eagle) */
 @RunWith(JUnit4.class)
 public class CollectionIncompatibleTypeTest {
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(CollectionIncompatibleType.class, getClass());
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(CollectionIncompatibleType.class, getClass());
-  }
+  private final BugCheckerRefactoringTestHelper refactorTestHelper =
+      BugCheckerRefactoringTestHelper.newInstance(CollectionIncompatibleType.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -62,12 +56,7 @@ public class CollectionIncompatibleTypeTest {
 
   @Test
   public void testCastFixes() {
-    CompilationTestHelper compilationHelperWithCastFix =
-        CompilationTestHelper.newInstance(
-            ScannerSupplier.fromScanner(
-                new ErrorProneScanner(new CollectionIncompatibleType(FixType.CAST))),
-            getClass());
-    compilationHelperWithCastFix
+    compilationHelper
         .addSourceLines(
             "Test.java",
             "import java.util.Collection;",
@@ -79,14 +68,12 @@ public class CollectionIncompatibleTypeTest {
             "    c1.containsAll(c2);",
             "  }",
             "}")
+        .setArgs(ImmutableList.of("-XepOpt:CollectionIncompatibleType:FixType=CAST"))
         .doTest();
   }
 
   @Test
   public void testSuppressWarningsFix() {
-    BugCheckerRefactoringTestHelper refactorTestHelper =
-        BugCheckerRefactoringTestHelper.newInstance(
-            new CollectionIncompatibleType(FixType.SUPPRESS_WARNINGS), getClass());
     refactorTestHelper
         .addInputLines(
             "in/Test.java",
@@ -108,6 +95,7 @@ public class CollectionIncompatibleTypeTest {
             "    c1.containsAll(/* expected: String, actual: Integer */ c2);",
             "  }",
             "}")
+        .setArgs("-XepOpt:CollectionIncompatibleType:FixType=SUPPRESS_WARNINGS")
         .doTest(TestMode.TEXT_MATCH);
   }
 
@@ -125,6 +113,185 @@ public class CollectionIncompatibleTypeTest {
             "  public boolean boundedTypeParameters(MyHashMap<?, ?> myHashMap) {",
             "    // BUG: Diagnostic contains:",
             "    return myHashMap.containsKey(\"bad\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void disjoint() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Collections;",
+            "import java.util.List;",
+            "public class Test {",
+            "  void f(List<String> a, List<String> b) {",
+            "    Collections.disjoint(a, b);",
+            "  }",
+            "  void g(List<String> a, List<Integer> b) {",
+            "    // BUG: Diagnostic contains: not compatible",
+            "    Collections.disjoint(a, b);",
+            "  }",
+            "  void h(List<?> a, List<Integer> b) {",
+            "    Collections.disjoint(a, b);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void difference() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Set;",
+            "import com.google.common.collect.Sets;",
+            "public class Test {",
+            "  void f(Set<String> a, Set<String> b) {",
+            "    Sets.difference(a, b);",
+            "  }",
+            "  void g(Set<String> a, Set<Integer> b) {",
+            "    // BUG: Diagnostic contains: not compatible",
+            "    Sets.difference(a, b);",
+            "  }",
+            "  void h(Set<?> a, Set<Integer> b) {",
+            "    Sets.difference(a, b);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReference() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "public class Test {",
+            "  java.util.stream.Stream filter(List<Integer> xs, List<String> ss) {",
+            "    // BUG: Diagnostic contains:",
+            "    return xs.stream().filter(ss::contains);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReferenceBinOp() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "public class Test {",
+            "  void removeAll(List<List<Integer>> xs, List<String> ss) {",
+            "    // BUG: Diagnostic contains:",
+            "    xs.forEach(ss::removeAll);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReference_compatibleType() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "public class Test {",
+            "  java.util.stream.Stream filter(List<Integer> xs, List<Object> ss) {",
+            "    return xs.stream().filter(ss::contains);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void memberReferenceWithBoundedGenerics() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.Sets;",
+            "import java.util.function.BiFunction;",
+            "import java.util.Set;",
+            "public class Test {",
+            "  <T extends String, M extends Integer> void a(",
+            "    BiFunction<Set<T>, Set<M>, Set<T>> b) {}",
+            "  void b() {",
+            "    // BUG: Diagnostic contains:",
+            "    a(Sets::difference);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void memberReferenceWithBoundedGenericsDependentOnEachOther() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.Sets;",
+            "import java.util.function.BiFunction;",
+            "import java.util.Set;",
+            "public class Test {",
+            "  <T extends String, M extends T> void a(",
+            "    BiFunction<Set<T>, Set<M>, Set<T>> b) {}",
+            "  void b() {",
+            "    a(Sets::difference);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void memberReferenceWithConcreteIncompatibleTypes() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.Sets;",
+            "import java.util.function.BiFunction;",
+            "import java.util.Set;",
+            "public class Test {",
+            "  void a(BiFunction<Set<Integer>, Set<String>, Set<Integer>> b) {}",
+            "  void b() {",
+            "    // BUG: Diagnostic contains:",
+            "    a(Sets::difference);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void memberReferenceWithConcreteCompatibleTypes() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.Sets;",
+            "import java.util.function.BiFunction;",
+            "import java.util.Set;",
+            "public class Test {",
+            "  void a(BiFunction<Set<Integer>, Set<Number>, Set<Integer>> b) {}",
+            "  void b() {",
+            "    a(Sets::difference);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void memberReferenceWithCustomFunctionalInterface() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.Sets;",
+            "import java.util.function.BiFunction;",
+            "import java.util.Set;",
+            "public interface Test {",
+            "  Set<Integer> test(Set<Integer> a, Set<String> b);",
+            "  static void a(Test b) {}",
+            "  static void b() {",
+            "    // BUG: Diagnostic contains: Integer is not compatible with String",
+            "    a(Sets::difference);",
             "  }",
             "}")
         .doTest();

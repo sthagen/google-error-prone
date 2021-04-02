@@ -5,8 +5,27 @@ dist: trusty
 jdk:
   - oraclejdk8
   - oraclejdk9
-  - oraclejdk10
-  - oraclejdk11
+  - openjdk11
+  - openjdk12
+  - openjdk13
+  - openjdk14
+  - openjdk-ea
+
+matrix:
+  include:
+    - jdk: openjdk10
+      before_install:
+        # https://github.com/travis-ci/travis-ci/issues/9368#issuecomment-395354755
+        - rm "${JAVA_HOME}/lib/security/cacerts"
+        - ln -s /etc/ssl/certs/java/cacerts "${JAVA_HOME}/lib/security/cacerts"
+    - jdk: openjdk15
+      script:
+        # default Maven command
+        - mvn test -B
+        # also test Javadoc generation
+        - mvn -P '!examples' javadoc:aggregate
+  allow_failures:
+    - jdk: openjdk-ea
 
 # see https://github.com/travis-ci/travis-ci/issues/8408
 before_install:
@@ -40,4 +59,9 @@ env:
 
 after_success:
   - util/publish-snapshot-on-commit.sh
-  - util/generate-latest-docs.sh
+
+# https://docs.travis-ci.com/user/web-ui/#build-pushed-branches
+# safelist
+branches:
+  only:
+  - master

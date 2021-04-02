@@ -16,8 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static org.junit.Assume.assumeTrue;
+
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -25,13 +27,8 @@ import org.junit.runners.JUnit4;
 /** {@link MissingCasesInEnumSwitch}Test */
 @RunWith(JUnit4.class)
 public class MissingCasesInEnumSwitchTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(MissingCasesInEnumSwitch.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(MissingCasesInEnumSwitch.class, getClass());
 
   @Test
   public void testExhaustive() {
@@ -47,6 +44,23 @@ public class MissingCasesInEnumSwitchTest {
             "      case THREE:",
             "        System.err.println(\"found it!\");",
             "        break;",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testExhaustive_multipleCaseExpressions() {
+    assumeTrue(RuntimeVersion.isAtLeast14());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  enum Case { ONE, TWO }",
+            "  void m(Case c) {",
+            "    switch (c) {",
+            "      case ONE, TWO -> {}",
             "    }",
             "  }",
             "}")

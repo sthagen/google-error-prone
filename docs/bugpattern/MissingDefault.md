@@ -1,5 +1,5 @@
 The [Google Java Style Guide §4.8.4.3][style] requires each switch statement to
-includes a `default` statement group, even if it contains no code.
+include a `default` statement group, even if it contains no code.
 
 NOTE: A switch statement for an `enum` type may omit the `default` statement
 group, if it includes explicit cases covering all possible values of that type.
@@ -13,6 +13,8 @@ If the unhandled cases should be impossible, add a `default` clause that throws
 `AssertionError`:
 
 ```java
+enum State { READY, DONE, RUNNING, BLOCKED }
+
 switch (state) {
   case READY:
     return true;
@@ -27,16 +29,16 @@ If having execution fall out of the switch is intentional, add a `default`
 clause with a comment:
 
 ```java
+enum State { READY, DONE, RUNNING, BLOCKED }
+
 switch (state) {
   case READY:
     return true;
   case DONE:
     return false;
-  default:
-    // fall out
+  default: // continue below to handle RUNNING/BLOCKED/etc.
 }
 ```
 
-[style]: https://google.github.io/styleguide/javaguide.html#s4.8.4-switch
-
+[style]: https://google.github.io/styleguide/javaguide.html#s4.8.4.3-switch-default
 [MissingCasesInEnumSwitch]: https://errorprone.info/bugpattern/MissingCasesInEnumSwitch

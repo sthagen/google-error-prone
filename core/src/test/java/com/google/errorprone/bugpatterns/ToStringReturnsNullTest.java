@@ -16,7 +16,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -29,12 +28,8 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public final class ToStringReturnsNullTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(ToStringReturnsNull.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ToStringReturnsNull.class, getClass());
 
   @Test
   public void positive() {
@@ -45,6 +40,21 @@ public final class ToStringReturnsNullTest {
             "  // BUG: Diagnostic contains: ToStringReturnsNull",
             "  public String toString() {",
             "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void conditionalExpression() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  final boolean cond = false;",
+            "  // BUG: Diagnostic contains: ToStringReturnsNull",
+            "  public String toString() {",
+            "    return cond ? null : \"foo\";",
             "  }",
             "}")
         .doTest();

@@ -30,8 +30,8 @@ import org.junit.Ignore;
  *
  * @author ghm@google.com (Graeme Morgan)
  */
-@Ignore("b/74365407 test proto sources are broken")
 @RunWith(JUnit4.class)
+@Ignore("b/130670719")
 public final class ProtoRedundantSetTest {
   private final CompilationTestHelper compilationHelper =
       CompilationTestHelper.newInstance(ProtoRedundantSet.class, getClass());
@@ -142,7 +142,7 @@ public final class ProtoRedundantSetTest {
 
   @Test
   public void testFixes() {
-    BugCheckerRefactoringTestHelper.newInstance(new ProtoRedundantSet(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(ProtoRedundantSet.class, getClass())
         .addInputLines(
             "ProtoRedundantSetPositiveCases.java",
             "import com.google.errorprone.bugpatterns.proto.ProtoTest.TestFieldProtoMessage;",

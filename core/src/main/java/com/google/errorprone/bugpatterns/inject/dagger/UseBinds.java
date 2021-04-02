@@ -16,8 +16,7 @@
 package com.google.errorprone.bugpatterns.inject.dagger;
 
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.errorprone.BugPattern.Category.DAGGER;
-import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
+import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.bugpatterns.inject.dagger.DaggerAnnotations.ELEMENTS_INTO_SET_CLASS_NAME;
 import static com.google.errorprone.bugpatterns.inject.dagger.DaggerAnnotations.INTO_MAP_CLASS_NAME;
 import static com.google.errorprone.bugpatterns.inject.dagger.DaggerAnnotations.INTO_SET_CLASS_NAME;
@@ -36,7 +35,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -68,9 +66,7 @@ import javax.lang.model.element.Modifier;
 @BugPattern(
     name = "UseBinds",
     summary = "@Binds is a more efficient and declarative mechanism for delegating a binding.",
-    category = DAGGER,
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class UseBinds extends BugChecker implements MethodTreeMatcher {
   private static final Matcher<MethodTree> SIMPLE_METHOD =
       new Matcher<MethodTree>() {
@@ -149,7 +145,7 @@ public class UseBinds extends BugChecker implements MethodTreeMatcher {
             .build());
   }
 
-  private SuggestedFix.Builder convertMethodToBinds(MethodTree method, VisitorState state) {
+  private static SuggestedFix.Builder convertMethodToBinds(MethodTree method, VisitorState state) {
     SuggestedFix.Builder fix = SuggestedFix.builder();
 
     JCModifiers modifiers = ((JCMethodDecl) method).getModifiers();
@@ -203,7 +199,7 @@ public class UseBinds extends BugChecker implements MethodTreeMatcher {
     return fix;
   }
 
-  private Description fixByDelegating() {
+  private static Description fixByDelegating() {
     // TODO(gak): add a suggested fix by which we make a nested abstract module that we can include
     return NO_MATCH;
   }

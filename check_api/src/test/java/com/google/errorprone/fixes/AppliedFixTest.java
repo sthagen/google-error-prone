@@ -18,10 +18,9 @@ package com.google.errorprone.fixes;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,20 +52,14 @@ public class AppliedFixTest {
 
         @Override
         public int replaceTree(JCTree oldtree, JCTree newtree) {
-          Integer endpos = map.get(oldtree);
-          if (endpos == null) {
-            endpos = Position.NOPOS;
-          }
+          Integer endpos = map.getOrDefault(oldtree, Position.NOPOS);
           map.put(newtree, endpos);
           return endpos;
         }
 
         @Override
         public int getEndPos(JCTree tree) {
-          Integer result = map.get(tree);
-          if (result == null) {
-            result = Position.NOPOS;
-          }
+          Integer result = map.getOrDefault(tree, Position.NOPOS);
           return result;
         }
       };
@@ -129,9 +122,8 @@ public class AppliedFixTest {
   @Test
   public void shouldReturnNullOnEmptyFix() {
     AppliedFix fix =
-        AppliedFix.fromSource("public class Foo {}", endPositions)
-            .apply(SuggestedFix.builder().build());
-    assertNull(fix);
+        AppliedFix.fromSource("public class Foo {}", endPositions).apply(SuggestedFix.emptyFix());
+    assertThat(fix).isNull();
   }
 
   @Test
@@ -139,7 +131,7 @@ public class AppliedFixTest {
     AppliedFix fix =
         AppliedFix.fromSource("public class Foo {}", endPositions)
             .apply(SuggestedFix.builder().addImport("foo.bar.Baz").build());
-    assertNull(fix);
+    assertThat(fix).isNull();
   }
 
   @Test

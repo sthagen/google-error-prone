@@ -24,6 +24,7 @@ import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
@@ -43,7 +44,6 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.TryTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
@@ -78,6 +78,7 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
       return NO_MATCH;
     }
     if (AbstractReturnValueIgnored.expectedExceptionTest(tree, state)
+        || AbstractReturnValueIgnored.mockitoInvocation(tree, state)
         || MOCKITO_MATCHER.matches(state.getPath().getParentPath().getLeaf(), state)) {
       return NO_MATCH;
     }
@@ -104,13 +105,12 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
             }
             // The caller method is not annotated, so the closing of the returned resource is not
             // enforced. Suggest fixing this by annotating the caller method.
-            return buildDescription(tree)
-                .addFix(
-                    SuggestedFix.builder()
-                        .prefixWith(callerMethodTree, "@MustBeClosed\n")
-                        .addImport(MustBeClosed.class.getCanonicalName())
-                        .build())
-                .build();
+            return describeMatch(
+                tree,
+                SuggestedFix.builder()
+                    .prefixWith(callerMethodTree, "@MustBeClosed\n")
+                    .addImport(MustBeClosed.class.getCanonicalName())
+                    .build());
           }
           break;
         case CONDITIONAL_EXPRESSION:
@@ -176,8 +176,8 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     return null;
   }
 
-  private boolean tryFinallyClose(VarSymbol var, TreePath path, VisitorState state) {
-    if ((var.flags() & (Flags.FINAL | Flags.EFFECTIVELY_FINAL)) == 0) {
+  private static boolean tryFinallyClose(VarSymbol var, TreePath path, VisitorState state) {
+    if (!isConsideredFinal(var)) {
       return false;
     }
     Tree parent = path.getParentPath().getLeaf();

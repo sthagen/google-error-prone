@@ -25,11 +25,8 @@ import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ImmutableMultimap.Builder;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
@@ -65,9 +62,7 @@ import com.sun.tools.javac.code.Types;
         "A wakelock acquired with a timeout may be released by the system before calling"
             + " `release`, even after checking `isHeld()`. If so, it will throw a RuntimeException."
             + " Please wrap in a try/catch block.",
-    severity = SeverityLevel.WARNING,
-    category = Category.ANDROID,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SeverityLevel.WARNING)
 public class WakelockReleasedDangerously extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final String WAKELOCK_CLASS_NAME = "android.os.PowerManager.WakeLock";
@@ -76,6 +71,9 @@ public class WakelockReleasedDangerously extends BugChecker implements MethodInv
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     // Match on calls to any override of WakeLock.release().
     if (!RELEASE.matches(tree, state)) {
       return NO_MATCH;
@@ -99,7 +97,8 @@ public class WakelockReleasedDangerously extends BugChecker implements MethodInv
     return describeMatch(releaseStatement, getFix(releaseStatement, wakelockSymbol, state));
   }
 
-  private SuggestedFix getFix(Tree releaseStatement, Symbol wakelockSymbol, VisitorState state) {
+  private static SuggestedFix getFix(
+      Tree releaseStatement, Symbol wakelockSymbol, VisitorState state) {
     // Wrap the release call line in a try/catch(RuntimeException) block.
     String before = "\ntry {\n";
     String after =
@@ -182,7 +181,7 @@ public class WakelockReleasedDangerously extends BugChecker implements MethodInv
                 m -> Boolean.FALSE.equals(constValue(m.getArguments().get(0), Boolean.class)));
   }
 
-  private ClassTree getTopLevelClass(VisitorState state) {
+  private static ClassTree getTopLevelClass(VisitorState state) {
     return (ClassTree)
         Streams.findLast(
                 Streams.stream(state.getPath().iterator())
@@ -196,7 +195,7 @@ public class WakelockReleasedDangerously extends BugChecker implements MethodInv
    */
   private ImmutableMultimap<String, MethodInvocationTree> methodCallsForSymbol(
       Symbol sym, ClassTree classTree) {
-    Builder<String, MethodInvocationTree> methodMap = ImmutableMultimap.builder();
+    ImmutableMultimap.Builder<String, MethodInvocationTree> methodMap = ImmutableMultimap.builder();
     // Populate map builder with names of method called : the tree in which it is called.
     classTree.accept(
         new TreeScanner<Void, Void>() {

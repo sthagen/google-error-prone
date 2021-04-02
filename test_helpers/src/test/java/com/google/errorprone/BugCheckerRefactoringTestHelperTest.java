@@ -17,12 +17,11 @@
 package com.google.errorprone;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
@@ -46,7 +45,7 @@ public class BugCheckerRefactoringTestHelperTest {
 
   @Before
   public void setUp() {
-    helper = BugCheckerRefactoringTestHelper.newInstance(new ReturnNullRefactoring(), getClass());
+    helper = BugCheckerRefactoringTestHelper.newInstance(ReturnNullRefactoring.class, getClass());
   }
 
   @Test
@@ -172,7 +171,7 @@ public class BugCheckerRefactoringTestHelperTest {
           .expectUnchanged()
           .doTest();
     } catch (AssertionError e) {
-      assertThat(e.getMessage()).contains("compilation failed unexpectedly");
+      assertThat(e).hasMessageThat().contains("compilation failed unexpectedly");
       return;
     }
     fail("compilation succeeded unexpectedly");
@@ -180,7 +179,7 @@ public class BugCheckerRefactoringTestHelperTest {
 
   @Test
   public void testAnnotationFullName() {
-    BugCheckerRefactoringTestHelper.newInstance(new RemoveAnnotationRefactoring(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(RemoveAnnotationRefactoring.class, getClass())
         .addInputLines("bar/Foo.java", "package bar;", "public @interface Foo {", "};")
         .expectUnchanged()
         .addInputLines("foo/Bar.java", "import bar.Foo;", "public @Foo class Bar {", "}")
@@ -192,9 +191,7 @@ public class BugCheckerRefactoringTestHelperTest {
       name = "ReturnNullRefactoring",
       summary = "Mock refactoring that replaces all returns with 'return null;' statement.",
       explanation = "For test purposes only.",
-      category = JDK,
-      severity = SUGGESTION,
-      providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+      severity = SUGGESTION)
   public static class ReturnNullRefactoring extends BugChecker implements ReturnTreeMatcher {
     @Override
     public Description matchReturn(ReturnTree tree, VisitorState state) {
@@ -206,9 +203,7 @@ public class BugCheckerRefactoringTestHelperTest {
       name = "RemoveAnnotationRefactoring",
       summary = "Mock refactoring that removes all annotations declared in package bar ",
       explanation = "For test purposes only.",
-      category = JDK,
-      severity = SUGGESTION,
-      providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+      severity = SUGGESTION)
   public static class RemoveAnnotationRefactoring extends BugChecker
       implements AnnotationTreeMatcher {
 
@@ -229,7 +224,7 @@ public class BugCheckerRefactoringTestHelperTest {
           .expectUnchanged()
           .doTest();
     } catch (AssertionError e) {
-      assertThat(e.getMessage()).contains("error: cannot find symbol");
+      assertThat(e).hasMessageThat().contains("error: cannot find symbol");
       return;
     }
     fail("compilation succeeded unexpectedly");
@@ -237,7 +232,7 @@ public class BugCheckerRefactoringTestHelperTest {
 
   @Test
   public void staticLastImportOrder() {
-    BugCheckerRefactoringTestHelper.newInstance(new ImportArrayList(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(ImportArrayList.class, getClass())
         .setImportOrder("static-last")
         .addInputLines("pkg/A.java", "import static java.lang.Math.min;", "class A {", "}")
         .addOutputLines(
@@ -255,15 +250,21 @@ public class BugCheckerRefactoringTestHelperTest {
       name = "ImportArrayList",
       summary = "Mock refactoring that imports an ArrayList",
       explanation = "For test purposes only.",
-      category = JDK,
-      severity = SUGGESTION,
-      providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+      severity = SUGGESTION)
   public static class ImportArrayList extends BugChecker implements CompilationUnitTreeMatcher {
 
     @Override
     public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
       SuggestedFix fix = SuggestedFix.builder().addImport("java.util.ArrayList").build();
-      return buildDescription(tree).addFix(fix).build();
+      return describeMatch(tree, fix);
     }
+  }
+
+  @Test
+  public void onlyCallDoTestOnce() {
+    helper.addInputLines("Test.java", "public class Test {}").expectUnchanged().doTest();
+    IllegalStateException expected =
+        assertThrows(IllegalStateException.class, () -> helper.doTest());
+    assertThat(expected).hasMessageThat().contains("doTest");
   }
 }

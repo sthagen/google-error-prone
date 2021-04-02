@@ -15,7 +15,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -24,13 +23,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ModifyCollectionInEnhancedForLoopTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(ModifyCollectionInEnhancedForLoop.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ModifyCollectionInEnhancedForLoop.class, getClass());
 
   @Test
   public void testPositiveCase() {
@@ -56,6 +50,23 @@ public class ModifyCollectionInEnhancedForLoopTest {
             "      if (add(e))",
             "        modified = true;",
             "    return modified;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void concurrentMap() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Map;",
+            "import java.util.concurrent.ConcurrentMap;",
+            "class Test {",
+            "  void f(ConcurrentMap<String, Integer> map) {",
+            "    for (Map.Entry<String, Integer> e : map.entrySet()) {",
+            "      map.remove(e.getKey());",
+            "    }",
             "  }",
             "}")
         .doTest();

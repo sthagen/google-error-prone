@@ -46,13 +46,11 @@ import com.google.common.collect.Range;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.matchers.method.MethodMatchers.ParameterMatcher;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionStatementTree;
 import com.sun.source.tree.ExpressionTree;
@@ -63,12 +61,11 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "UnnecessarySetDefault",
     summary = "Unnecessary call to NullPointerTester#setDefault",
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class UnnecessarySetDefault extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> SET_DEFAULT =
@@ -245,7 +242,7 @@ public class UnnecessarySetDefault extends BugChecker implements MethodInvocatio
     return description.build();
   }
 
-  private static ParameterMatcher factoryMatcher(Class<?> clazz, String name) {
+  private static Matcher<ExpressionTree> factoryMatcher(Class<?> clazz, String name) {
     return staticMethod().onClass(clazz.getCanonicalName()).named(name).withParameters();
   }
 

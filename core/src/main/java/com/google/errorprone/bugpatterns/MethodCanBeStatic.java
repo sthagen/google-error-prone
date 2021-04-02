@@ -16,18 +16,15 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.fixes.SuggestedFixes.addModifiers;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
-import static com.google.errorprone.util.ASTHelpers.isSameType;
-import static com.google.errorprone.util.ASTHelpers.isSubtype;
+import static com.google.errorprone.matchers.Matchers.SERIALIZATION_METHODS;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
@@ -46,7 +43,6 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,14 +50,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MethodCanBeStatic",
     altNames = "static-method",
     summary = "A private method that does not reference the enclosing instance can be static",
-    category = JDK,
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class MethodCanBeStatic extends BugChecker implements CompilationUnitTreeMatcher {
   private final FindingOutputStyle findingOutputStyle;
 
@@ -121,7 +115,7 @@ public class MethodCanBeStatic extends BugChecker implements CompilationUnitTree
           nodes.put(sym, new MethodDetails(tree, true, ImmutableSet.of()));
         } else {
           CanBeStaticResult result = CanBeStaticAnalyzer.canBeStaticResult(tree, sym, state);
-          boolean isExcluded = isExcluded(sym, state);
+          boolean isExcluded = isExcluded(tree, state);
           nodes.put(
               sym,
               new MethodDetails(
@@ -179,6 +173,7 @@ public class MethodCanBeStatic extends BugChecker implements CompilationUnitTree
   private Description generateDescription(
       Map<MethodSymbol, MethodDetails> nodes, VisitorState state) {
     SuggestedFix.Builder fixBuilder = SuggestedFix.builder();
+    fixBuilder.setShortDescription("Make static");
     Set<MethodTree> affectedTrees = new HashSet<>();
     for (Map.Entry<MethodSymbol, MethodDetails> entry : nodes.entrySet()) {
       MethodSymbol sym = entry.getKey();
@@ -227,11 +222,14 @@ public class MethodCanBeStatic extends BugChecker implements CompilationUnitTree
     return builder.build();
   }
 
-  private static boolean isExcluded(MethodSymbol sym, VisitorState state) {
+  private static boolean isExcluded(MethodTree tree, VisitorState state) {
+    MethodSymbol sym = ASTHelpers.getSymbol(tree);
     if (sym == null) {
       return true;
     }
-    if (sym.isConstructor() || sym.getModifiers().contains(Modifier.NATIVE)) {
+    if (sym.isConstructor()
+        || sym.getModifiers().contains(Modifier.NATIVE)
+        || sym.getModifiers().contains(Modifier.SYNCHRONIZED)) {
       return true;
     }
     if (!sym.isPrivate()) {
@@ -251,37 +249,7 @@ public class MethodCanBeStatic extends BugChecker implements CompilationUnitTree
       case ANONYMOUS:
         return true;
     }
-    if (isSubtype(sym.owner.enclClass().type, state.getSymtab().serializableType, state)) {
-      switch (sym.getSimpleName().toString()) {
-        case "readObject":
-          if (sym.getParameters().size() == 1
-              && isSameType(
-                  getOnlyElement(sym.getParameters()).type,
-                  state.getTypeFromString("java.io.ObjectInputStream"),
-                  state)) {
-            return true;
-          }
-          break;
-        case "writeObject":
-          if (sym.getParameters().size() == 1
-              && isSameType(
-                  getOnlyElement(sym.getParameters()).type,
-                  state.getTypeFromString("java.io.ObjectOutputStream"),
-                  state)) {
-            return true;
-          }
-          break;
-        case "readObjectNoData":
-        case "readResolve":
-        case "writeReplace":
-          if (sym.getParameters().size() == 0) {
-            return true;
-          }
-          break;
-        default: // fall out
-      }
-    }
-    return false;
+    return SERIALIZATION_METHODS.matches(tree, state);
   }
 
   /** Information about a {@link MethodSymbol} and whether it can be made static. */
@@ -309,7 +277,7 @@ public class MethodCanBeStatic extends BugChecker implements CompilationUnitTree
       public Description report(
           Set<MethodTree> affectedTrees, SuggestedFix fix, VisitorState state, BugChecker checker) {
         return affectedTrees.stream()
-            .min(Comparator.comparingInt(t -> ((JCTree) t).getStartPosition()))
+            .min(Comparator.comparingInt(t -> getStartPosition(t)))
             .map(t -> checker.describeMatch(t.getModifiers(), fix))
             .orElse(NO_MATCH);
       }

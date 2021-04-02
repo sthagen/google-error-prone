@@ -16,11 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.allOf;
-import static com.google.errorprone.matchers.Matchers.instanceMethod;
+import static com.google.errorprone.matchers.Matchers.instanceEqualsInvocation;
 import static com.google.errorprone.matchers.Matchers.receiverSameAsArgument;
 import static com.google.errorprone.matchers.Matchers.sameArgument;
 import static com.google.errorprone.matchers.Matchers.staticEqualsInvocation;
@@ -28,7 +27,6 @@ import static com.google.errorprone.matchers.Matchers.toType;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -54,9 +52,7 @@ import javax.annotation.Nullable;
 @BugPattern(
     name = "SelfEquals",
     summary = "Testing an object for equality with itself will always be true.",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class SelfEquals extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<Tree> ASSERTION =
@@ -65,12 +61,7 @@ public class SelfEquals extends BugChecker implements MethodInvocationTreeMatche
           staticMethod().anyClass().namedAnyOf("assertTrue", "assertThat"));
 
   private static final Matcher<MethodInvocationTree> INSTANCE_MATCHER =
-      allOf(
-          instanceMethod()
-              .onDescendantOf("java.lang.Object")
-              .named("equals")
-              .withParameters("java.lang.Object"),
-          receiverSameAsArgument(0));
+      allOf(instanceEqualsInvocation(), receiverSameAsArgument(0));
 
   private static final Matcher<MethodInvocationTree> STATIC_MATCHER =
       allOf(staticEqualsInvocation(), sameArgument(0, 1));

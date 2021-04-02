@@ -17,19 +17,20 @@
 package com.google.errorprone.refaster;
 
 import static com.google.common.truth.Truth.assertWithMessage;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.argThat;
 
 import com.google.common.base.Joiner;
 import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.parser.Parser;
 import com.sun.tools.javac.parser.ParserFactory;
 import com.sun.tools.javac.tree.JCTree.JCExpression;
 import com.sun.tools.javac.tree.JCTree.JCIdent;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.List;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Before;
+import org.mockito.hamcrest.MockitoHamcrest;
 
 /**
  * Basics for testing {@code UTree} implementations.
@@ -45,6 +46,8 @@ public abstract class AbstractUTreeTest {
   public void createContext() {
     context = new Context();
     JavacFileManager.preRegister(context);
+    JavaCompiler compiler = JavaCompiler.instance(context);
+    compiler.initModules(List.nil());
     unifier = new Unifier(context);
     inliner = unifier.createInliner();
   }
@@ -63,10 +66,11 @@ public abstract class AbstractUTreeTest {
 
   public void assertInlines(String expression, UTree<?> template) {
     try {
-      assertEquals(
-          String.format("Expected template %s to inline to expression %s", template, expression),
-          expression,
-          template.inline(inliner).toString());
+      assertWithMessage(
+              String.format(
+                  "Expected template %s to inline to expression %s", template, expression))
+          .that(template.inline(inliner).toString())
+          .isEqualTo(expression);
     } catch (CouldNotResolveImportException e) {
       throw new RuntimeException(e);
     }
@@ -75,10 +79,11 @@ public abstract class AbstractUTreeTest {
   public void assertInlines(String expression, UStatement template) {
     try {
       // javac's pretty-printer uses the platform line terminator
-      assertEquals(
-          String.format("Expected template %s to inline to expression %s", template, expression),
-          expression,
-          Joiner.on(System.lineSeparator()).join(template.inlineStatements(inliner)));
+      assertWithMessage(
+              String.format(
+                  "Expected template %s to inline to expression %s", template, expression))
+          .that(Joiner.on(System.lineSeparator()).join(template.inlineStatements(inliner)))
+          .isEqualTo(expression);
     } catch (CouldNotResolveImportException e) {
       throw new RuntimeException(e);
     }
@@ -102,7 +107,7 @@ public abstract class AbstractUTreeTest {
   }
 
   protected JCExpression ident(final String name) {
-    return argThat(
+    return MockitoHamcrest.argThat(
         new TypeSafeMatcher<JCExpression>() {
           @Override
           public void describeTo(Description description) {

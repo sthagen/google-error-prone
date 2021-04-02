@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JUNIT;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.staticMethod;
 
@@ -38,7 +37,6 @@ import java.util.List;
 @BugPattern(
     name = "JUnitAssertSameCheck",
     summary = "An object is tested for reference equality to itself using JUnit library.",
-    category = JUNIT,
     severity = ERROR)
 public class JUnitAssertSameCheck extends BugChecker implements MethodInvocationTreeMatcher {
 
@@ -52,7 +50,6 @@ public class JUnitAssertSameCheck extends BugChecker implements MethodInvocation
    *   <li>junit.framework.Assert.assertSame("message", a, a);
    * </ol>
    */
-  @SuppressWarnings({"unchecked"})
   private static final Matcher<ExpressionTree> ASSERT_SAME_MATCHER =
       staticMethod().onClassAny("org.junit.Assert", "junit.framework.Assert").named("assertSame");
 

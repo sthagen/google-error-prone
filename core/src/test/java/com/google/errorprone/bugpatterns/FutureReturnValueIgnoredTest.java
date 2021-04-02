@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -27,13 +26,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class FutureReturnValueIgnoredTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(FutureReturnValueIgnored.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(FutureReturnValueIgnored.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -59,9 +53,23 @@ public class FutureReturnValueIgnoredTest {
         .doTest();
   }
 
-  @Ignore("requires JDK 9")
   @Test
   public void testCompletableFutureReturnValue() {
+    compilationHelper
+        .addSourceLines(
+            "test.java",
+            "import java.util.concurrent.CompletableFuture;",
+            "class Test {",
+            "  void f(CompletableFuture<?> cf) {",
+            "    cf.exceptionally(t -> null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Ignore("requires JDK 9")
+  @Test
+  public void testCompletableFutureReturnValueJdk9() {
     compilationHelper
         .addSourceLines(
             "test.java",

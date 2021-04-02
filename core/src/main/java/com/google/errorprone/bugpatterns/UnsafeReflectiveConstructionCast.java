@@ -16,13 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TypeCastTreeMatcher;
@@ -36,7 +35,6 @@ import com.sun.source.tree.TypeCastTree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.tree.JCTree;
 import java.lang.reflect.Constructor;
 
 /**
@@ -51,10 +49,8 @@ import java.lang.reflect.Constructor;
             + " to detect classes of incorrect type before invoking their constructors."
             + "This way, if the class is of the incorrect type,"
             + "it will throw an exception before invoking its constructor.",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class UnsafeReflectiveConstructionCast extends BugChecker implements TypeCastTreeMatcher {
 
   private static final Matcher<ExpressionTree> CLASS_FOR_NAME =
@@ -102,9 +98,7 @@ public class UnsafeReflectiveConstructionCast extends BugChecker implements Type
     if (types.isSameType(typeCastTreeType, erasedType)) {
       // remove the type
       fix.replace(
-          ((JCTree) typeCastTree).getStartPosition(),
-          ((JCTree) typeCastTree.getExpression()).getStartPosition(),
-          "");
+          getStartPosition(typeCastTree), getStartPosition(typeCastTree.getExpression()), "");
     }
     return describeMatch(classForName, fix.build());
   }

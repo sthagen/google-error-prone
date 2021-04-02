@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -32,12 +31,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class ArrayAsKeyOfSetOrMapTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(ArrayAsKeyOfSetOrMap.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ArrayAsKeyOfSetOrMap.class, getClass());
 
   @Test
   public void positive() {
@@ -48,6 +43,7 @@ public final class ArrayAsKeyOfSetOrMapTest {
             "import java.util.Set;",
             "import java.util.Map;",
             "import java.util.LinkedHashMap;",
+            "import java.util.concurrent.ConcurrentHashMap;",
             "import com.google.common.collect.Sets;",
             "import com.google.common.collect.Maps;",
             "import com.google.common.collect.HashMultiset;",
@@ -94,6 +90,9 @@ public final class ArrayAsKeyOfSetOrMapTest {
             "    LinkedHashMap<String[], Integer> testLinkedHashMap"
                 + "= new LinkedHashMap<String[], Integer>();",
             "    // BUG: Diagnostic contains: ArrayAsKeyOfSetOrMap",
+            "    ConcurrentHashMap<String[], Integer> testConcurrentHashMap"
+                + "= new ConcurrentHashMap<String[], Integer>();",
+            "    // BUG: Diagnostic contains: ArrayAsKeyOfSetOrMap",
             "    HashMultiset<String[]> testHashMultiSet = HashMultiset.create();",
             "    // BUG: Diagnostic contains: ArrayAsKeyOfSetOrMap",
             "    LinkedHashMultiset<String[]> testLinkedHashMultiSet"
@@ -112,6 +111,7 @@ public final class ArrayAsKeyOfSetOrMapTest {
             "import java.util.Set;",
             "import java.util.Map;",
             "import java.util.LinkedHashMap;",
+            "import java.util.concurrent.ConcurrentHashMap;",
             "import com.google.common.collect.Sets;",
             "import com.google.common.collect.Maps;",
             "import java.util.HashMap;",
@@ -147,6 +147,8 @@ public final class ArrayAsKeyOfSetOrMapTest {
             "    HashBiMap<String, Integer> testHashBiMap = HashBiMap.create();",
             "    LinkedHashMap<String, Integer> testLinkedHashMap"
                 + "= new LinkedHashMap<String, Integer>();",
+            "    ConcurrentHashMap<String, Integer> testConcurrentHashMap"
+                + "= new ConcurrentHashMap<String, Integer>();",
             "    HashMultiset<String> testHashMultiSet = HashMultiset.create();",
             "    LinkedHashMultiset<String> testLinkedHashMultiSet"
                 + "= LinkedHashMultiset.create();",

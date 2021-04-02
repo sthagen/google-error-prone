@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 
@@ -41,17 +40,18 @@ import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "GuardedBy",
     altNames = "GuardedByChecker",
     summary = "Checks for unguarded accesses to fields and methods with @GuardedBy annotations",
-    category = JDK,
     severity = ERROR)
 public class GuardedByChecker extends BugChecker
     implements VariableTreeMatcher, MethodTreeMatcher, LambdaExpressionTreeMatcher {
 
   private static final String JUC_READ_WRITE_LOCK = "java.util.concurrent.locks.ReadWriteLock";
+
+  private final GuardedByFlags flags = GuardedByFlags.allOn();
 
   @Override
   public Description matchMethod(MethodTree tree, final VisitorState state) {
@@ -71,12 +71,13 @@ public class GuardedByChecker extends BugChecker
     return NO_MATCH;
   }
 
-  private void analyze(final VisitorState state) {
+  private void analyze(VisitorState state) {
     HeldLockAnalyzer.analyze(
         state,
         (ExpressionTree tree, GuardedByExpression guard, HeldLockSet live) ->
             report(GuardedByChecker.this.checkGuardedAccess(tree, guard, live, state), state),
-        this::isSuppressed);
+        this::isSuppressed,
+        flags);
   }
 
   @Override
@@ -110,11 +111,6 @@ public class GuardedByChecker extends BugChecker
       return NO_MATCH;
     }
 
-    // TODO(cushon): re-enable once the clean-up is done
-    if (guard.kind() == GuardedByExpression.Kind.ERROR) {
-      return NO_MATCH;
-    }
-
     return buildDescription(tree).setMessage(buildMessage(guard, locks)).build();
   }
 
@@ -127,7 +123,7 @@ public class GuardedByChecker extends BugChecker
    *   <li>This access should be guarded by 'this'; instead found: 'mu1', 'mu2'
    * </ul>
    */
-  private String buildMessage(GuardedByExpression guard, HeldLockSet locks) {
+  private static String buildMessage(GuardedByExpression guard, HeldLockSet locks) {
     int heldLocks = locks.allLocks().size();
     StringBuilder message = new StringBuilder();
     Select enclosing = findOuterInstance(guard);
@@ -176,7 +172,7 @@ public class GuardedByChecker extends BugChecker
     return null;
   }
 
-  private boolean enclosingInstance(GuardedByExpression expr) {
+  private static boolean enclosingInstance(GuardedByExpression expr) {
     while (expr.kind() == Kind.SELECT) {
       expr = ((Select) expr).base();
       if (expr.kind() == Kind.THIS) {
@@ -206,7 +202,7 @@ public class GuardedByChecker extends BugChecker
 
   // TODO(cushon) - this is a hack. Provide an abstraction for matchers that need to do
   // stateful visiting? (e.g. a traversal that passes along a set of held locks...)
-  private void report(Description description, VisitorState state) {
+  private static void report(Description description, VisitorState state) {
     if (description == null || description == NO_MATCH) {
       return;
     }
@@ -214,8 +210,8 @@ public class GuardedByChecker extends BugChecker
   }
 
   /** Validates that {@code @GuardedBy} strings can be resolved. */
-  Description validate(Tree tree, VisitorState state) {
-    GuardedByValidationResult result = GuardedByUtils.isGuardedByValid(tree, state);
+  private Description validate(Tree tree, VisitorState state) {
+    GuardedByValidationResult result = GuardedByUtils.isGuardedByValid(tree, state, flags);
     if (result.isValid()) {
       return Description.NO_MATCH;
     }

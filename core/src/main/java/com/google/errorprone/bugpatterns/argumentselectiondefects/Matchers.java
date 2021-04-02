@@ -46,7 +46,7 @@ import java.util.regex.Pattern;
  *
  * @author andrewrice@google.com (Andrew Rice)
  */
-class Matchers {
+final class Matchers {
 
   /** Matches if the tree is a constructor for an AutoValue class. */
   static final Matcher<NewClassTree> AUTOVALUE_CONSTRUCTOR =
@@ -112,7 +112,7 @@ class Matchers {
             return false;
           }
           return ASTHelpers.isSameType(
-                  parameters.get(0).asType(), state.getTypeFromString("java.lang.String"), state)
+                  parameters.get(0).asType(), state.getSymtab().stringType, state)
               && ASTHelpers.isSameType(
                   parameters.get(1).asType(), parameters.get(2).asType(), state);
         }
@@ -134,4 +134,6 @@ class Matchers {
           anyOf(TWO_PARAMETER_ASSERT, THREE_PARAMETER_ASSERT),
           not(ARGUMENT_EXTENDS_TRHOWABLE),
           not(METHOD_ANNOTATED_WITH_BEFORETEMPLATE));
+
+  private Matchers() {}
 }

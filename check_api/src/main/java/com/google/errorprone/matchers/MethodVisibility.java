@@ -46,13 +46,14 @@ public class MethodVisibility implements Matcher<MethodTree> {
     }
   }
 
-  public static enum Visibility {
+  /** The visibility of a member. */
+  public enum Visibility {
     PUBLIC(Modifier.PUBLIC),
     PROTECTED(Modifier.PROTECTED),
     DEFAULT(null),
     PRIVATE(Modifier.PRIVATE);
 
-    private Modifier correspondingModifier;
+    private final Modifier correspondingModifier;
 
     Visibility(Modifier correspondingModifier) {
       this.correspondingModifier = correspondingModifier;

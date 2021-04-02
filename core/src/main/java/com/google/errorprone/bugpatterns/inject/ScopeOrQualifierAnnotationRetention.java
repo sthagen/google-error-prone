@@ -14,11 +14,12 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.bugpatterns.inject.ElementPredicates.doesNotHaveRuntimeRetention;
 import static com.google.errorprone.bugpatterns.inject.ElementPredicates.hasSourceRetention;
+import static com.google.errorprone.matchers.InjectMatchers.DAGGER_MAP_KEY_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_BINDING_ANNOTATION;
+import static com.google.errorprone.matchers.InjectMatchers.GUICE_MAP_KEY_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_SCOPE_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_QUALIFIER_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_SCOPE_ANNOTATION;
@@ -28,8 +29,8 @@ import static com.google.errorprone.matchers.Matchers.hasAnnotation;
 import static com.google.errorprone.matchers.Matchers.kindIs;
 import static com.sun.source.tree.Tree.Kind.ANNOTATION_TYPE;
 
+import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
@@ -44,18 +45,17 @@ import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import java.lang.annotation.Retention;
 import javax.annotation.Nullable;
 
+// TODO(b/180081278): Rename this check to MissingRuntimeRetention
 /** @author sgoldfeder@google.com (Steven Goldfeder) */
 @BugPattern(
     name = "InjectScopeOrQualifierAnnotationRetention",
     summary = "Scoping and qualifier annotations must have runtime retention.",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class ScopeOrQualifierAnnotationRetention extends BugChecker implements ClassTreeMatcher {
 
   private static final String RETENTION_ANNOTATION = "java.lang.annotation.Retention";
 
-  /** Matches classes that are annotated with @Scope or @ScopeAnnotation. */
+  /** Matches classes that are qualifier, scope annotation or map binding keys. */
   private static final Matcher<ClassTree> SCOPE_OR_QUALIFIER_ANNOTATION_MATCHER =
       allOf(
           kindIs(ANNOTATION_TYPE),
@@ -63,7 +63,9 @@ public class ScopeOrQualifierAnnotationRetention extends BugChecker implements C
               hasAnnotation(GUICE_SCOPE_ANNOTATION),
               hasAnnotation(JAVAX_SCOPE_ANNOTATION),
               hasAnnotation(GUICE_BINDING_ANNOTATION),
-              hasAnnotation(JAVAX_QUALIFIER_ANNOTATION)));
+              hasAnnotation(JAVAX_QUALIFIER_ANNOTATION),
+              hasAnnotation(GUICE_MAP_KEY_ANNOTATION),
+              hasAnnotation(DAGGER_MAP_KEY_ANNOTATION)));
 
   @Override
   public final Description matchClass(ClassTree classTree, VisitorState state) {
@@ -79,7 +81,10 @@ public class ScopeOrQualifierAnnotationRetention extends BugChecker implements C
       if (!state.isAndroidCompatible() && doesNotHaveRuntimeRetention(classSymbol)) {
         // Is this in a dagger component?
         ClassTree outer = ASTHelpers.findEnclosingNode(state.getPath(), ClassTree.class);
-        if (outer != null && InjectMatchers.IS_DAGGER_COMPONENT_OR_MODULE.matches(outer, state)) {
+        if (outer != null
+            && allOf(
+                    InjectMatchers.IS_DAGGER_COMPONENT_OR_MODULE)
+                .matches(outer, state)) {
           return Description.NO_MATCH;
         }
         return describe(classTree, state, ASTHelpers.getAnnotation(classSymbol, Retention.class));
@@ -91,12 +96,13 @@ public class ScopeOrQualifierAnnotationRetention extends BugChecker implements C
   private Description describe(
       ClassTree classTree, VisitorState state, @Nullable Retention retention) {
     if (retention == null) {
+      AnnotationTree annotation = Iterables.getLast(classTree.getModifiers().getAnnotations());
       return describeMatch(
           classTree,
           SuggestedFix.builder()
               .addImport("java.lang.annotation.Retention")
               .addStaticImport("java.lang.annotation.RetentionPolicy.RUNTIME")
-              .prefixWith(classTree, "@Retention(RUNTIME)\n")
+              .postfixWith(annotation, "@Retention(RUNTIME)")
               .build());
     }
     AnnotationTree retentionNode = null;

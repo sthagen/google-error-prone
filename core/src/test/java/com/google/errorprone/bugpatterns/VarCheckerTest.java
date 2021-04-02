@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
 import java.util.Arrays;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,12 +26,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class VarCheckerTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(VarChecker.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(VarChecker.class, getClass());
 
   // fields are ignored
   @Test
@@ -331,6 +326,65 @@ public class VarCheckerTest {
             "class Test {",
             "  public void f(Test this, int x) {",
             "    this.toString();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void suppressedByGeneratedAnnotation() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import javax.annotation.processing.Generated;",
+            "@Generated(\"generator\") class Test {",
+            "  public void x() {",
+            "    final int y = 0;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void suppressedBySuppressWarningsAnnotation() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "@SuppressWarnings(\"Var\") class Test {",
+            "  public void x() {",
+            "    final int y = 0;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void notSuppressedByUnrelatedSuppressWarningsAnnotation() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "@SuppressWarnings(\"Foo\") class Test {",
+            "  public void x() {",
+            "    // BUG: Diagnostic contains: Unnecessary 'final' modifier.",
+            "    final int y = 0;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void effectivelyFinal() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.errorprone.annotations.Var;",
+            "class Test {",
+            "  int f(",
+            "      // BUG: Diagnostic contains: @Var variable is never modified",
+            "      @Var int x,",
+            "      @Var int y) {",
+            "    y++;",
+            "    return x + y;",
             "  }",
             "}")
         .doTest();

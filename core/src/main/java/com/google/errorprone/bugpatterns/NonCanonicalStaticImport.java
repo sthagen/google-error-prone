@@ -16,11 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ImportTreeMatcher;
 import com.google.errorprone.bugpatterns.StaticImports.StaticImportInfo;
@@ -36,10 +34,8 @@ import com.sun.source.tree.ImportTree;
 @BugPattern(
     name = "NonCanonicalStaticImport",
     summary = "Static import of type uses non-canonical name",
-    category = JDK,
     severity = ERROR,
-    documentSuppression = false,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    documentSuppression = false)
 public class NonCanonicalStaticImport extends BugChecker implements ImportTreeMatcher {
 
   @Override

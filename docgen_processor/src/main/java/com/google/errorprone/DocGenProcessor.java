@@ -64,7 +64,7 @@ public class DocGenProcessor extends AbstractProcessor {
           processingEnv
               .getFiler()
               .createResource(StandardLocation.SOURCE_OUTPUT, "", "bugPatterns.txt");
-      pw = new PrintWriter(new OutputStreamWriter(manifest.openOutputStream(), UTF_8));
+      pw = new PrintWriter(new OutputStreamWriter(manifest.openOutputStream(), UTF_8), true);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -75,14 +75,14 @@ public class DocGenProcessor extends AbstractProcessor {
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
     for (Element element : roundEnv.getElementsAnnotatedWith(BugPattern.class)) {
       gson.toJson(BugPatternInstance.fromElement(element), pw);
-      pw.write("\n");
+      pw.println();
     }
 
     if (roundEnv.processingOver()) {
       // this was the last round, do cleanup
       cleanup();
     }
-    return true;
+    return false;
   }
 
   /** Perform cleanup after last round of annotation processing. */

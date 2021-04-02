@@ -16,14 +16,14 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
+import static com.sun.source.tree.Tree.Kind.AND;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
@@ -33,7 +33,6 @@ import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
 import com.sun.source.util.TreeScanner;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.Iterator;
 
 /**
@@ -43,11 +42,9 @@ import java.util.Iterator;
  */
 @BugPattern(
     name = "ShortCircuitBoolean",
-    category = JDK,
     summary = "Prefer the short-circuiting boolean operators && and || to & and |.",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class ShortCircuitBoolean extends BugChecker implements BinaryTreeMatcher {
 
   @Override
@@ -90,9 +87,9 @@ public class ShortCircuitBoolean extends BugChecker implements BinaryTreeMatcher
     public Void visitBinary(BinaryTree tree, SuggestedFix.Builder p) {
       if (tree.getKind() == Kind.AND || tree.getKind() == Kind.OR) {
         p.replace(
-            state.getEndPosition(tree.getLeftOperand()),
-            ((JCTree) tree.getRightOperand()).getStartPosition(),
-            tree.getKind() == Tree.Kind.AND ? " && " : " || ");
+            /* startPos= */ state.getEndPosition(tree.getLeftOperand()),
+            /* endPos= */ getStartPosition(tree.getRightOperand()),
+            tree.getKind() == AND ? " && " : " || ");
       }
 
       return super.visitBinary(tree, p);

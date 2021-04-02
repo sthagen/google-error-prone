@@ -25,7 +25,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SwitchDefaultTest {
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new SwitchDefault(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(SwitchDefault.class, getClass());
 
   @Test
   public void refactoring_groupAndCase() {
@@ -188,6 +188,38 @@ public class SwitchDefaultTest {
             "        return false;",
             "    }",
             "    return true;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void refactoring_outOfOrder() {
+    testHelper
+        .addInputLines(
+            "in/Test.java", //
+            "class Test {",
+            "  boolean f(int i) {",
+            "    switch (i) {",
+            "      case 0:",
+            "        return true;",
+            "      default: // fall through",
+            "      case 1: // fall through",
+            "    }",
+            "    return false;",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Test.java", //
+            "class Test {",
+            "  boolean f(int i) {",
+            "    switch (i) {",
+            "      case 0:",
+            "        return true;",
+            "      case 1: // fall through",
+            "      default: // fall through",
+            "    }",
+            "    return false;",
             "  }",
             "}")
         .doTest();

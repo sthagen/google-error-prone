@@ -101,7 +101,7 @@ public class AndroidJdkLibsCheckerTest extends Java7ApiCheckerTest {
   }
 
   @Test
-  public void allowJava8Flag_packageWhitelist() {
+  public void allowJava8Flag_packageAllowed() {
     allowJava8Helper
         .addSourceLines(
             "Test.java",
@@ -119,7 +119,7 @@ public class AndroidJdkLibsCheckerTest extends Java7ApiCheckerTest {
   }
 
   @Test
-  public void allowJava8Flag_memberWhitelist() {
+  public void allowJava8Flag_memberAllowed() {
     allowJava8Helper
         .addSourceLines(
             "Test.java",
@@ -133,7 +133,7 @@ public class AndroidJdkLibsCheckerTest extends Java7ApiCheckerTest {
   }
 
   @Test
-  public void allowJava8Flag_memberBlacklist() {
+  public void allowJava8Flag_memberBanned() {
     allowJava8Helper
         .addSourceLines(
             "Test.java",
@@ -147,4 +147,30 @@ public class AndroidJdkLibsCheckerTest extends Java7ApiCheckerTest {
         .doTest();
   }
 
+  @Test
+  public void allowJava8Flag_getTimeZone() {
+    allowJava8Helper
+        .addSourceLines(
+            "Test.java",
+            "import java.time.ZoneId;",
+            "import java.util.TimeZone;",
+            "public class Test {",
+            "  public static void test() {",
+            "    TimeZone.getTimeZone(\"a\");",
+            "    TimeZone.getTimeZone(ZoneId.of(\"a\"));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void allowJava8Flag_explicitNestedClass() {
+    allowJava8Helper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Spliterator;",
+            "public abstract class Test implements Spliterator.OfInt {",
+            "}")
+        .doTest();
+  }
 }

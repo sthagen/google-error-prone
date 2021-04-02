@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns.android;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -25,14 +25,10 @@ import org.junit.runners.JUnit4;
 /** @author avenet@google.com (Arnaud J. Venet) */
 @RunWith(JUnit4.class)
 public class RectIntersectReturnValueIgnoredTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(RectIntersectReturnValueIgnored.class, getClass())
-            .addSourceFile("testdata/stubs/android/graphics/Rect.java");
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(RectIntersectReturnValueIgnored.class, getClass())
+          .addSourceFile("testdata/stubs/android/graphics/Rect.java")
+          .setArgs(ImmutableList.of("-XDandroidCompatible=true"));
 
   @Test
   public void testPositiveCases() {

@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -31,7 +30,6 @@ import static com.sun.source.tree.Tree.Kind.IF;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -53,9 +51,7 @@ import com.sun.source.tree.Tree;
     name = "DeadException",
     altNames = "ThrowableInstanceNeverThrown",
     summary = "Exception created but not thrown",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class DeadException extends BugChecker implements NewClassTreeMatcher {
 
   public static final Matcher<Tree> MATCHER =

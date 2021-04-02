@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -25,11 +24,11 @@ import static com.google.errorprone.matchers.Matchers.toType;
 import static com.google.errorprone.matchers.method.MethodMatchers.constructor;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -50,7 +49,6 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.tree.JCTree;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -69,28 +67,26 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "DefaultCharset",
-    category = JDK,
     summary =
         "Implicit use of the platform default charset, which can result in differing behaviour"
             + " between JVM executions or incorrect behavior if the encoding of the data source"
             + " doesn't match expectations.",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class DefaultCharset extends BugChecker
     implements MethodInvocationTreeMatcher, NewClassTreeMatcher {
 
   enum CharsetFix {
-    UTF_8_FIX("UTF_8") {
+    UTF_8_FIX("UTF_8", "Specify UTF-8") {
       @Override
       void addImport(SuggestedFix.Builder fix, VisitorState state) {
         fix.addStaticImport("java.nio.charset.StandardCharsets.UTF_8");
       }
     },
-    DEFAULT_CHARSET_FIX("Charset.defaultCharset()") {
+    DEFAULT_CHARSET_FIX("Charset.defaultCharset()", "Specify default charset") {
       @Override
       void addImport(SuggestedFix.Builder fix, VisitorState state) {
         fix.addImport("java.nio.charset.Charset");
@@ -98,9 +94,11 @@ public class DefaultCharset extends BugChecker
     };
 
     final String replacement;
+    final String title;
 
-    CharsetFix(String replacement) {
+    CharsetFix(String replacement, String title) {
       this.replacement = replacement;
+      this.title = title;
     }
 
     String replacement() {
@@ -156,7 +154,7 @@ public class DefaultCharset extends BugChecker
       staticMethod().onClass("com.google.protobuf.ByteString").named("copyFrom");
 
   private static final Matcher<ExpressionTree> STRING_GET_BYTES =
-      instanceMethod().onExactClass(String.class.getName()).withSignature("getBytes()");
+      instanceMethod().onExactClass(String.class.getName()).named("getBytes").withParameters();
 
   private static final Matcher<ExpressionTree> FILE_NEW_WRITER =
       staticMethod()
@@ -220,11 +218,11 @@ public class DefaultCharset extends BugChecker
       MethodInvocationTree tree,
       ExpressionTree parent,
       VisitorState state) {
-    description.addFix(byteStringFix(tree, parent, state, ".copyFromUtf8(", "").build());
+    description.addFix(byteStringFix(tree, parent, state, "copyFromUtf8(", "").build());
 
     SuggestedFix.Builder builder =
         byteStringFix(
-            tree, parent, state, ".copyFrom(", ", " + CharsetFix.DEFAULT_CHARSET_FIX.replacement());
+            tree, parent, state, "copyFrom(", ", " + CharsetFix.DEFAULT_CHARSET_FIX.replacement());
     CharsetFix.DEFAULT_CHARSET_FIX.addImport(builder, state);
     description.addFix(builder.build());
   }
@@ -235,13 +233,22 @@ public class DefaultCharset extends BugChecker
       VisitorState state,
       String prefix,
       String suffix) {
-    return SuggestedFix.builder()
-        .replace(
-            /*startPos=*/ state.getEndPosition(ASTHelpers.getReceiver(parent)),
-            /*endPos=*/ ((JCTree) tree).getStartPosition(),
-            /*replaceWith=*/ prefix)
-        .replace(
-            state.getEndPosition(ASTHelpers.getReceiver(tree)), state.getEndPosition(tree), suffix);
+    Tree parentReceiver = ASTHelpers.getReceiver(parent);
+    SuggestedFix.Builder fix = SuggestedFix.builder();
+    if (parentReceiver != null) {
+      fix.replace(
+          /*startPos=*/ state.getEndPosition(parentReceiver),
+          /*endPos=*/ getStartPosition(tree),
+          /*replaceWith=*/ "." + prefix);
+    } else {
+      fix.replace(
+          /*startPos=*/ getStartPosition(parent),
+          /*endPos=*/ getStartPosition(tree),
+          /*replaceWith=*/ prefix);
+    }
+    fix.replace(
+        state.getEndPosition(ASTHelpers.getReceiver(tree)), state.getEndPosition(tree), suffix);
+    return fix;
   }
 
   @Override
@@ -319,7 +326,8 @@ public class DefaultCharset extends BugChecker
     }
   }
 
-  private Fix nioFileReaderFix(VisitorState state, Tree arg, Tree toReplace, CharsetFix charset) {
+  private static Fix nioFileReaderFix(
+      VisitorState state, Tree arg, Tree toReplace, CharsetFix charset) {
     SuggestedFix.Builder fix = SuggestedFix.builder();
     fix.replace(
         toReplace,
@@ -331,7 +339,7 @@ public class DefaultCharset extends BugChecker
     return fix.build();
   }
 
-  private Fix guavaFileReaderFix(
+  private static Fix guavaFileReaderFix(
       VisitorState state, Tree fileArg, Tree toReplace, CharsetFix charset) {
     SuggestedFix.Builder fix = SuggestedFix.builder();
     fix.replace(
@@ -344,7 +352,7 @@ public class DefaultCharset extends BugChecker
     return fix.build();
   }
 
-  private void variableTypeFix(
+  private static void variableTypeFix(
       SuggestedFix.Builder fix, VisitorState state, Class<?> original, Class<?> replacement) {
     Tree parent = state.getPath().getParentPath().getLeaf();
     Symbol sym;
@@ -362,21 +370,21 @@ public class DefaultCharset extends BugChecker
         sym.type, state.getTypeFromString(original.getCanonicalName()), state)) {
       return;
     }
-    state
-        .getPath()
-        .getCompilationUnit()
-        .accept(
-            new TreeScanner<Void, Void>() {
-              @Override
-              public Void visitVariable(VariableTree node, Void aVoid) {
-                if (sym.equals(ASTHelpers.getSymbol(node))) {
-                  fix.replace(node.getType(), replacement.getSimpleName())
-                      .addImport(replacement.getCanonicalName());
-                }
-                return null;
-              }
-            },
-            null);
+    new TreeScanner<Void, Void>() {
+      @Override
+      public Void visitVariable(VariableTree node, Void unused) {
+        if (!sym.equals(ASTHelpers.getSymbol(node))) {
+          return null;
+        }
+        if (ASTHelpers.getStartPosition(node.getType()) == -1) {
+          // ignore synthetic tree nodes for `var`
+          return null;
+        }
+        fix.replace(node.getType(), replacement.getSimpleName())
+            .addImport(replacement.getCanonicalName());
+        return null;
+      }
+    }.scan(state.getPath().getCompilationUnit(), null);
   }
 
   private Description handleFileWriter(NewClassTree tree, VisitorState state) {
@@ -398,7 +406,7 @@ public class DefaultCharset extends BugChecker
     return description.build();
   }
 
-  private Fix guavaFileWriterFix(
+  private static Fix guavaFileWriterFix(
       VisitorState state, Tree fileArg, Tree toReplace, CharsetFix charset) {
     SuggestedFix.Builder fix = SuggestedFix.builder();
     fix.replace(
@@ -411,7 +419,7 @@ public class DefaultCharset extends BugChecker
     return fix.build();
   }
 
-  private Fix nioFileWriterFix(
+  private static Fix nioFileWriterFix(
       VisitorState state,
       Tree appendTree,
       Tree fileArg,
@@ -440,7 +448,7 @@ public class DefaultCharset extends BugChecker
   }
 
   /** Convert a boolean append mode to a StandardOpenOption. */
-  private String toAppendMode(SuggestedFix.Builder fix, Tree appendArg, VisitorState state) {
+  private static String toAppendMode(SuggestedFix.Builder fix, Tree appendArg, VisitorState state) {
     // recognize constants to try to avoid `true ? CREATE, APPEND : CREATE`
     Boolean value = ASTHelpers.constValue(appendArg, Boolean.class);
     if (value != null) {
@@ -462,7 +470,7 @@ public class DefaultCharset extends BugChecker
   }
 
   /** Converts a {@code String} to a {@code File}. */
-  private Object toFile(VisitorState state, Tree fileArg, SuggestedFix.Builder fix) {
+  private static Object toFile(VisitorState state, Tree fileArg, SuggestedFix.Builder fix) {
     Type type = ASTHelpers.getType(fileArg);
     if (ASTHelpers.isSubtype(type, state.getSymtab().stringType, state)) {
       fix.addImport("java.io.File");
@@ -475,7 +483,7 @@ public class DefaultCharset extends BugChecker
   }
 
   /** Convert a {@code String} or {@code File} argument to a {@code Path}. */
-  private String toPath(VisitorState state, Tree fileArg, SuggestedFix.Builder fix) {
+  private static String toPath(VisitorState state, Tree fileArg, SuggestedFix.Builder fix) {
     Type type = ASTHelpers.getType(fileArg);
     if (ASTHelpers.isSubtype(type, state.getSymtab().stringType, state)) {
       fix.addImport("java.nio.file.Paths");
@@ -487,7 +495,7 @@ public class DefaultCharset extends BugChecker
     }
   }
 
-  private void appendCharsets(
+  private static void appendCharsets(
       Description.Builder description,
       Tree tree,
       Tree select,
@@ -498,7 +506,7 @@ public class DefaultCharset extends BugChecker
         appendCharset(tree, select, arguments, state, CharsetFix.DEFAULT_CHARSET_FIX));
   }
 
-  private Fix appendCharset(
+  private static Fix appendCharset(
       Tree tree,
       Tree select,
       List<? extends ExpressionTree> arguments,
@@ -514,6 +522,7 @@ public class DefaultCharset extends BugChecker
       fix.postfixWith(Iterables.getLast(arguments), ", " + charset.replacement());
     }
     charset.addImport(fix, state);
+    fix.setShortDescription(charset.title);
     return fix.build();
   }
 

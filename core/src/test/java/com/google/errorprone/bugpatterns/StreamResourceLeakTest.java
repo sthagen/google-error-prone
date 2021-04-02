@@ -93,7 +93,7 @@ public class StreamResourceLeakTest {
 
   @Test
   public void fix() {
-    BugCheckerRefactoringTestHelper.newInstance(new StreamResourceLeak(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(StreamResourceLeak.class, getClass())
         .addInputLines(
             "in/Test.java",
             "import java.io.IOException;",
@@ -124,7 +124,7 @@ public class StreamResourceLeakTest {
 
   @Test
   public void fixVariable() {
-    BugCheckerRefactoringTestHelper.newInstance(new StreamResourceLeak(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(StreamResourceLeak.class, getClass())
         .addInputLines(
             "in/Test.java",
             "import java.io.IOException;",
@@ -227,7 +227,7 @@ public class StreamResourceLeakTest {
 
   @Test
   public void moreRefactorings() {
-    BugCheckerRefactoringTestHelper.newInstance(new StreamResourceLeak(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(StreamResourceLeak.class, getClass())
         .addInputLines(
             "in/Test.java",
             "import java.io.IOException;",
@@ -266,5 +266,23 @@ public class StreamResourceLeakTest {
             "  }",
             "}")
         .doTest(TestMode.TEXT_MATCH);
+  }
+
+  @Test
+  public void defaultMethod() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.io.IOException;",
+            "import java.nio.file.Files;",
+            "import java.nio.file.Path;",
+            "import java.nio.file.DirectoryStream;",
+            "interface I {",
+            "  default DirectoryStream<Path> f(Path path) throws IOException {",
+            "    // BUG: Diagnostic contains: should be closed",
+            "    return Files.newDirectoryStream(path);",
+            "  }",
+            "}")
+        .doTest();
   }
 }

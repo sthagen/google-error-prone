@@ -24,11 +24,10 @@ import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.checkerframework.dataflow.analysis.AbstractValue;
-import org.checkerframework.dataflow.analysis.FlowExpressions;
-import org.checkerframework.dataflow.analysis.Store;
-import org.checkerframework.dataflow.cfg.CFGVisualizer;
-import org.checkerframework.dataflow.cfg.node.LocalVariableNode;
+import org.checkerframework.shaded.dataflow.analysis.AbstractValue;
+import org.checkerframework.shaded.dataflow.analysis.Store;
+import org.checkerframework.shaded.dataflow.cfg.visualize.CFGVisualizer;
+import org.checkerframework.shaded.dataflow.expression.JavaExpression;
 
 /**
  * Immutable map from local variables or heap access paths to their {@link AbstractValue}
@@ -40,7 +39,7 @@ import org.checkerframework.dataflow.cfg.node.LocalVariableNode;
  */
 @AutoValue
 public abstract class AccessPathStore<V extends AbstractValue<V>>
-    implements Store<AccessPathStore<V>>, LocalVariableValues<V>, AccessPathValues<V> {
+    implements Store<AccessPathStore<V>>, AccessPathValues<V> {
 
   public abstract ImmutableMap<AccessPath, V> heap();
 
@@ -56,11 +55,6 @@ public abstract class AccessPathStore<V extends AbstractValue<V>>
   @SuppressWarnings("unchecked") // fully variant
   public static <V extends AbstractValue<V>> AccessPathStore<V> empty() {
     return (AccessPathStore<V>) EMPTY;
-  }
-
-  @Override
-  public V valueOfLocalVariable(LocalVariableNode node, V defaultValue) {
-    return valueOfAccessPath(AccessPath.fromLocalVariable(node), defaultValue);
   }
 
   @Nullable
@@ -100,12 +94,12 @@ public abstract class AccessPathStore<V extends AbstractValue<V>>
   }
 
   @Override
-  public boolean canAlias(FlowExpressions.Receiver a, FlowExpressions.Receiver b) {
+  public boolean canAlias(JavaExpression a, JavaExpression b) {
     return true;
   }
 
   @Override
-  public void visualize(CFGVisualizer<?, AccessPathStore<V>, ?> cfgVisualizer) {
+  public String visualize(CFGVisualizer<?, AccessPathStore<V>, ?> cfgVisualizer) {
     throw new UnsupportedOperationException("DOT output not supported");
   }
   /**

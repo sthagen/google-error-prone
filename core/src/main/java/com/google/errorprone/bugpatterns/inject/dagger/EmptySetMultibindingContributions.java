@@ -15,23 +15,19 @@
  */
 package com.google.errorprone.bugpatterns.inject.dagger;
 
-import static com.google.errorprone.BugPattern.Category.DAGGER;
-import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
+import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.hasAnnotation;
 import static com.google.errorprone.matchers.Matchers.hasArgumentWithValue;
-import static com.sun.source.tree.Tree.Kind.RETURN;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -42,11 +38,8 @@ import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.matchers.method.MethodMatchers;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotationTree;
-import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.ReturnTree;
-import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Flags;
@@ -70,9 +63,7 @@ import java.util.TreeSet;
     summary =
         "@Multibinds is a more efficient and declarative mechanism for ensuring that a set"
             + " multibinding is present in the graph.",
-    category = DAGGER,
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public final class EmptySetMultibindingContributions extends BugChecker
     implements MethodTreeMatcher {
   private static final Matcher<AnnotationTree> HAS_DAGGER_ONE_MODULE_ARGUMENT =
@@ -130,6 +121,9 @@ public final class EmptySetMultibindingContributions extends BugChecker
           SET_FACTORY_METHODS,
           ENUM_SET_NONE_OF);
 
+  private static final Matcher<MethodTree> DIRECTLY_RETURNS_EMPTY_SET =
+      Matchers.singleStatementReturnMatcher(EMPTY_SET);
+
   private static final Matcher<MethodTree> RETURNS_EMPTY_SET =
       new Matcher<MethodTree>() {
         @Override
@@ -138,19 +132,7 @@ public final class EmptySetMultibindingContributions extends BugChecker
           if (!parameters.isEmpty()) {
             return false;
           }
-          BlockTree body = method.getBody();
-          if (body == null) {
-            return false;
-          }
-          List<? extends StatementTree> statements = body.getStatements();
-          if (statements.size() != 1) {
-            return false;
-          }
-          StatementTree onlyStatement = Iterables.getOnlyElement(statements);
-          if (!onlyStatement.getKind().equals(RETURN)) {
-            return false;
-          }
-          return EMPTY_SET.matches(((ReturnTree) onlyStatement).getExpression(), state);
+          return DIRECTLY_RETURNS_EMPTY_SET.matches(method, state);
         }
       };
 
@@ -205,12 +187,8 @@ public final class EmptySetMultibindingContributions extends BugChecker
     return describeMatch(method, fixBuilder.build());
   }
 
-  private Description fixByDelegating() {
-    // TODO(gak): add a suggested fix by which we make a nested abstract module that we can include
-    return NO_MATCH;
-  }
-
-  private String createReplacementMethodModifiers(VisitorState state, JCModifiers modifiers) {
+  private static String createReplacementMethodModifiers(
+      VisitorState state, JCModifiers modifiers) {
     ImmutableList.Builder<String> modifierStringsBuilder =
         ImmutableList.<String>builder().add("@Multibinds");
 
@@ -235,7 +213,7 @@ public final class EmptySetMultibindingContributions extends BugChecker
     return Joiner.on(' ').join(modifierStringsBuilder.build());
   }
 
-  private String createReplacementClassModifiers(
+  private static String createReplacementClassModifiers(
       VisitorState state, JCModifiers enclosingClassModifiers) {
     ImmutableList.Builder<String> classModifierStringsBuilder = ImmutableList.builder();
 

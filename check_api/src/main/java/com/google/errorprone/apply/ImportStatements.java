@@ -44,7 +44,7 @@ public class ImportStatements {
   private int startPos = Integer.MAX_VALUE;
   private int endPos = -1;
   private final Set<String> importStrings;
-  private boolean hasExistingImports;
+  private final boolean hasExistingImports;
 
   /** A copy of the original imports, used to check for any actual changes to the imports. */
   private final ImmutableSet<String> originalImports;
@@ -89,7 +89,7 @@ public class ImportStatements {
       }
     }
 
-    // sanity check for start/end positions
+    // validate start/end positions
     Preconditions.checkState(startPos <= endPos);
 
     this.importOrganizer = importOrganizer;
@@ -173,7 +173,7 @@ public class ImportStatements {
   /** Returns a string representation of the imports as Java code in correct order. */
   @Override
   public String toString() {
-    if (importStrings.size() == 0) {
+    if (importStrings.isEmpty()) {
       return "";
     }
 

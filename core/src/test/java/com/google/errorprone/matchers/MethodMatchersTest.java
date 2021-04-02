@@ -16,7 +16,6 @@
 
 package com.google.errorprone.matchers;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.instanceMethod;
@@ -24,15 +23,16 @@ import static com.google.errorprone.matchers.Matchers.staticMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.constructor;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
+import com.google.errorprone.bugpatterns.BugChecker.MemberReferenceTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.method.MethodMatchers;
 import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.NewClassTree;
 import org.junit.Test;
@@ -44,28 +44,31 @@ import org.junit.runners.JUnit4;
 public class MethodMatchersTest {
 
   /** A bugchecker to test constructor matching. */
-  @BugPattern(
-      name = "ConstructorDeleter",
-      category = JDK,
-      summary = "Deletes constructors",
-      severity = ERROR,
-      providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+  @BugPattern(name = "ConstructorDeleter", summary = "Deletes constructors", severity = ERROR)
   public static class ConstructorDeleter extends BugChecker
-      implements BugChecker.MethodInvocationTreeMatcher, BugChecker.NewClassTreeMatcher {
+      implements BugChecker.MethodInvocationTreeMatcher,
+          BugChecker.NewClassTreeMatcher,
+          BugChecker.MemberReferenceTreeMatcher {
 
     static final Matcher<ExpressionTree> CONSTRUCTOR =
         constructor().forClass("test.Foo").withParameters("java.lang.String");
 
     @Override
     public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
-      if (CONSTRUCTOR.matches(tree, state)) {
-        return describeMatch(tree, SuggestedFix.delete(tree));
-      }
-      return NO_MATCH;
+      return match(tree, state);
     }
 
     @Override
     public Description matchNewClass(NewClassTree tree, VisitorState state) {
+      return match(tree, state);
+    }
+
+    @Override
+    public Description matchMemberReference(MemberReferenceTree tree, VisitorState state) {
+      return match(tree, state);
+    }
+
+    private Description match(ExpressionTree tree, VisitorState state) {
       if (CONSTRUCTOR.matches(tree, state)) {
         return describeMatch(tree, SuggestedFix.delete(tree));
       }
@@ -111,6 +114,21 @@ public class MethodMatchersTest {
   }
 
   @Test
+  public void constructorMatcherTest_reference() {
+    CompilationTestHelper.newInstance(ConstructorDeleter.class, getClass())
+        .addSourceLines(
+            "test/Foo.java",
+            "package test;",
+            "import java.util.function.Function;",
+            "public class Foo { ",
+            "  public Foo(String s) {}",
+            "  // BUG: Diagnostic contains:",
+            "  private static final Function<String, Foo> make = Foo::new;",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void constructorMatcherTest_regular() {
     CompilationTestHelper.newInstance(ConstructorDeleter.class, getClass())
         .addSourceLines(
@@ -132,11 +150,7 @@ public class MethodMatchersTest {
   }
 
   /** This is javadoc. */
-  @BugPattern(
-      name = "CrashyParameterMatcherTestChecker",
-      category = JDK,
-      summary = "",
-      severity = ERROR)
+  @BugPattern(name = "CrashyParameterMatcherTestChecker", summary = "", severity = ERROR)
   public static class CrashyerMatcherTestChecker extends BugChecker
       implements MethodInvocationTreeMatcher {
 
@@ -166,7 +180,7 @@ public class MethodMatchersTest {
   /** Test BugChecker for namedAnyOf(...) */
   @BugPattern(name = "FlagMethodNames", summary = "", severity = ERROR)
   public static class FlagMethodNamesChecker extends BugChecker
-      implements MethodInvocationTreeMatcher {
+      implements MethodInvocationTreeMatcher, MemberReferenceTreeMatcher {
     private static final MethodNameMatcher INSTANCE_MATCHER =
         instanceMethod().anyClass().namedAnyOf("foo", "bar");
     private static final MethodNameMatcher STATIC_MATCHER =
@@ -174,6 +188,15 @@ public class MethodMatchersTest {
 
     @Override
     public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
+      return match(tree, state);
+    }
+
+    @Override
+    public Description matchMemberReference(MemberReferenceTree tree, VisitorState state) {
+      return match(tree, state);
+    }
+
+    private Description match(ExpressionTree tree, VisitorState state) {
       if (INSTANCE_MATCHER.matches(tree, state)) {
         return buildDescription(tree).setMessage("instance varargs").build();
       }
@@ -205,6 +228,8 @@ public class MethodMatchersTest {
             "    Test.fizz();",
             "    // BUG: Diagnostic contains: static varargs",
             "    Test.buzz();",
+            "    // BUG: Diagnostic contains: static varargs",
+            "    Runnable r = Test::fizz;",
             "    // These ones are ok",
             "    this.anotherMethod();",
             "    Test.yetAnother();",

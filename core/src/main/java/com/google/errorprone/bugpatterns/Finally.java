@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
@@ -61,9 +60,7 @@ import com.sun.tools.javac.util.Name;
     summary =
         "If you return or throw from a finally, then values returned or thrown from the"
             + " try-catch block will be ignored. Consider using try-with-resources instead.",
-    category = JDK,
     severity = WARNING,
-    generateExamplesFromTestCases = false,
     tags = StandardTags.FRAGILE_CODE)
 public class Finally extends BugChecker
     implements ContinueTreeMatcher, ThrowTreeMatcher, BreakTreeMatcher, ReturnTreeMatcher {
@@ -100,7 +97,7 @@ public class Finally extends BugChecker
     return Description.NO_MATCH;
   }
 
-  private static enum MatchResult {
+  private enum MatchResult {
     KEEP_LOOKING,
     NO_MATCH,
     FOUND_ERROR;
@@ -117,7 +114,7 @@ public class Finally extends BugChecker
     /**
      * Matches a StatementTree type by walking that statement's ancestor chain.
      *
-     * @returns true if an error is found.
+     * @return true if an error is found.
      */
     @Override
     public boolean matches(T tree, VisitorState state) {
@@ -165,12 +162,12 @@ public class Finally extends BugChecker
     }
 
     public FinallyJumpMatcher(JCContinue jcContinue) {
-      this.label = jcContinue.label;
+      this.label = jcContinue.getLabel();
       this.jumpType = JumpType.CONTINUE;
     }
 
     public FinallyJumpMatcher(JCBreak jcBreak) {
-      this.label = jcBreak.label;
+      this.label = jcBreak.getLabel();
       this.jumpType = JumpType.BREAK;
     }
 

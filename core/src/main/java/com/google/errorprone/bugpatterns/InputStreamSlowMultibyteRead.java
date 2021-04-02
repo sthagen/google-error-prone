@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.hasAnnotation;
@@ -34,19 +33,15 @@ import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.JUnitMatchers;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.ReturnTree;
-import com.sun.source.tree.StatementTree;
-import com.sun.source.tree.Tree;
-import com.sun.source.tree.Tree.Kind;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.code.Type;
 import java.io.InputStream;
-import java.util.List;
 import javax.lang.model.element.ElementKind;
 
 /** Checks that InputStreams should override int read(byte[], int, int); */
@@ -55,7 +50,6 @@ import javax.lang.model.element.ElementKind;
     summary =
         "Please also override int read(byte[], int, int), otherwise multi-byte reads from this "
             + "input stream are likely to be slow.",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.PERFORMANCE)
 public class InputStreamSlowMultibyteRead extends BugChecker implements ClassTreeMatcher {
@@ -105,19 +99,15 @@ public class InputStreamSlowMultibyteRead extends BugChecker implements ClassTre
         : maybeMatchReadByte(readByteMethod, state);
   }
 
+  private static final Matcher<MethodTree> RETURNS_CONSTANT =
+      Matchers.singleStatementReturnMatcher((e, s) -> ASTHelpers.constValue(e) != null);
+
   private Description maybeMatchReadByte(MethodTree readByteMethod, VisitorState state) {
     // Methods that return a constant expression are likely to be 'dummy streams', for which
     // the multibyte read is OK.
 
-    if (readByteMethod.getBody() != null) { // Null-check for native/abstract overrides of read()
-      List<? extends StatementTree> statements = readByteMethod.getBody().getStatements();
-      if (statements.size() == 1) {
-        Tree tree = statements.get(0);
-        if (tree.getKind() == Kind.RETURN
-            && ASTHelpers.constValue(((ReturnTree) tree).getExpression()) != null) {
-          return Description.NO_MATCH;
-        }
-      }
+    if (RETURNS_CONSTANT.matches(readByteMethod, state)) {
+      return Description.NO_MATCH;
     }
 
     // Streams within JUnit test cases are likely to be OK as well.

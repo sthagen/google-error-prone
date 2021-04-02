@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.ONE_OFF;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.allOf;
@@ -24,7 +23,6 @@ import static com.google.errorprone.matchers.Matchers.instanceMethod;
 import static com.google.errorprone.matchers.Matchers.isSameType;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -36,11 +34,9 @@ import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.Tree.Kind;
 
 @BugPattern(
-    category = ONE_OFF,
     name = "ProtoStringFieldReferenceEquality",
     severity = ERROR,
-    summary = "Comparing protobuf fields of type String using reference equality",
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    summary = "Comparing protobuf fields of type String using reference equality")
 public class ProtoStringFieldReferenceEquality extends BugChecker implements BinaryTreeMatcher {
 
   private static final String PROTO_SUPER_CLASS = "com.google.protobuf.GeneratedMessage";
@@ -74,7 +70,7 @@ public class ProtoStringFieldReferenceEquality extends BugChecker implements Bin
     return NO_MATCH;
   }
 
-  private boolean match(ExpressionTree a, ExpressionTree b, VisitorState state) {
+  private static boolean match(ExpressionTree a, ExpressionTree b, VisitorState state) {
     return PROTO_STRING_METHOD.matches(a, state) && b.getKind() != Kind.NULL_LITERAL;
   }
 }

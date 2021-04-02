@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns.android;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,13 +26,9 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class StaticOrDefaultInterfaceMethodTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(StaticOrDefaultInterfaceMethod.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(StaticOrDefaultInterfaceMethod.class, getClass())
+          .setArgs(ImmutableList.of("-XDandroidCompatible=true"));
 
   @Test
   public void testPositiveCaseDefault() {

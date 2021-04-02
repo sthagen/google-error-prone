@@ -25,14 +25,13 @@ import static com.google.errorprone.matchers.Matchers.staticMethod;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.matchers.method.MethodMatchers.MethodNameMatcher;
 import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 
 /**
@@ -47,10 +46,9 @@ import com.sun.source.tree.MethodInvocationTree;
         "Math.round() called with an integer or long type results in truncation"
             + " because Math.round only accepts floats or doubles and some integers and longs can't"
             + " be represented with float.",
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public final class MathRoundIntLong extends BugChecker implements MethodInvocationTreeMatcher {
-  private static final MethodNameMatcher MATH_ROUND_CALLS =
+  private static final Matcher<ExpressionTree> MATH_ROUND_CALLS =
       staticMethod().onClass("java.lang.Math").named("round");
 
   private static final Matcher<MethodInvocationTree> ROUND_CALLS_WITH_INT_ARG =
@@ -73,14 +71,13 @@ public final class MathRoundIntLong extends BugChecker implements MethodInvocati
   private Description removeMathRoundCall(MethodInvocationTree tree, VisitorState state) {
     if (ROUND_CALLS_WITH_INT_ARG.matches(tree, state)) {
       if (ASTHelpers.requiresParentheses(Iterables.getOnlyElement(tree.getArguments()), state)) {
-        return buildDescription(tree)
-            .addFix(
-                SuggestedFix.builder()
-                    .prefixWith(tree, "(")
-                    .replace(tree, state.getSourceForNode(tree.getArguments().get(0)))
-                    .postfixWith(tree, ")")
-                    .build())
-            .build();
+        return describeMatch(
+            tree,
+            SuggestedFix.builder()
+                .prefixWith(tree, "(")
+                .replace(tree, state.getSourceForNode(tree.getArguments().get(0)))
+                .postfixWith(tree, ")")
+                .build());
       }
       return describeMatch(
           tree, SuggestedFix.replace(tree, state.getSourceForNode(tree.getArguments().get(0))));
@@ -95,6 +92,7 @@ public final class MathRoundIntLong extends BugChecker implements MethodInvocati
               .postfixWith(tree, ")")
               .build());
     }
-    throw new AssertionError("Unknown argument type to round call: " + tree);
+    throw new AssertionError(
+        "Unknown argument type to round call: " + state.getSourceForNode(tree));
   }
 }

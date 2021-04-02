@@ -16,14 +16,12 @@
 
 package com.google.errorprone.bugpatterns.inject.guice;
 
-import static com.google.errorprone.BugPattern.Category.GUICE;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_INJECT_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_INJECT_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.hasInjectAnnotation;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -45,9 +43,7 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
     summary =
         "This method is not annotated with @Inject, but it overrides a method that is "
             + " annotated with @javax.inject.Inject. The method will not be Injected.",
-    category = GUICE,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class OverridesJavaxInjectableMethod extends BugChecker implements MethodTreeMatcher {
 
   @Override

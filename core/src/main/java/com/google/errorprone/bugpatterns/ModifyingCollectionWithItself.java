@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.bugpatterns.ReplacementVariableFinder.fixesByReplacingExpressionWithLocallyDeclaredField;
 import static com.google.errorprone.bugpatterns.ReplacementVariableFinder.fixesByReplacingExpressionWithMethodParameter;
@@ -32,7 +31,6 @@ import static com.sun.source.tree.Tree.Kind.MEMBER_SELECT;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -53,9 +51,7 @@ import javax.lang.model.element.ElementKind;
 @BugPattern(
     name = "ModifyingCollectionWithItself",
     summary = "Using a collection function with itself as the argument.",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class ModifyingCollectionWithItself extends BugChecker
     implements MethodInvocationTreeMatcher {
 
@@ -115,7 +111,7 @@ public class ModifyingCollectionWithItself extends BugChecker
     return builder.build();
   }
 
-  private List<Fix> buildFixes(
+  private static List<Fix> buildFixes(
       MethodInvocationTree methodInvocationTree,
       VisitorState state,
       ExpressionTree receiver,
@@ -162,7 +158,7 @@ public class ModifyingCollectionWithItself extends BugChecker
     if (parent instanceof ExpressionStatementTree) {
       Fix fix;
       if (instanceMethod().anyClass().named("removeAll").matches(methodInvocationTree, state)) {
-        fix = SuggestedFix.replace(methodInvocationTree, lhs + ".clear()");
+        fix = SuggestedFix.replace(methodInvocationTree, state.getSourceForNode(lhs) + ".clear()");
       } else {
         fix = SuggestedFix.delete(parent);
       }

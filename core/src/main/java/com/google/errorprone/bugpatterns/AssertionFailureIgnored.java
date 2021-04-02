@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.collect.Iterables.getLast;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.BugPattern.StandardTags.LIKELY_ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
@@ -56,8 +55,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "AssertionFailureIgnored",
     summary =
@@ -65,8 +65,7 @@ import java.util.stream.Stream;
             + " try block.",
     // TODO(cushon): promote this to an error and turn down TryFailThrowable
     severity = WARNING,
-    tags = LIKELY_ERROR,
-    category = JDK)
+    tags = LIKELY_ERROR)
 public class AssertionFailureIgnored extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> ASSERTION =
@@ -207,6 +206,7 @@ public class AssertionFailureIgnored extends BugChecker implements MethodInvocat
         .findFirst();
   }
 
+  @Nullable
   private static JCTry enclosingTry(VisitorState state) {
     Tree prev = null;
     for (Tree parent : state.getPath()) {

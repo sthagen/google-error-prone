@@ -17,8 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
@@ -36,13 +34,14 @@ import com.sun.source.tree.Tree.Kind;
 @BugPattern(
     name = "RandomModInteger",
     summary = "Use Random.nextInt(int).  Random.nextInt() % n can have negative results",
-    severity = SeverityLevel.ERROR,
-    category = Category.JDK,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SeverityLevel.ERROR)
 public class RandomModInteger extends BugChecker implements BinaryTreeMatcher {
 
   private static final Matcher<ExpressionTree> RANDOM_NEXT_INT =
-      Matchers.instanceMethod().onDescendantOf("java.util.Random").withSignature("nextInt()");
+      Matchers.instanceMethod()
+          .onDescendantOf("java.util.Random")
+          .named("nextInt")
+          .withParameters();
 
   @Override
   public Description matchBinary(BinaryTree tree, VisitorState state) {

@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
@@ -41,7 +40,6 @@ import java.util.Set;
         "Declaring a type parameter that is only used in the return type is a misuse of"
             + " generics: operations on the type parameter are unchecked, it hides unsafe casts at"
             + " invocations of the method, and it interacts badly with method overload resolution.",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.FRAGILE_CODE)
 public class TypeParameterUnusedInFormals extends BugChecker implements MethodTreeMatcher {
@@ -70,7 +68,8 @@ public class TypeParameterUnusedInFormals extends BugChecker implements MethodTr
 
     // Ignore f-bounds.
     // e.g.: <T extends Enum<T>> T unsafeEnumDeserializer();
-    if (retType.bound != null && TypeParameterFinder.visit(retType.bound).contains(retType.tsym)) {
+    if (retType.getUpperBound() != null
+        && TypeParameterFinder.visit(retType.getUpperBound()).contains(retType.tsym)) {
       return Description.NO_MATCH;
     }
 
@@ -141,8 +140,8 @@ public class TypeParameterUnusedInFormals extends BugChecker implements MethodTr
       if (!seen.add(type.tsym)) {
         return null;
       }
-      if (type.bound != null) {
-        type.bound.accept(this, null);
+      if (type.getUpperBound() != null) {
+        type.getUpperBound().accept(this, null);
       }
       return null;
     }

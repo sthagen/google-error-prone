@@ -74,12 +74,21 @@ class ScannerSupplierImpl extends ScannerSupplier implements Serializable {
       try {
         return flagsConstructor.get().newInstance(getFlags());
       } catch (ReflectiveOperationException e) {
-        // Invoking flags constructor failed, do nothing and try default constructor.
+        throw new LinkageError("Could not instantiate BugChecker.", e);
       }
     }
+
     // If no flags constructor, invoke default constructor.
+    Class<? extends BugChecker> checkerClass = checker.checkerClass();
     try {
-      return checker.checkerClass().getConstructor().newInstance();
+      return checkerClass.getConstructor().newInstance();
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new LinkageError(
+          String.format(
+              "Could not instantiate BugChecker %s: Are both the class and the zero-arg"
+                  + " constructor public?",
+              checkerClass),
+          e);
     } catch (ReflectiveOperationException e) {
       throw new LinkageError("Could not instantiate BugChecker.", e);
     }
@@ -121,9 +130,9 @@ class ScannerSupplierImpl extends ScannerSupplier implements Serializable {
     return flags;
   }
 
-  /** Returns the name of the first check, or {@code null}. */
+  /** Returns the name of the first check, or {@code ""}. */
   @Override
   public String toString() {
-    return getFirst(getAllChecks().keySet(), null);
+    return getFirst(getAllChecks().keySet(), "");
   }
 }

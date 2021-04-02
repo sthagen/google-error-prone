@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns.nullness;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class EqualsBrokenForNullTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(EqualsBrokenForNull.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(EqualsBrokenForNull.class, getClass());
 
   @Test
   public void testPositiveCase() {
@@ -41,5 +36,24 @@ public class EqualsBrokenForNullTest {
   @Test
   public void testNegativeCase() {
     compilationHelper.addSourceFile("EqualsBrokenForNullNegativeCases.java").doTest();
+  }
+
+  @Test
+  public void negativeGenerics() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test<A, B> {",
+            "  A a;",
+            "  B b;",
+            "  public boolean equals(Object other) {",
+            "    if (!(other instanceof Test<?, ?>)) {",
+            "      return false;",
+            "    }",
+            "    Test<?, ?> that = (Test<?, ?>) other;",
+            "    return a.equals(that.a) && b.equals(that.b);",
+            "  }",
+            "}")
+        .doTest();
   }
 }

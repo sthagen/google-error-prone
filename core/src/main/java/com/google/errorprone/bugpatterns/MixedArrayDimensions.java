@@ -16,13 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
-import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 
 import com.google.common.base.CharMatcher;
-import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
@@ -31,23 +28,19 @@ import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ErrorProneToken;
-import com.google.errorprone.util.ErrorProneTokens;
 import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.parser.Tokens.TokenKind;
+import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MixedArrayDimensions",
-    category = JDK,
     summary = "C-style array declarations should not be used",
     severity = SUGGESTION,
-    linkType = CUSTOM,
-    tags = StandardTags.STYLE,
-    link = "https://google.github.io/styleguide/javaguide.html#s4.8.3.2-array-declarations"
-    )
+    tags = StandardTags.STYLE)
 public class MixedArrayDimensions extends BugChecker
     implements MethodTreeMatcher, VariableTreeMatcher {
 
@@ -73,16 +66,13 @@ public class MixedArrayDimensions extends BugChecker
       if (start >= end) {
         continue;
       }
-      String dim = source.subSequence(start, end).toString();
-      if (dim.isEmpty()) {
-        continue;
-      }
-      ImmutableList<ErrorProneToken> tokens = ErrorProneTokens.getTokens(dim.trim(), state.context);
+      List<ErrorProneToken> tokens = state.getOffsetTokens(start, end);
       if (tokens.size() > 2 && tokens.get(0).kind() == TokenKind.IDENTIFIER) {
+        String dim = source.subSequence(start, end).toString();
         int nonWhitespace = CharMatcher.isNot(' ').indexIn(dim);
         int idx = dim.indexOf("[]", nonWhitespace);
         if (idx > nonWhitespace) {
-          String replacement = dim.substring(idx, dim.length()) + dim.substring(0, idx);
+          String replacement = dim.substring(idx) + dim.substring(0, idx);
           return describeMatch(tree, SuggestedFix.replace(start, end, replacement));
         }
       }

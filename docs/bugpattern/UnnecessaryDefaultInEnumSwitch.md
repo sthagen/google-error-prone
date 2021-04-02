@@ -2,12 +2,15 @@ Including a default case is redundant when switching on an enum type if the
 switch handles all possible values of the enum, and execution cannot continue
 below the switch from any of the non-default statement groups.
 
+Note: This check does not apply to pseudo-enums such as Android `@IntDef`s,
+which are integers that are treated specially by other tools.
+
 TIP: Removing the unnecessary default allows Error Prone to enforce that the
 switch continues to handle all cases, even if new values are added to the enum,
-see: [MissingCasesInEnumSwitch](MissingCasesInEnumSwitch.md). After the unnecessary
-default is removed, Error Prone will report an error if new enum constants are
-added in the future, to remind you to either handle the cases explicitly or
-restore the default case.
+see: [MissingCasesInEnumSwitch](MissingCasesInEnumSwitch.md). After the
+unnecessary default is removed, Error Prone will report an error if new enum
+constants are added in the future, to remind you to either handle the cases
+explicitly or restore the default case.
 
 ## When the default can be removed
 
@@ -65,11 +68,13 @@ default from an exhaustive enum switch.
 Before:
 
 ```java
-boolean isReady(State state) {
+enum State { ON, OFF }
+
+boolean isOn(State state) {
   switch (state) {
-    case READY:
+    case ON:
       return true;
-    case DONE:
+    case OFF:
       return false;
     default:
       throw new AssertionError("unknown state: " + state);
@@ -79,12 +84,14 @@ boolean isReady(State state) {
 
 After:
 
-```java {.good}
-boolean isReady(State state) {
+```java
+enum State { ON, OFF }
+
+boolean isOn(State state) {
   switch (state) {
-    case READY:
+    case ON:
       return true;
-    case DONE:
+    case OFF:
       return false;
   }
   throw new AssertionError("unknown state: " + state);
@@ -96,11 +103,13 @@ boolean isReady(State state) {
 Before:
 
 ```java
-boolean isReady(State state) {
+enum State { ON, OFF }
+
+boolean isOn(State state) {
   switch (state) {
-    case READY:
+    case ON:
       return true;
-    case DONE:
+    case OFF:
       break;
     default:
       break;
@@ -111,12 +120,14 @@ boolean isReady(State state) {
 
 After:
 
-```java {.good}
-boolean isReady(State state) {
+```java
+enum State { ON, OFF }
+
+boolean isOn(State state) {
   switch (state) {
-    case READY:
+    case ON:
       return true;
-    case DONE:
+    case OFF:
       break;
   }
   return false;
@@ -125,13 +136,16 @@ boolean isReady(State state) {
 
 ## Cases with UNRECOGNIZED
 
-In situations where a switch handles all values of a proto-generated enum except
-for UNRECOGNIZED, UNRECOGNIZED is explicitly handled and the default is removed.
-This is preferred practice because it will catch unexpected enum types at
-compiletime instead of runtime.
+When a switch statement handles all values of a proto-generated enum except for
+UNRECOGNIZED, the UNRECOGNIZED case should be explicitly handled and the default
+should be removed. This is preferred so that `MissingCasesInEnumSwitch` will
+catch unexpected enum types at compile-time instead of runtime.
 
-If the switch statement cannot complete normally, the default is deleted and its
-statements are moved after the switch statement. Case UNRECOGNIZED is added with
-a break.
+If the switch statement cannot [complete normally], the default should be
+deleted and its statements moved after the switch statement. The UNRECOGNIZED
+case should be added with a break.
 
-If it can complete, we merge the default with an added UNRECOGNIZED case.
+If it can complete normally, the default should be merged with an added
+UNRECOGNIZED case.
+
+[complete normally]: https://docs.oracle.com/javase/specs/jls/se10/html/jls-14.html#jls-14.1

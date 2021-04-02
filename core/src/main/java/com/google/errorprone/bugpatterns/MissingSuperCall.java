@@ -23,7 +23,6 @@ import static com.google.errorprone.matchers.Matchers.isType;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -33,27 +32,22 @@ import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.ExpressionTree;
-import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.LambdaExpressionTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.NewClassTree;
-import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import java.util.List;
-import java.util.stream.Stream;
+import java.util.Arrays;
 import javax.lang.model.element.Modifier;
 
 /** @author eaftan@google.com (Eddie Aftandilian) */
 @BugPattern(
     name = "MissingSuperCall",
     summary = "Overriding method is missing a call to overridden super method",
-    severity = ERROR,
-    providesFix = ProvidesFix.NO_FIX)
+    severity = ERROR)
 // TODO(eaftan): Add support for JDK methods that cannot be annotated, such as
 // java.lang.Object#finalize and java.lang.Object#clone.
 public class MissingSuperCall extends BugChecker
@@ -61,6 +55,7 @@ public class MissingSuperCall extends BugChecker
 
   private enum AnnotationType {
     ANDROID("android.support.annotation.CallSuper"),
+    ANDROIDX("androidx.annotation.CallSuper"),
     ERROR_PRONE("com.google.errorprone.annotations.OverridingMethodsMustInvokeSuper"),
     JSR305("javax.annotation.OverridingMethodsMustInvokeSuper"),
     FINDBUGS("edu.umd.cs.findbugs.annotations.OverrideMustInvoke");
@@ -87,7 +82,7 @@ public class MissingSuperCall extends BugChecker
 
   private static final Matcher<AnnotationTree> ANNOTATION_MATCHER =
       anyOf(
-          Stream.of(AnnotationType.values())
+          Arrays.stream(AnnotationType.values())
               .map(anno -> isType(anno.fullyQualifiedName()))
               .collect(ImmutableList.toImmutableList()));
 
@@ -176,33 +171,22 @@ public class MissingSuperCall extends BugChecker
 
   /** Scans a tree looking for calls to a method that is overridden by the given one. */
   private static class FindSuperTreeScanner extends TreeScanner<Boolean, Void> {
-    private String overridingMethodName;
+    private final String overridingMethodName;
 
     private FindSuperTreeScanner(String overridingMethodName) {
       this.overridingMethodName = overridingMethodName;
     }
 
     @Override
-    public Boolean visitNewClass(NewClassTree node, Void unused) {
-      Boolean r = scan(node.getEnclosingExpression(), null);
-      r = scanAndReduce(node.getIdentifier(), r);
-      r = scanAndReduce(node.getTypeArguments(), r);
-      r = scanAndReduce(node.getArguments(), r);
-      // don't descend into class body, if it exists
-      return r;
-    }
-
-    @Override
     public Boolean visitClass(ClassTree node, Void unused) {
-      // don't descend into local classes
+      // don't descend into classes
       return false;
     }
 
     @Override
     public Boolean visitLambdaExpression(LambdaExpressionTree node, Void unused) {
-      Boolean r = scan(node.getParameters(), null);
-      r = scanAndReduce(node.getBody(), r);
-      return r;
+      // don't descend into lambdas
+      return false;
     }
 
     @Override
@@ -214,20 +198,13 @@ public class MissingSuperCall extends BugChecker
         if (methodSelect.getKind() == Kind.MEMBER_SELECT) {
           MemberSelectTree memberSelect = (MemberSelectTree) methodSelect;
           result =
-              isSuper(memberSelect.getExpression())
+              ASTHelpers.isSuper(memberSelect.getExpression())
                   && memberSelect.getIdentifier().contentEquals(overridingMethodName);
         }
       }
       return result || super.visitMethodInvocation(tree, unused);
     }
 
-    private Boolean scanAndReduce(List<? extends Tree> node, Boolean r) {
-      return reduce(scan(node, null), r);
-    }
-
-    private Boolean scanAndReduce(Tree node, Boolean r) {
-      return reduce(scan(node, null), r);
-    }
 
     @Override
     public Boolean reduce(Boolean b1, Boolean b2) {
@@ -240,11 +217,7 @@ public class MissingSuperCall extends BugChecker
    * "java.util.function.Function#apply".
    */
   private static String getMethodName(MethodSymbol methodSym) {
-    return String.format("%s#%s", methodSym.owner.toString(), methodSym.getSimpleName());
+    return String.format("%s#%s", methodSym.owner, methodSym.getSimpleName());
   }
 
-  private static boolean isSuper(ExpressionTree tree) {
-    return tree.getKind() == Kind.IDENTIFIER
-        && ((IdentifierTree) tree).getName().contentEquals("super");
-  }
 }

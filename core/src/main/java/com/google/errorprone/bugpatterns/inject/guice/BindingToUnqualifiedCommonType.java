@@ -14,7 +14,6 @@
 
 package com.google.errorprone.bugpatterns.inject.guice;
 
-import static com.google.errorprone.BugPattern.Category.GUICE;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.ChildMultiMatcher.MatchType.AT_LEAST_ONE;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_PROVIDES_ANNOTATION;
@@ -22,7 +21,6 @@ import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.annotations;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.classLiteral;
-import static com.google.errorprone.matchers.Matchers.hasAnnotation;
 import static com.google.errorprone.matchers.Matchers.instanceMethod;
 import static com.google.errorprone.matchers.Matchers.isPrimitiveOrBoxedPrimitiveType;
 import static com.google.errorprone.matchers.Matchers.isSameType;
@@ -31,6 +29,7 @@ import static com.google.errorprone.matchers.Matchers.methodInvocation;
 import static com.google.errorprone.matchers.Matchers.methodReturns;
 import static com.google.errorprone.matchers.Matchers.not;
 import static com.google.errorprone.matchers.Matchers.receiverOfInvocation;
+import static com.google.errorprone.matchers.Matchers.symbolHasAnnotation;
 
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
@@ -48,13 +47,26 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Month;
+import java.time.MonthDay;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.ZonedDateTime;
 
 /** @author glorioso@google.com (Nick Glorioso) */
 @BugPattern(
     name = "BindingToUnqualifiedCommonType",
     summary =
         "This code declares a binding for a common value type without a Qualifier annotation.",
-    category = GUICE,
     severity = WARNING)
 public class BindingToUnqualifiedCommonType extends BugChecker
     implements MethodTreeMatcher, MethodInvocationTreeMatcher {
@@ -62,6 +74,22 @@ public class BindingToUnqualifiedCommonType extends BugChecker
   private static final Matcher<Tree> IS_SIMPLE_TYPE =
       anyOf(
           isPrimitiveOrBoxedPrimitiveType(),
+          // java.time types
+          isSameType(DayOfWeek.class),
+          isSameType(Duration.class),
+          isSameType(Instant.class),
+          isSameType(LocalDate.class),
+          isSameType(LocalDateTime.class),
+          isSameType(LocalTime.class),
+          isSameType(Month.class),
+          isSameType(MonthDay.class),
+          isSameType(OffsetDateTime.class),
+          isSameType(OffsetTime.class),
+          isSameType(Period.class),
+          isSameType(Year.class),
+          isSameType(YearMonth.class),
+          isSameType(ZonedDateTime.class),
+          // other common JDK types
           isSameType(String.class),
           isSameType(BigDecimal.class));
 
@@ -72,8 +100,8 @@ public class BindingToUnqualifiedCommonType extends BugChecker
               annotations(
                   AT_LEAST_ONE,
                   Matchers.<AnnotationTree>anyOf(
-                      hasAnnotation(InjectMatchers.GUICE_BINDING_ANNOTATION),
-                      hasAnnotation(InjectMatchers.JAVAX_QUALIFIER_ANNOTATION)))),
+                      symbolHasAnnotation(InjectMatchers.GUICE_BINDING_ANNOTATION),
+                      symbolHasAnnotation(InjectMatchers.JAVAX_QUALIFIER_ANNOTATION)))),
           methodReturns(IS_SIMPLE_TYPE));
 
   private static final Matcher<MethodInvocationTree> BIND_TO_UNQUALIFIED_CONSTANT =

@@ -1,33 +1,34 @@
 If the body of the lambda passed to `assertThrows` contains multiple statements,
-executation of the lambda will stop at the first statement that throws an
+execution of the lambda will stop at the first statement that throws an
 exception and all subsequent statements will be ignored.
 
 This means that:
 
 *   Any set-up logic in the lambda will cause the test to incorrectly pass if it
     throws the expected exception.
-*   Any assertions that run after the statement that throws will never be 
+*   Any assertions that run after the statement that throws will never be
     executed.
 
 Don't do this:
 
-```java {.bad}
-ImmutableList<Integer> xs;
+```java
 assertThrows(
     UnsupportedOperationException.class,
     () -> {
-        xs = ImmutableList.of(); // the test passes if this throws
-        xs.add(0);
-        assertThat(xs).isEmpty(); // this is never executed
+        AppendOnlyList list = new AppendOnlyList();
+        list.add(0, "a");
+        list.remove(0);
+        assertThat(list).containsExactly("a");
     });
 ```
 
 Do this instead:
 
-```java {.good}
-ImmutableList<Integer> xs = ImmutableList.of();
+```java
+AppendOnlyList list = new AppendOnlyList();
+list.add(0, "a");
 assertThrows(
     UnsupportedOperationException.class,
-    () -> xs.add(0));
-assertThat(xs).isEmpty();
+    () -> list.remove(0));
+assertThat(list).containsExactly("a");
 ```

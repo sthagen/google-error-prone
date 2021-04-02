@@ -6,7 +6,8 @@ in the [documentation][javadoc].
 
 Although these classes are *technically* not interfaces (in order to prevent
 unauthorized implementations), they *are* actually interfaces in the sense used
-by [Effective Java Item 52][ej52] ("Refer to objects by their interfaces").
+by [Effective Java 3rd Edition §64][ej3e-64] ("Refer to objects by their
+interfaces").
 
 So, prefer this:
 
@@ -34,7 +35,5 @@ prevent accidental attempts to modify the collection at compile-time (see
 [`ImmutableModification`]).
 
 [`ImmutableModification`]: https://errorprone.info/bugpattern/ImmutableModification
-
-[ej52]: https://books.google.com/books?id=ka2VUBqHiWkC
-
-[javadoc]: https://google.github.io/guava/releases/snapshot-jre/api/docs/com/google/common/collect/ImmutableCollection.html
+[ej3e-64]: https://books.google.com/books?id=BIpDDwAAQBAJ
+[javadoc]: https://guava.dev/releases/snapshot-jre/api/docs/com/google/common/collect/ImmutableCollection.html

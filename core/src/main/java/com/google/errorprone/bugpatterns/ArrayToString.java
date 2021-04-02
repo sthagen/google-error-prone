@@ -16,11 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 
-import com.google.common.base.Optional;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.fixes.Fix;
@@ -31,6 +29,9 @@ import com.google.errorprone.predicates.TypePredicates;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.Tree;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
+import java.util.Optional;
 
 /**
  * @author adgar@google.com (Mike Edgar)
@@ -39,7 +40,6 @@ import com.sun.source.tree.Tree;
 @BugPattern(
     name = "ArrayToString",
     summary = "Calling toString on an array does not provide useful information",
-    category = JDK,
     severity = ERROR)
 public class ArrayToString extends AbstractToString {
 
@@ -57,7 +57,12 @@ public class ArrayToString extends AbstractToString {
   protected Optional<Fix> implicitToStringFix(ExpressionTree tree, VisitorState state) {
     // e.g. println(theArray) -> println(Arrays.toString(theArray))
     // or:  "" + theArray -> "" + Arrays.toString(theArray)
-    return fix(tree, tree, state);
+    return toStringFix(tree, tree, state);
+  }
+
+  @Override
+  protected boolean allowableToStringKind(ToStringKind toStringKind) {
+    return toStringKind == ToStringKind.FLOGGER || toStringKind == ToStringKind.FORMAT_METHOD;
   }
 
   @Override
@@ -77,14 +82,23 @@ public class ArrayToString extends AbstractToString {
     }
     // e.g. String.valueOf(theArray) -> Arrays.toString(theArray)
     // or:  theArray.toString() -> Arrays.toString(theArray)
+    // or:  theArrayOfArrays.toString() -> Arrays.deepToString(theArrayOfArrays)
     return fix(parent, tree, state);
   }
 
-  private Optional<Fix> fix(Tree replace, Tree with, VisitorState state) {
+  private static Optional<Fix> fix(Tree replace, Tree with, VisitorState state) {
+    String method = isNestedArray(with, state) ? "deepToString" : "toString";
+
     return Optional.of(
         SuggestedFix.builder()
             .addImport("java.util.Arrays")
-            .replace(replace, String.format("Arrays.toString(%s)", state.getSourceForNode(with)))
+            .replace(replace, String.format("Arrays.%s(%s)", method, state.getSourceForNode(with)))
             .build());
+  }
+
+  private static boolean isNestedArray(Tree with, VisitorState state) {
+    Types types = state.getTypes();
+    Type withType = ASTHelpers.getType(with);
+    return withType != null && types.isArray(withType) && types.isArray(types.elemtype(withType));
   }
 }

@@ -16,12 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
@@ -32,19 +31,16 @@ import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.ParenthesizedTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
-import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCBinary;
 import com.sun.tools.javac.tree.TreeInfo;
 import java.util.EnumSet;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "OperatorPrecedence",
-    category = JDK,
     summary = "Use grouping parenthesis to make the operator precedence explicit",
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public class OperatorPrecedence extends BugChecker implements BinaryTreeMatcher {
 
   private static final EnumSet<Kind> CONDITIONAL =
@@ -75,7 +71,7 @@ public class OperatorPrecedence extends BugChecker implements BinaryTreeMatcher 
     return createAppropriateFix(tree, state);
   }
 
-  private boolean isConfusing(Kind thisKind, Kind parentKind) {
+  private static boolean isConfusing(Kind thisKind, Kind parentKind) {
     if (CONDITIONAL.contains(thisKind) && CONDITIONAL.contains(parentKind)) {
       return true;
     }
@@ -100,8 +96,8 @@ public class OperatorPrecedence extends BugChecker implements BinaryTreeMatcher 
     String prefix = "(";
     String postfix = ")";
     if (tree.getRightOperand() instanceof ParenthesizedTree) {
-      startPos = ((JCTree) tree.getRightOperand()).getStartPosition();
-      endPos = ((JCTree) tree.getRightOperand()).getStartPosition() + 1;
+      startPos = getStartPosition(tree.getRightOperand());
+      endPos = getStartPosition(tree.getRightOperand()) + 1;
       postfix = "";
     } else {
       startPos = state.getEndPosition(tree.getLeftOperand()) - 1;

@@ -18,19 +18,10 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 
-import com.google.common.io.ByteStreams;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Enumeration;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -116,7 +107,7 @@ public class JdkObsoleteTest {
 
   @Test
   public void refactoring() {
-    BugCheckerRefactoringTestHelper.newInstance(new JdkObsolete(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(JdkObsolete.class, getClass())
         .addInputLines(
             "in/Test.java", //
             "import java.util.*;",
@@ -150,7 +141,7 @@ public class JdkObsoleteTest {
 
   @Test
   public void stringBufferRefactoringTest() {
-    BugCheckerRefactoringTestHelper.newInstance(new JdkObsolete(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(JdkObsolete.class, getClass())
         .addInputLines(
             "in/Test.java", //
             "class Test {",
@@ -170,28 +161,13 @@ public class JdkObsoleteTest {
         .doTest();
   }
 
-  @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
-
   /** A test input. */
   public interface Lib {
     Enumeration<Integer> foos();
   }
 
-  static void addClassToJar(JarOutputStream jos, Class<?> clazz) throws IOException {
-    String entryPath = clazz.getName().replace('.', '/') + ".class";
-    try (InputStream is = clazz.getClassLoader().getResourceAsStream(entryPath)) {
-      jos.putNextEntry(new JarEntry(entryPath));
-      ByteStreams.copy(is, jos);
-    }
-  }
-
   @Test
-  public void obsoleteOverride() throws IOException {
-    File libJar = tempFolder.newFile("lib.jar");
-    try (FileOutputStream fis = new FileOutputStream(libJar);
-        JarOutputStream jos = new JarOutputStream(fis)) {
-      addClassToJar(jos, Lib.class);
-    }
+  public void obsoleteOverride() {
     testHelper
         .addSourceLines(
             "Test.java",
@@ -210,7 +186,7 @@ public class JdkObsoleteTest {
 
   @Test
   public void additionalRefactorings() {
-    BugCheckerRefactoringTestHelper.newInstance(new JdkObsolete(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(JdkObsolete.class, getClass())
         .addInputLines(
             "in/Test.java", //
             "import java.util.*;",
@@ -263,12 +239,7 @@ public class JdkObsoleteTest {
   }
 
   @Test
-  public void obsoleteMocking() throws IOException {
-    File libJar = tempFolder.newFile("lib.jar");
-    try (FileOutputStream fis = new FileOutputStream(libJar);
-        JarOutputStream jos = new JarOutputStream(fis)) {
-      addClassToJar(jos, Lib.class);
-    }
+  public void obsoleteMocking() {
     testHelper
         .addSourceLines(
             "Test.java",
@@ -287,6 +258,57 @@ public class JdkObsoleteTest {
             "                return null;",
             "              }",
             "            });",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void navigableSetRepro() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.NavigableSet;",
+            "import java.util.Optional;",
+            "class Test {",
+            "  Optional<Object> fail1(Optional<NavigableSet<Object>> myOptionalSet) {",
+            "    return myOptionalSet.map(NavigableSet::first);",
+            "  }",
+            "  Optional<Object> fail2(Optional<NavigableSet<Object>> myOptionalSet) {",
+            "    return myOptionalSet.map(NavigableSet::last);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void navigableMapInheritedMethod() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Map;",
+            "import java.util.Set;",
+            "import java.util.NavigableMap;",
+            "class Test {",
+            "  void f(NavigableMap<String, Integer> m) {",
+            "    for (Integer e : m.values()) {",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void indirect() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.SortedSetMultimap;",
+            "import com.google.common.collect.TreeMultimap;",
+            "class Test {",
+            "  void f() {",
+            "    SortedSetMultimap<String, String> myMultimap = TreeMultimap.create();",
+            "    String myValue = myMultimap.get(\"foo\").first();",
             "  }",
             "}")
         .doTest();

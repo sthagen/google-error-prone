@@ -26,6 +26,8 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.primitives.Primitives;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.bugpatterns.ImmutableCollections;
 import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.suppliers.Suppliers;
 import com.sun.tools.javac.code.Type;
@@ -36,8 +38,14 @@ import java.util.Map;
 import java.util.Set;
 
 /** A collection of types with known mutability. */
+@Immutable
 public final class WellKnownMutability implements ThreadSafety.KnownTypes {
 
+  /** Types that are known to be immutable. */
+  private final ImmutableMap<String, AnnotationInfo> knownImmutableClasses;
+
+  /** Types that are known to be mutable. */
+  private final ImmutableSet<String> knownUnsafeClasses;
 
   private WellKnownMutability(List<String> knownImmutable, List<String> knownUnsafe) {
     knownImmutableClasses = buildImmutableClasses(knownImmutable);
@@ -45,10 +53,8 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
   }
 
   public static WellKnownMutability fromFlags(ErrorProneFlags flags) {
-    ImmutableList<String> immutable =
-        flags.getList("Immutable:KnownImmutable").orElse(ImmutableList.of());
-    ImmutableList<String> unsafe =
-        flags.getList("Immutable:KnownUnsafe").orElse(ImmutableList.of());
+    List<String> immutable = flags.getList("Immutable:KnownImmutable").orElse(ImmutableList.of());
+    List<String> unsafe = flags.getList("Immutable:KnownUnsafe").orElse(ImmutableList.of());
     return new WellKnownMutability(immutable, unsafe);
   }
 
@@ -65,9 +71,6 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
   public Set<String> getKnownUnsafeClasses() {
     return knownUnsafeClasses;
   }
-
-  /** Types that are known to be immutable. */
-  private final ImmutableMap<String, AnnotationInfo> knownImmutableClasses;
 
   static class Builder {
     final ImmutableMap.Builder<String, AnnotationInfo> mapBuilder = ImmutableMap.builder();
@@ -124,12 +127,14 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
         .addStrings(extraKnownImmutables)
         .addClasses(Primitives.allPrimitiveTypes())
         .addClasses(Primitives.allWrapperTypes())
+        .add("com.github.zafarkhaja.semver.Version")
         .add("com.google.protobuf.ByteString")
         .add("com.google.protobuf.Descriptors$Descriptor")
         .add("com.google.protobuf.Descriptors$EnumDescriptor")
         .add("com.google.protobuf.Descriptors$EnumValueDescriptor")
         .add("com.google.protobuf.Descriptors$FieldDescriptor")
         .add("com.google.protobuf.Descriptors$FileDescriptor")
+        .add("com.google.protobuf.Descriptors$OneofDescriptor")
         .add("com.google.protobuf.Descriptors$ServiceDescriptor")
         .add("com.google.protobuf.Extension")
         .add("com.google.protobuf.ExtensionRegistry$ExtensionInfo")
@@ -172,15 +177,21 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
         .add(com.google.common.primitives.UnsignedInteger.class)
         .add(com.google.common.primitives.UnsignedLong.class)
         .add("com.ibm.icu.number.LocalizedNumberFormatter")
+        .add("com.ibm.icu.number.LocalizedNumberRangeFormatter")
         .add("com.ibm.icu.number.UnlocalizedNumberFormatter")
+        .add("com.ibm.icu.number.UnlocalizedNumberRangeFormatter")
+        .add("com.ibm.icu.util.Currency")
         .add("com.ibm.icu.util.ULocale")
         .add(java.lang.Class.class)
         .add(java.lang.String.class)
         .add(java.lang.annotation.Annotation.class)
         .add(java.math.BigDecimal.class)
         .add(java.math.BigInteger.class)
+        .add(java.net.Inet4Address.class)
+        .add(java.net.Inet6Address.class)
         .add(java.net.InetAddress.class)
         .add(java.net.URI.class)
+        .add(java.nio.ByteOrder.class)
         .add(java.nio.charset.Charset.class)
         .add(java.nio.file.Path.class)
         .add(java.nio.file.WatchEvent.class)
@@ -190,11 +201,13 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
         .add(java.util.Locale.class)
         .add(java.util.regex.Pattern.class)
         .add("android.net.Uri")
+        .add("java.awt.Color")
         .add("java.util.AbstractMap$SimpleImmutableEntry", "K", "V")
         .add("java.util.Optional", "T")
         .add("java.util.OptionalDouble")
         .add("java.util.OptionalInt")
         .add("java.util.OptionalLong")
+        .add("java.time.Clock")
         .add("java.time.Duration")
         .add("java.time.Instant")
         .add("java.time.LocalDate")
@@ -277,7 +290,20 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
         .add("org.threeten.bp.zone.ZoneOffsetTransitionRule")
         .add("org.threeten.bp.zone.ZoneRules")
         .add("org.threeten.bp.zone.ZoneRulesProvider")
+        .add("org.threeten.extra.DayOfMonth")
+        .add("org.threeten.extra.DayOfYear")
+        .add("org.threeten.extra.Days")
+        .add("org.threeten.extra.Hours")
         .add("org.threeten.extra.Interval")
+        .add("org.threeten.extra.LocalDateRange")
+        .add("org.threeten.extra.Minutes")
+        .add("org.threeten.extra.Months")
+        .add("org.threeten.extra.PeriodDuration")
+        .add("org.threeten.extra.Seconds")
+        .add("org.threeten.extra.Weeks")
+        .add("org.threeten.extra.YearQuarter")
+        .add("org.threeten.extra.YearWeek")
+        .add("org.threeten.extra.Years")
         .add("org.joda.time.DateTime")
         .add("org.joda.time.DateTimeZone")
         .add("org.joda.time.Days")
@@ -294,26 +320,31 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
         .build();
   }
 
-  /** Types that are known to be mutable. */
-  private final ImmutableSet<String> knownUnsafeClasses;
-
   private static ImmutableSet<String> buildUnsafeClasses(List<String> knownUnsafes) {
-    ImmutableSet.Builder<String> result = ImmutableSet.<String>builder();
-    result.addAll(knownUnsafes);
-    for (Class<?> clazz :
-        ImmutableSet.<Class<?>>of(
-            java.lang.Iterable.class,
-            java.lang.Object.class,
-            java.util.ArrayList.class,
-            java.util.Collection.class,
-            java.util.List.class,
-            java.util.Map.class,
-            java.util.Set.class,
-            java.util.EnumSet.class,
-            java.util.EnumMap.class)) {
-      result.add(clazz.getName());
-    }
-    return result.build();
+    return ImmutableSet.<String>builder()
+        .addAll(knownUnsafes)
+        .addAll(ImmutableCollections.MUTABLE_TO_IMMUTABLE_CLASS_NAME_MAP.keySet())
+        .add("com.google.protobuf.util.FieldMaskUtil.MergeOptions")
+        .add(java.util.BitSet.class.getName())
+        .add(java.util.Calendar.class.getName())
+        .add(java.lang.Iterable.class.getName())
+        .add(java.lang.Object.class.getName())
+        .add("java.text.DateFormat")
+        .add(java.util.ArrayList.class.getName())
+        .add(java.util.Collection.class.getName())
+        .add(java.util.EnumMap.class.getName())
+        .add(java.util.EnumSet.class.getName())
+        .add(java.util.List.class.getName())
+        .add(java.util.Map.class.getName())
+        .add(java.util.HashMap.class.getName())
+        .add(java.util.HashSet.class.getName())
+        .add(java.util.NavigableMap.class.getName())
+        .add(java.util.NavigableSet.class.getName())
+        .add(java.util.TreeMap.class.getName())
+        .add(java.util.TreeSet.class.getName())
+        .add(java.util.Vector.class.getName())
+        .add(java.util.Set.class.getName())
+        .build();
   }
 
   // ProtocolSupport matches Message (not MessageLite) for legacy reasons
@@ -332,6 +363,7 @@ public final class WellKnownMutability implements ThreadSafety.KnownTypes {
       // the type couldn't be loaded
       return false;
     }
+    to = state.getTypes().erasure(to);
     return state.getTypes().isAssignable(type, to);
   }
 

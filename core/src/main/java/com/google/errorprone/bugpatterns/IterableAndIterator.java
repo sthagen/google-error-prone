@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
@@ -37,7 +36,6 @@ import java.util.List;
 @BugPattern(
     name = "IterableAndIterator",
     summary = "Class should not implement both `Iterable` and `Iterator`",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.FRAGILE_CODE)
 public class IterableAndIterator extends BugChecker implements ClassTreeMatcher {
@@ -55,23 +53,15 @@ public class IterableAndIterator extends BugChecker implements ClassTreeMatcher 
   private static final Matcher<Tree> ITERABLE_AND_ITERATOR_MATCHER =
       allOf(ITERABLE_MATCHER, ITERATOR_MATCHER);
 
-  private boolean matchAnySuperType(ClassTree tree, VisitorState state) {
+  private static boolean matchAnySuperType(ClassTree tree, VisitorState state) {
     List<Tree> superTypes = Lists.<Tree>newArrayList(tree.getImplementsClause());
     Tree superClass = tree.getExtendsClause();
     if (superClass != null) {
       superTypes.add(superClass);
     }
 
-    /* NOTE: at "Eight day", use Java 8 feature below
     return superTypes.stream()
         .anyMatch(superType -> ITERABLE_AND_ITERATOR_MATCHER.matches(superType, state));
-     */
-    for (Tree superType : superTypes) {
-      if (ITERABLE_AND_ITERATOR_MATCHER.matches(superType, state)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   @Override

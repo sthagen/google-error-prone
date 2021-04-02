@@ -19,10 +19,8 @@ package com.google.errorprone.scanner;
 import static com.google.common.truth.Truth.assertAbout;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.scanner.BuiltInCheckerSuppliers.getSuppliers;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.Joiner;
@@ -39,6 +37,7 @@ import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.ErrorProneJavaCompilerTest;
 import com.google.errorprone.ErrorProneJavaCompilerTest.UnsuppressibleArrayEquals;
 import com.google.errorprone.ErrorProneOptions;
+import com.google.errorprone.FileManagers;
 import com.google.errorprone.InvalidCommandLineOptionException;
 import com.google.errorprone.bugpatterns.ArrayEquals;
 import com.google.errorprone.bugpatterns.BadShiftAmount;
@@ -49,10 +48,9 @@ import com.google.errorprone.bugpatterns.DivZero;
 import com.google.errorprone.bugpatterns.EqualsIncompatibleType;
 import com.google.errorprone.bugpatterns.LongLiteralLowerCaseSuffix;
 import com.google.errorprone.bugpatterns.PackageLocation;
-import com.google.errorprone.bugpatterns.PreconditionsCheckNotNull;
-import com.google.errorprone.bugpatterns.RestrictedApiChecker;
 import com.google.errorprone.bugpatterns.StaticQualifiedUsingExpression;
 import com.google.errorprone.bugpatterns.StringEquality;
+import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
@@ -64,7 +62,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 import javax.tools.JavaFileObject.Kind;
@@ -104,15 +101,14 @@ public class ScannerSupplierTest {
         ScannerSupplier.fromBugCheckerClasses(
             ArrayEquals.class, StaticQualifiedUsingExpression.class);
     ScannerSupplier ss2 =
-        ScannerSupplier.fromBugCheckerClasses(
-            BadShiftAmount.class, PreconditionsCheckNotNull.class);
+        ScannerSupplier.fromBugCheckerClasses(BadShiftAmount.class, UnnecessaryCheckNotNull.class);
 
     assertScanner(ss1.plus(ss2))
         .hasEnabledChecks(
             ArrayEquals.class,
             StaticQualifiedUsingExpression.class,
             BadShiftAmount.class,
-            PreconditionsCheckNotNull.class);
+            UnnecessaryCheckNotNull.class);
   }
 
   // Allow different instances of classes to be merged, provided they have the same name.
@@ -213,8 +209,7 @@ public class ScannerSupplierTest {
       FileSystem fileSystem, String name, String... lines)
       throws IOException, ClassNotFoundException {
     JavacTool javacTool = JavacTool.create();
-    JavacFileManager fileManager =
-        javacTool.getStandardFileManager(null, Locale.getDefault(), UTF_8);
+    JavacFileManager fileManager = FileManagers.testFileManager();
     Path tmp = fileSystem.getPath("tmp");
     Files.createDirectories(tmp);
     Path output = Files.createTempDirectory(tmp, "output");
@@ -250,7 +245,6 @@ public class ScannerSupplierTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void applyOverridesWorksOnEmptySeverityMap() {
     ScannerSupplier ss =
         ScannerSupplier.fromBugCheckerClasses(
@@ -333,52 +327,6 @@ public class ScannerSupplierTest {
             ss.applyOverrides(epOptions)
                 .plus(ScannerSupplier.fromBugCheckerClasses(DivZero.class).filter(t -> false)))
         .hasEnabledChecks(BadShiftAmount.class, StaticQualifiedUsingExpression.class);
-  }
-
-  @Test
-  public void applyOverridesDisableAllChecks() {
-    // Create new scanner.
-    ScannerSupplier ss =
-        ScannerSupplier.fromBugCheckerClasses(
-            ArrayEquals.class, BadShiftAmount.class, StaticQualifiedUsingExpression.class);
-
-    // Make sure all checks in the scanner start enabled.
-    assertScanner(ss)
-        .hasEnabledChecks(
-            ArrayEquals.class, BadShiftAmount.class, StaticQualifiedUsingExpression.class);
-
-    // Apply the 'DisableAllChecks' flag, make sure all checks are disabled.
-    ErrorProneOptions epOptions =
-        ErrorProneOptions.processArgs(ImmutableList.of("-XepDisableAllChecks"));
-
-    assertScanner(ss.applyOverrides(epOptions)).hasEnabledChecks();
-
-    // Don't suppress unsuppressible checks.
-    ss = ss.plus(ScannerSupplier.fromBugCheckerClasses(RestrictedApiChecker.class));
-
-    assertScanner(ss.applyOverrides(epOptions)).hasEnabledChecks(RestrictedApiChecker.class);
-
-    // Apply 'DisableAllChecks' flag with another -Xep flag
-    epOptions =
-        ErrorProneOptions.processArgs(
-            ImmutableList.of("-XepDisableAllChecks", "-Xep:ArrayEquals:ERROR"));
-
-    // Make sure the severity flag overrides the global disable flag.
-    assertScanner(ss.applyOverrides(epOptions))
-        .hasEnabledChecks(RestrictedApiChecker.class, ArrayEquals.class);
-
-    // Order matters. The DisableAllChecks flag should override all severities that come before it.
-    epOptions =
-        ErrorProneOptions.processArgs(
-            ImmutableList.of("-Xep:ArrayEquals:ERROR", "-XepDisableAllChecks"));
-
-    // Make sure the global disable flag overrides flags that come before it.
-    assertScanner(ss.applyOverrides(epOptions)).hasEnabledChecks(RestrictedApiChecker.class);
-
-    // The 'DisableAllChecks' flag doesn't populate through to additional plugins.
-    assertScanner(
-            ss.applyOverrides(epOptions).plus(ScannerSupplier.fromBugCheckerClasses(DivZero.class)))
-        .hasEnabledChecks(RestrictedApiChecker.class, DivZero.class);
   }
 
   @Test
@@ -487,7 +435,7 @@ public class ScannerSupplierTest {
 
     InvalidCommandLineOptionException exception =
         assertThrows(InvalidCommandLineOptionException.class, () -> ss.applyOverrides(epOptions));
-    assertThat(exception.getMessage()).contains("may not be disabled");
+    assertThat(exception).hasMessageThat().contains("may not be disabled");
   }
 
   @Test
@@ -500,7 +448,7 @@ public class ScannerSupplierTest {
 
     InvalidCommandLineOptionException exception =
         assertThrows(InvalidCommandLineOptionException.class, () -> ss.applyOverrides(epOptions));
-    assertThat(exception.getMessage()).contains("may not be demoted to a warning");
+    assertThat(exception).hasMessageThat().contains("may not be demoted to a warning");
   }
 
   @Test
@@ -616,7 +564,6 @@ public class ScannerSupplierTest {
   @BugPattern(
       name = "PackageLocation",
       summary = "",
-      category = JDK,
       severity = ERROR,
       suppressionAnnotations = {},
       disableable = false)
@@ -630,35 +577,34 @@ public class ScannerSupplierTest {
 
     InvalidCommandLineOptionException exception =
         assertThrows(InvalidCommandLineOptionException.class, () -> ss.applyOverrides(epOptions));
-    assertThat(exception.getMessage()).contains("may not be disabled");
+    assertThat(exception).hasMessageThat().contains("may not be disabled");
   }
 
-  private static class ScannerSupplierSubject
-      extends Subject<ScannerSupplierSubject, ScannerSupplier> {
+  private static class ScannerSupplierSubject extends Subject {
+    private final ScannerSupplier actual;
+
     ScannerSupplierSubject(FailureMetadata failureMetadata, ScannerSupplier scannerSupplier) {
       super(failureMetadata, scannerSupplier);
+      this.actual = scannerSupplier;
     }
 
     final void hasSeverities(Map<String, SeverityLevel> severities) {
-      check().that(actual().severities()).containsExactlyEntriesIn(severities);
+      check("severities()").that(actual.severities()).containsExactlyEntriesIn(severities);
     }
 
     @SafeVarargs
     final void hasEnabledChecks(Class<? extends BugChecker>... bugCheckers) {
-      check()
-          .that(actual().getEnabledChecks())
+      check("getEnabledChecks()")
+          .that(actual.getEnabledChecks())
           .containsExactlyElementsIn(getSuppliers(bugCheckers));
     }
 
     final MapSubject flagsMap() {
-      return check().that(actual().getFlags().getFlagsMap()).named("Flags map");
+      return check("getFlags().getFlagsMap()").that(actual.getFlags().getFlagsMap());
     }
   }
 
-  private ScannerSupplierSubject assertScanner(ScannerSupplier scannerSupplier) {
-    return assertAbout(SCANNER_SUBJECT_FACTORY).that(scannerSupplier);
+  private static ScannerSupplierSubject assertScanner(ScannerSupplier scannerSupplier) {
+    return assertAbout(ScannerSupplierSubject::new).that(scannerSupplier);
   }
-
-  private static final Subject.Factory<ScannerSupplierSubject, ScannerSupplier>
-      SCANNER_SUBJECT_FACTORY = ScannerSupplierSubject::new;
 }

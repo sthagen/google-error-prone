@@ -72,7 +72,7 @@ public class DateFormatConstantTest {
 
   @Test
   public void threadLocalFix() {
-    BugCheckerRefactoringTestHelper.newInstance(new DateFormatConstant(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(DateFormatConstant.class, getClass())
         .addInputLines(
             "in/Test.java",
             "import java.text.SimpleDateFormat;",
@@ -91,10 +91,10 @@ public class DateFormatConstantTest {
             "import java.text.DateFormat;",
             "import java.util.Date;",
             "class Test {",
-            "  private static final ThreadLocal<DateFormat> DATE_FORMAT = ",
+            "  private static final ThreadLocal<DateFormat> dateFormat = ",
             "    ThreadLocal.withInitial(() -> new SimpleDateFormat(\"yyyy-MM-dd HH:mm\"));",
             "  static String f(Date d) {",
-            "    return DATE_FORMAT.get().format(d);",
+            "    return dateFormat.get().format(d);",
             "  }",
             "}")
         .doTest();
@@ -102,7 +102,7 @@ public class DateFormatConstantTest {
 
   @Test
   public void lowerCamelCaseFix() {
-    BugCheckerRefactoringTestHelper.newInstance(new DateFormatConstant(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(DateFormatConstant.class, getClass())
         .addInputLines(
             "in/Test.java",
             "import java.text.SimpleDateFormat;",

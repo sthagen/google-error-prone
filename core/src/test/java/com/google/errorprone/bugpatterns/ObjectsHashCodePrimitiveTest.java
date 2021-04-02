@@ -26,7 +26,7 @@ import org.junit.runners.JUnit4;
 public class ObjectsHashCodePrimitiveTest {
 
   private final BugCheckerRefactoringTestHelper helper =
-      BugCheckerRefactoringTestHelper.newInstance(new ObjectsHashCodePrimitive(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(ObjectsHashCodePrimitive.class, getClass());
 
   @Test
   public void hashCodeIntLiteral() {
@@ -289,7 +289,7 @@ public class ObjectsHashCodePrimitiveTest {
             "Test.java", //
             "import java.util.Objects;",
             "class Test {",
-            "  Integer x = new Integer(3);",
+            "  Integer x = Integer.valueOf(3);",
             "  void f() {",
             "    int y = Objects.hashCode(x);",
             "  }",
@@ -305,7 +305,7 @@ public class ObjectsHashCodePrimitiveTest {
             "Test.java", //
             "import java.util.Objects;",
             "class Test {",
-            "  Integer x = new Integer(3);",
+            "  Integer x = Integer.valueOf(3);",
             "  void f() {",
             "    int y = x.hashCode();",
             "  }",

@@ -16,7 +16,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,17 +26,16 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class ComparableAndComparatorTest {
-  private CompilationTestHelper compilationHelper;
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ComparableAndComparator.class, getClass());
 
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(ComparableAndComparator.class, getClass());
+  @Test
+  public void positive() {
+    compilationHelper.addSourceFile("ComparableAndComparatorPositiveCases.java").doTest();
   }
 
   @Test
-  public void testCases() {
-    compilationHelper.addSourceFile("ComparableAndComparatorPositiveCases.java").doTest();
+  public void negative() {
     compilationHelper.addSourceFile("ComparableAndComparatorNegativeCases.java").doTest();
   }
 }

@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
@@ -38,10 +37,9 @@ import com.sun.source.tree.Tree.Kind;
 import com.sun.source.util.SimpleTreeVisitor;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "InfiniteRecursion",
-    category = JDK,
     summary = "This method always recurses, and will cause a StackOverflowError",
     severity = ERROR)
 public class InfiniteRecursion extends BugChecker implements BugChecker.MethodTreeMatcher {
@@ -70,24 +68,26 @@ public class InfiniteRecursion extends BugChecker implements BugChecker.MethodTr
       return NO_MATCH;
     }
     ExpressionTree select = ((MethodInvocationTree) expr).getMethodSelect();
-    switch (select.getKind()) {
-      case IDENTIFIER:
-        break;
-      case MEMBER_SELECT:
-        ExpressionTree receiver = ((MemberSelectTree) select).getExpression();
-        if (receiver.getKind() != Kind.IDENTIFIER) {
-          return NO_MATCH;
-        }
-        if (!((IdentifierTree) receiver).getName().contentEquals("this")) {
-          return NO_MATCH;
-        }
-        break;
-      default:
-        return NO_MATCH;
-    }
     MethodSymbol sym = ASTHelpers.getSymbol(tree);
     if (sym == null || !sym.equals(ASTHelpers.getSymbol(expr))) {
       return NO_MATCH;
+    }
+    if (!sym.isStatic()) {
+      switch (select.getKind()) {
+        case IDENTIFIER:
+          break;
+        case MEMBER_SELECT:
+          ExpressionTree receiver = ((MemberSelectTree) select).getExpression();
+          if (receiver.getKind() != Kind.IDENTIFIER) {
+            return NO_MATCH;
+          }
+          if (!((IdentifierTree) receiver).getName().contentEquals("this")) {
+            return NO_MATCH;
+          }
+          break;
+        default:
+          return NO_MATCH;
+      }
     }
     return describeMatch(statement);
   }

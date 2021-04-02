@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class NumericEqualityTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(NumericEquality.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(NumericEquality.class, getClass());
 
   @Test
   public void testPositiveCase() {
@@ -51,11 +46,11 @@ public class NumericEqualityTest {
             "Test.java",
             "class Test {",
             "  void f() {",
-            "    final Long constValue = new Long(1000L);",
+            "    final Long constValue = Long.valueOf(1000L);",
             "    Long assignedValue;",
             "    // BUG: Diagnostic contains:"
-                + " (!(assignedValue = new Long(1000L)).equals(constValue))",
-            "    boolean retVal = ((assignedValue = new Long(1000L)) != constValue);",
+                + " (!(assignedValue = Long.valueOf(1000L)).equals(constValue))",
+            "    boolean retVal = ((assignedValue = Long.valueOf(1000L)) != constValue);",
             "  }",
             "}")
         .doTest();

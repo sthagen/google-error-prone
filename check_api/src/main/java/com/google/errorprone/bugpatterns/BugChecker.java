@@ -17,8 +17,9 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.errorprone.BugCheckerInfo;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
@@ -26,6 +27,7 @@ import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Suppressible;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotatedTypeTree;
 import com.sun.source.tree.AnnotationTree;
@@ -79,9 +81,11 @@ import com.sun.source.tree.UnionTypeTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.WhileLoopTree;
 import com.sun.source.tree.WildcardTree;
+import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
+import com.sun.tools.javac.util.Name;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -90,6 +94,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 
 /**
  * A base class for implementing bug checkers. The {@code BugChecker} supplies a Scanner
@@ -102,15 +107,55 @@ import java.util.Set;
  */
 public abstract class BugChecker implements Suppressible, Serializable {
   private final BugCheckerInfo info;
+  private final BiPredicate<Set<? extends Name>, VisitorState> checkSuppression;
 
   public BugChecker() {
     info = BugCheckerInfo.create(getClass());
+    checkSuppression = suppressionPredicate(info.customSuppressionAnnotations());
+  }
+
+  private static BiPredicate<Set<? extends Name>, VisitorState> suppressionPredicate(
+      Set<Class<? extends Annotation>> suppressionClasses) {
+    switch (suppressionClasses.size()) {
+      case 0:
+        return (annos, state) -> false;
+      case 1:
+        {
+          Supplier<Name> self =
+              VisitorState.memoize(
+                  state -> state.getName(Iterables.getOnlyElement(suppressionClasses).getName()));
+          return (annos, state) -> annos.contains(self.get(state));
+        }
+      default:
+        {
+          Supplier<Set<? extends Name>> self =
+              VisitorState.memoize(
+                  state ->
+                      suppressionClasses.stream()
+                          .map(Class::getName)
+                          .map(state::getName)
+                          .collect(toImmutableSet()));
+          return (annos, state) -> !Collections.disjoint(self.get(state), annos);
+        }
+    }
   }
 
   /** Helper to create a Description for the common case where there is a fix. */
   @CheckReturnValue
   protected Description describeMatch(Tree node, Fix fix) {
     return buildDescription(node).addFix(fix).build();
+  }
+
+  /** Helper to create a Description for the common case where there is a fix. */
+  @CheckReturnValue
+  protected Description describeMatch(JCTree node, Fix fix) {
+    return describeMatch((Tree) node, fix);
+  }
+
+  /** Helper to create a Description for the common case where there is a fix. */
+  @CheckReturnValue
+  protected Description describeMatch(DiagnosticPosition position, Fix fix) {
+    return buildDescription(position).addFix(fix).build();
   }
 
   /** Helper to create a Description for the common case where there is no fix. */
@@ -125,13 +170,10 @@ public abstract class BugChecker implements Suppressible, Serializable {
     return buildDescription(node).addFix(fix).build();
   }
 
-  /**
-   * Returns a Description builder, which allows you to customize the diagnostic with a custom
-   * message or multiple fixes.
-   */
+  /** Helper to create a Description for the common case where there is an {@link Optional} fix. */
   @CheckReturnValue
-  protected Description.Builder buildDescription(Tree node) {
-    return buildDescriptionFromChecker(node, this);
+  protected Description describeMatch(DiagnosticPosition position, Optional<? extends Fix> fix) {
+    return buildDescription(position).addFix(fix).build();
   }
 
   /**
@@ -139,8 +181,17 @@ public abstract class BugChecker implements Suppressible, Serializable {
    * message or multiple fixes.
    */
   @CheckReturnValue
-  protected Description.Builder buildDescription(DiagnosticPosition position) {
-    return buildDescriptionFromChecker(position, this);
+  public Description.Builder buildDescription(Tree node) {
+    return Description.builder(node, canonicalName(), linkUrl(), defaultSeverity(), message());
+  }
+
+  /**
+   * Returns a Description builder, which allows you to customize the diagnostic with a custom
+   * message or multiple fixes.
+   */
+  @CheckReturnValue
+  public Description.Builder buildDescription(DiagnosticPosition position) {
+    return Description.builder(position, canonicalName(), linkUrl(), defaultSeverity(), message());
   }
 
   /**
@@ -149,57 +200,8 @@ public abstract class BugChecker implements Suppressible, Serializable {
    */
   // This overload exists purely to disambiguate for JCTree.
   @CheckReturnValue
-  protected Description.Builder buildDescription(JCTree tree) {
-    return buildDescriptionFromChecker((DiagnosticPosition) tree, this);
-  }
-
-  /**
-   * Returns a new builder for {@link Description}s.
-   *
-   * @param node the node where the error is
-   * @param checker the {@code BugChecker} instance that is producing this {@code Description}
-   */
-  @CheckReturnValue
-  public static Description.Builder buildDescriptionFromChecker(Tree node, BugChecker checker) {
-    return Description.builder(
-        Preconditions.checkNotNull(node),
-        checker.canonicalName(),
-        checker.linkUrl(),
-        checker.defaultSeverity(),
-        checker.message());
-  }
-
-  /**
-   * Returns a new builder for {@link Description}s.
-   *
-   * @param position the position of the error
-   * @param checker the {@code BugChecker} instance that is producing this {@code Description}
-   */
-  @CheckReturnValue
-  public static Description.Builder buildDescriptionFromChecker(
-      DiagnosticPosition position, BugChecker checker) {
-    return Description.builder(
-        position,
-        checker.canonicalName(),
-        checker.linkUrl(),
-        checker.defaultSeverity(),
-        checker.message());
-  }
-
-  /**
-   * Returns a new builder for {@link Description}s.
-   *
-   * @param tree the tree where the error is
-   * @param checker the {@code BugChecker} instance that is producing this {@code Description}
-   */
-  @CheckReturnValue
-  public static Description.Builder buildDescriptionFromChecker(JCTree tree, BugChecker checker) {
-    return Description.builder(
-        (DiagnosticPosition) tree,
-        checker.canonicalName(),
-        checker.linkUrl(),
-        checker.defaultSeverity(),
-        checker.message());
+  public Description.Builder buildDescription(JCTree tree) {
+    return Description.builder(tree, canonicalName(), linkUrl(), defaultSeverity(), message());
   }
 
   @Override
@@ -233,9 +235,18 @@ public abstract class BugChecker implements Suppressible, Serializable {
     return info.supportsSuppressWarnings();
   }
 
+  public boolean disableable() {
+    return info.disableable();
+  }
+
   @Override
   public Set<Class<? extends Annotation>> customSuppressionAnnotations() {
     return info.customSuppressionAnnotations();
+  }
+
+  @Override
+  public boolean suppressedByAnyOf(Set<Name> annotations, VisitorState s) {
+    return checkSuppression.test(annotations, s);
   }
 
   /**
@@ -243,9 +254,7 @@ public abstract class BugChecker implements Suppressible, Serializable {
    * bug checker.
    */
   public boolean isSuppressed(Tree tree) {
-    SuppressWarnings suppression = ASTHelpers.getAnnotation(tree, SuppressWarnings.class);
-    return suppression != null
-        && !Collections.disjoint(Arrays.asList(suppression.value()), allNames());
+    return isSuppressed(ASTHelpers.getAnnotation(tree, SuppressWarnings.class));
   }
 
   /**
@@ -253,7 +262,10 @@ public abstract class BugChecker implements Suppressible, Serializable {
    * this bug checker.
    */
   public boolean isSuppressed(Symbol symbol) {
-    SuppressWarnings suppression = ASTHelpers.getAnnotation(symbol, SuppressWarnings.class);
+    return isSuppressed(ASTHelpers.getAnnotation(symbol, SuppressWarnings.class));
+  }
+
+  private boolean isSuppressed(SuppressWarnings suppression) {
     return suppression != null
         && !Collections.disjoint(Arrays.asList(suppression.value()), allNames());
   }
@@ -486,5 +498,15 @@ public abstract class BugChecker implements Suppressible, Serializable {
         defaultSeverity(),
         supportsSuppressWarnings(),
         customSuppressionAnnotations());
+  }
+
+  /** A {@link TreePathScanner} which skips trees which are suppressed for this check. */
+  protected class SuppressibleTreePathScanner<A, B> extends TreePathScanner<A, B> {
+    @Override
+    public final A scan(Tree tree, B b) {
+      boolean isSuppressible =
+          tree instanceof ClassTree || tree instanceof MethodTree || tree instanceof VariableTree;
+      return isSuppressible && isSuppressed(tree) ? null : super.scan(tree, b);
+    }
   }
 }

@@ -16,12 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -42,20 +41,17 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.List;
 import java.util.Objects;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "StreamResourceLeak",
     altNames = "FilesLinesLeak",
-    category = JDK,
     summary =
         "Streams that encapsulate a closeable resource should be closed using"
             + " try-with-resources",
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class StreamResourceLeak extends AbstractMustBeClosedChecker
     implements MethodInvocationTreeMatcher {
 
@@ -85,15 +81,15 @@ public class StreamResourceLeak extends AbstractMustBeClosedChecker
         // e.g. `int count = Files.lines(p).count();`
         // -> `int count; try (Stream<String> stream = Files.lines(p)) { count = stream.count(); }`
         VariableTree var = (VariableTree) statement;
-        int pos = ((JCTree) var).getStartPosition();
-        int initPos = ((JCTree) var.getInitializer()).getStartPosition();
+        int pos = getStartPosition(var);
+        int initPos = getStartPosition(var.getInitializer());
         int eqPos = pos + state.getSourceForNode(var).substring(0, initPos - pos).lastIndexOf('=');
         fix.replace(
             eqPos,
             initPos,
             String.format(
                 ";\ntry (%s stream = %s) {\n%s =",
-                streamType, state.getSourceForNode(tree), var.getName().toString()));
+                streamType, state.getSourceForNode(tree), var.getName()));
       } else {
         // the non-variable case, e.g. `return Files.lines(p).count()`
         // -> try (Stream<Stream> stream = Files.lines(p)) { return stream.count(); }`

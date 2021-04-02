@@ -16,9 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.FixChoosers;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.ErrorProneFlags;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -31,7 +33,8 @@ public class JUnit4TestNotRunTest {
       CompilationTestHelper.newInstance(JUnit4TestNotRun.class, getClass());
 
   private final BugCheckerRefactoringTestHelper refactoringHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new JUnit4TestNotRun(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(
+          new JUnit4TestNotRun(ErrorProneFlags.empty()), getClass());
 
   @Test
   public void testPositiveCase1() {
@@ -264,7 +267,6 @@ public class JUnit4TestNotRunTest {
         .doTest();
   }
 
-
   @Test
   public void hasOtherAnnotation_notATest() {
     compilationHelper
@@ -483,13 +485,32 @@ public class JUnit4TestNotRunTest {
   }
 
   @Test
+  public void suppression() {
+    compilationHelper
+        .addSourceLines(
+            "TestStuff.java",
+            "import org.junit.Test;",
+            "public class TestStuff {",
+            "  @SuppressWarnings(\"JUnit4TestNotRun\")",
+            "  public void testDoesSomething() {}",
+            "  @Test",
+            "  public void foo() {}",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void testNegativeCase1() {
-    compilationHelper.addSourceFile("JUnit4TestNotRunNegativeCase1.java").doTest();
+    compilationHelper
+        .addSourceFile("JUnit4TestNotRunNegativeCase1.java")
+        .doTest();
   }
 
   @Test
   public void testNegativeCase2() {
-    compilationHelper.addSourceFile("JUnit4TestNotRunNegativeCase2.java").doTest();
+    compilationHelper
+        .addSourceFile("JUnit4TestNotRunNegativeCase2.java")
+        .doTest();
   }
 
   @Test
@@ -499,7 +520,9 @@ public class JUnit4TestNotRunTest {
 
   @Test
   public void testNegativeCase4() {
-    compilationHelper.addSourceFile("JUnit4TestNotRunNegativeCase4.java").doTest();
+    compilationHelper
+        .addSourceFile("JUnit4TestNotRunNegativeCase4.java")
+        .doTest();
   }
 
   @Test
@@ -522,6 +545,80 @@ public class JUnit4TestNotRunTest {
             "public class TestStuff {",
             "  @Ignore",
             "  public void testMethod() {}",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void junit4Theory_isTestAnnotation() {
+    compilationHelper
+        .addSourceLines(
+            "TestTheories.java",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.experimental.theories.Theories;",
+            "import org.junit.experimental.theories.Theory;",
+            "@RunWith(Theories.class)",
+            "public class TestTheories {",
+            "  @Theory public void testMyTheory() {}",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodsWithParameters_areStillTests() {
+    compilationHelper
+        .addSourceLines(
+            "TestTheories.java",
+            "import static org.junit.Assert.fail;",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.experimental.theories.Theories;",
+            "import org.junit.experimental.theories.FromDataPoints;",
+            "@RunWith(Theories.class)",
+            "public class TestTheories {",
+            "   // BUG: Diagnostic contains:",
+            "   public void testMyTheory(@FromDataPoints(\"foo\") Object foo) {",
+            "     fail();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodsWithParameters_flaggedOff_notConsideredTests() {
+    compilationHelper
+        .addSourceLines(
+            "TestTheories.java",
+            "import static org.junit.Assert.fail;",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.experimental.theories.Theories;",
+            "import org.junit.experimental.theories.FromDataPoints;",
+            "@RunWith(Theories.class)",
+            "public class TestTheories {",
+            "   // BUG: Diagnostic contains:",
+            "   public void testMyTheory(@FromDataPoints(\"foo\") Object foo) {",
+            "     fail();",
+            "  }",
+            "}")
+        .setArgs(ImmutableList.of("-XepOpt:JUnit4TestNotRun:AllowParameterizingAnnotations:OFF"))
+        .doTest();
+  }
+
+  @Test
+  public void annotationOnSuperMethod() {
+    compilationHelper
+        .addSourceLines(
+            "TestSuper.java",
+            "import org.junit.Test;",
+            "public class TestSuper {",
+            "  @Test public void testToOverride() {}",
+            "}")
+        .addSourceLines(
+            "TestSub.java",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.runners.JUnit4;",
+            "@RunWith(JUnit4.class)",
+            "public class TestSub extends TestSuper {",
+            "  @Override public void testToOverride() {}",
             "}")
         .doTest();
   }

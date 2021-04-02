@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns.threadsafety;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 
@@ -26,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.Immutable;
@@ -41,7 +39,6 @@ import com.google.errorprone.bugpatterns.threadsafety.ThreadSafety.Violation;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
-import com.google.errorprone.matchers.Description.Builder;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MemberReferenceTree;
@@ -57,17 +54,14 @@ import com.sun.tools.javac.tree.JCTree.JCMemberReference;
 import com.sun.tools.javac.tree.JCTree.JCNewClass;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "Immutable",
     summary = "Type declaration annotated with @Immutable is not immutable",
-    category = JDK,
     severity = ERROR,
-    documentSuppression = false,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    documentSuppression = false)
 public class ImmutableChecker extends BugChecker
     implements ClassTreeMatcher,
         NewClassTreeMatcher,
@@ -209,7 +203,7 @@ public class ImmutableChecker extends BugChecker
                 e ->
                     annotation.containerOf().contains(e.getKey())
                         && analysis.hasThreadSafeTypeParameterAnnotation(e.getValue()))
-            .map(Entry::getKey)
+            .map(Map.Entry::getKey)
             .collect(toImmutableSet());
     if (!immutableAndContainer.isEmpty()) {
       return buildDescription(tree)
@@ -287,7 +281,7 @@ public class ImmutableChecker extends BugChecker
             ASTHelpers.getType(tree),
             new ViolationReporter() {
               @Override
-              public Builder describe(Tree tree, Violation info) {
+              public Description.Builder describe(Tree tree, Violation info) {
                 return describeAnonymous(tree, superType, info);
               }
             });
@@ -334,7 +328,7 @@ public class ImmutableChecker extends BugChecker
    */
   private Type immutableSupertype(Symbol sym, VisitorState state) {
     for (Type superType : state.getTypes().closure(sym.type)) {
-      if (superType.equals(sym.type)) {
+      if (superType.tsym.equals(sym.type.tsym)) {
         continue;
       }
       // Don't use getImmutableAnnotation here: subtypes of trusted types are
@@ -365,7 +359,7 @@ public class ImmutableChecker extends BugChecker
    * cases like:
    *
    * <pre>
-   * @Immutable(containerOf="T") class C<T> {
+   * {@code @}Immutable(containerOf="T") class C<T> {
    *   class Inner extends ImmutableCollection<T> {}
    * }
    * </pre>

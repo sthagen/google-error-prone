@@ -17,17 +17,33 @@
 package com.google.errorprone.matchers.method;
 
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.matchers.method.MethodInvocationMatcher.Rule;
 import com.google.errorprone.predicates.TypePredicate;
 import com.google.errorprone.suppliers.Supplier;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.tools.javac.code.Type;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
-public class MethodMatchers {
+public final class MethodMatchers {
+
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface MethodMatcher extends Matcher<ExpressionTree> {
+
+    /**
+     * A rule for expressing this matcher as a MethodInvocationMatcher, if possible. If this matcher
+     * uses predicates not supported by the MethodInvocationMatcher evaluator, this method will
+     * return empty().
+     */
+    Optional<Rule> asRule();
+  }
 
   // Language definition for fluent method matchers.
 
-  public interface InstanceMethodMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface InstanceMethodMatcher extends MethodMatcher {
     /** Match on types that satisfy the given predicate. */
     MethodClassMatcher onClass(TypePredicate predicate);
 
@@ -36,6 +52,12 @@ public class MethodMatchers {
 
     /** Match on the given type exactly. */
     MethodClassMatcher onExactClass(Supplier<Type> classType);
+
+    /** Match on types that are exactly the same as any of the the given types. */
+    MethodClassMatcher onExactClassAny(Iterable<String> classTypes);
+
+    /** Match on types that are exactly the same as any of the the given types. */
+    MethodClassMatcher onExactClassAny(String... classTypes);
 
     /** Match on descendants of the given fully-qualified type name. */
     MethodClassMatcher onDescendantOf(String className);
@@ -53,7 +75,9 @@ public class MethodMatchers {
     MethodClassMatcher anyClass();
   }
 
-  public interface StaticMethodMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface StaticMethodMatcher extends MethodMatcher {
     /** Match on types that satisfy the given predicate. */
     MethodClassMatcher onClass(TypePredicate predicate);
 
@@ -73,15 +97,22 @@ public class MethodMatchers {
     MethodClassMatcher anyClass();
   }
 
-  public interface AnyMethodMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface AnyMethodMatcher extends MethodMatcher {
     /** Match the given type exactly. */
     MethodClassMatcher onClass(TypePredicate predicate);
+
+    /** Match on types with the given fully-qualified name. (e.g. {@code java.lang.String} */
+    MethodClassMatcher onClass(String className);
 
     /** Match on any class. */
     MethodClassMatcher anyClass();
   }
 
-  public interface MethodClassMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface MethodClassMatcher extends MethodMatcher {
     /** Match methods with the given name. (e.g. {@code toString}) */
     MethodNameMatcher named(String name);
 
@@ -107,17 +138,26 @@ public class MethodMatchers {
     MethodSignatureMatcher withSignature(String signature);
   }
 
-  public interface MethodSignatureMatcher extends Matcher<ExpressionTree> {}
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface MethodSignatureMatcher extends MethodMatcher {}
 
-  public interface MethodNameMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface MethodNameMatcher extends MethodMatcher {
     /** Match methods whose formal parameters have the given types. */
     ParameterMatcher withParameters(String... parameters);
 
     /** Match methods whose formal parameters have the given types. */
     ParameterMatcher withParameters(Iterable<String> parameters);
+
+    /** Match constructors whose formal parameters have the given types. */
+    ParameterMatcher withParametersOfType(Iterable<Supplier<Type>> parameters);
   }
 
-  public interface ConstructorMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface ConstructorMatcher extends MethodMatcher {
     /** Match on types that satisfy the given predicate. */
     ConstructorClassMatcher forClass(TypePredicate predicate);
 
@@ -128,7 +168,9 @@ public class MethodMatchers {
     ConstructorClassMatcher forClass(Supplier<Type> classType);
   }
 
-  public interface ConstructorClassMatcher extends Matcher<ExpressionTree> {
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface ConstructorClassMatcher extends MethodMatcher {
     /** Match constructors whose formal parameters have the given types. */
     ParameterMatcher withParameters(String... parameters);
 
@@ -139,23 +181,27 @@ public class MethodMatchers {
     ParameterMatcher withParametersOfType(Iterable<Supplier<Type>> parameters);
   }
 
-  public interface ParameterMatcher extends Matcher<ExpressionTree> {}
+  /** @deprecated use {@code Matcher<ExpressionTree>} instead of referring directly to this type. */
+  @Deprecated
+  public interface ParameterMatcher extends MethodMatcher {}
 
   // Method matcher factories
 
   public static StaticMethodMatcher staticMethod() {
-    return new StaticMethodMatcherImpl();
+    return MethodMatcherImpl.STATIC_METHOD;
   }
 
   public static InstanceMethodMatcher instanceMethod() {
-    return new InstanceMethodMatcherImpl();
+    return MethodMatcherImpl.INSTANCE_METHOD;
   }
 
   public static AnyMethodMatcher anyMethod() {
-    return new AnyMethodMatcherImpl();
+    return MethodMatcherImpl.ANY_METHOD;
   }
 
   public static ConstructorMatcher constructor() {
-    return new ConstructorMatcherImpl();
+    return MethodMatcherImpl.CONSTRUCTOR;
   }
+
+  private MethodMatchers() {}
 }

@@ -16,18 +16,17 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getLast;
-import static com.google.errorprone.BugPattern.LinkType.CUSTOM;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.BugPattern.StandardTags.STYLE;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
+import static com.google.errorprone.util.ASTHelpers.isSameType;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
-import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.CatchTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -35,6 +34,7 @@ import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.CatchTree;
 import com.sun.source.tree.NewClassTree;
+import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
@@ -65,10 +65,8 @@ import javax.lang.model.element.Modifier;
         "This catch block catches an exception and re-throws another, but swallows the caught"
             + " exception rather than setting it as a cause. This can make debugging harder.",
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    linkType = CUSTOM,
-    link = "https://google.github.io/styleguide/javaguide.html#s6.2-caught-exceptions",
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = STYLE,
+    documentSuppression = false)
 public final class UnusedException extends BugChecker implements CatchTreeMatcher {
 
   private static final ImmutableSet<Modifier> VISIBILITY_MODIFIERS =
@@ -76,7 +74,13 @@ public final class UnusedException extends BugChecker implements CatchTreeMatche
 
   @Override
   public Description matchCatch(CatchTree tree, VisitorState state) {
+    if (isSuppressed(tree.getParameter()) || isSuppressedViaName(tree.getParameter())) {
+      return Description.NO_MATCH;
+    }
     VarSymbol exceptionSymbol = ASTHelpers.getSymbol(tree.getParameter());
+    if (isSameType(exceptionSymbol.asType(), state.getSymtab().interruptedExceptionType, state)) {
+      return Description.NO_MATCH;
+    }
     AtomicBoolean symbolUsed = new AtomicBoolean(false);
     ((JCTree) tree)
         .accept(
@@ -121,18 +125,17 @@ public final class UnusedException extends BugChecker implements CatchTreeMatche
     return describeMatch(tree, allFixes.build());
   }
 
+  private static boolean isSuppressedViaName(VariableTree parameter) {
+    return parameter.getName().toString().startsWith("unused");
+  }
+
   private static Optional<SuggestedFix> fixConstructor(
       NewClassTree constructor, VarSymbol exception, VisitorState state) {
     Symbol symbol = ASTHelpers.getSymbol(((JCNewClass) constructor).clazz);
     if (!(symbol instanceof ClassSymbol)) {
       return Optional.empty();
     }
-    ClassSymbol classSymbol = (ClassSymbol) symbol;
-    ImmutableList<MethodSymbol> constructors =
-        classSymbol.getEnclosedElements().stream()
-            .filter(Symbol::isConstructor)
-            .map(e -> (MethodSymbol) e)
-            .collect(toImmutableList());
+    ImmutableList<MethodSymbol> constructors = ASTHelpers.getConstructors((ClassSymbol) symbol);
     MethodSymbol constructorSymbol = ASTHelpers.getSymbol(constructor);
     if (constructorSymbol == null) {
       return Optional.empty();
@@ -172,7 +175,7 @@ public final class UnusedException extends BugChecker implements CatchTreeMatche
       // Skip past the opening '(' of the constructor.
 
       String source = state.getSourceForNode(constructor);
-      int startPosition = ((JCTree) constructor).getStartPosition();
+      int startPosition = getStartPosition(constructor);
       int pos =
           source.indexOf('(', state.getEndPosition(constructor.getIdentifier()) - startPosition)
               + startPosition

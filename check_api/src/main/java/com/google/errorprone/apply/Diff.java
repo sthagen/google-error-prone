@@ -23,12 +23,12 @@ package com.google.errorprone.apply;
  */
 public interface Diff {
   /** Gets the name of the file this difference applies to */
-  public String getRelevantFileName();
+  String getRelevantFileName();
 
   /**
    * Applies this difference to the supplied {@code sourceFile}.
    *
    * @throws DiffNotApplicableException if the diff could not be applied to the source file
    */
-  public void applyDifferences(SourceFile sourceFile) throws DiffNotApplicableException;
+  void applyDifferences(SourceFile sourceFile);
 }

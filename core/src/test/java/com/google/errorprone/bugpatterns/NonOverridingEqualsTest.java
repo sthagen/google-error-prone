@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 // TODO(eaftan): Tests for correctness of suggested fix
 @RunWith(JUnit4.class)
 public class NonOverridingEqualsTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(NonOverridingEquals.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(NonOverridingEquals.class, getClass());
 
   // Positive cases
 
@@ -76,11 +71,11 @@ public class NonOverridingEqualsTest {
             "Test.java",
             "public class Test {",
             "  boolean isInVersion;",
-            "  String whitelist;",
+            "  String str;",
             "  // BUG: Diagnostic contains: Did you mean '@Override'",
             "  public boolean equals(Test that) {",
             "    return (this.isInVersion == that.isInVersion)",
-            "        && this.whitelist.equals(that.whitelist);",
+            "        && this.str.equals(that.str);",
             "  }",
             "}")
         .doTest();

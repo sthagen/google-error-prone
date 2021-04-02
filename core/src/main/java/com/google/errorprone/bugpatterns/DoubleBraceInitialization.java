@@ -54,14 +54,14 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "DoubleBraceInitialization",
     summary =
@@ -229,7 +229,7 @@ public class DoubleBraceInitialization extends BugChecker implements NewClassTre
     }
     BlockTree block = (BlockTree) member;
     Optional<CollectionTypes> collectionType =
-        Stream.of(CollectionTypes.values())
+        Arrays.stream(CollectionTypes.values())
             .filter(type -> type.constructorMatcher.matches(tree, state))
             .findFirst();
     if (!collectionType.isPresent()) {

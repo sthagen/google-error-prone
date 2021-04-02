@@ -16,10 +16,9 @@
 
 package com.google.errorprone.matchers;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 
-import com.google.common.truth.Truth;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.CompileTimeConstant;
@@ -44,7 +43,6 @@ public class CompileTimeConstantExpressionMatcherTest {
   public void testMatches_matchesLiteralsAndStaticFinals() {
     String[] lines = {
       "package test;",
-      "import com.google.errorprone.annotations.CompileTimeConstant;",
       "public class CompileTimeConstantExpressionMatcherTestCase {",
       "  private final String final_string = \"bap\";",
       "  private final int final_int = 29;",
@@ -58,7 +56,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "}"
     };
 
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("s1", true);
     expectedMatches.put("int2", true);
     expectedMatches.put("int3", true);
@@ -70,7 +68,6 @@ public class CompileTimeConstantExpressionMatcherTest {
   public void testMatches_nullLiteral() {
     String[] lines = {
       "package test;",
-      "import com.google.errorprone.annotations.CompileTimeConstant;",
       "public class CompileTimeConstantExpressionMatcherTestCase {",
       "  private static final String static_final_string = null;",
       "  public void m() { ",
@@ -79,7 +76,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "  }",
       "}"
     };
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("s1", true);
     // Even though s2 has the compile-time constant value "null", it's not
     // a literal.  I don't know how to distinguish this, but I doubt this is
@@ -92,7 +89,6 @@ public class CompileTimeConstantExpressionMatcherTest {
   public void testMatches_doesNotMatchNonLiterals() {
     String[] lines = {
       "package test;",
-      "import com.google.errorprone.annotations.CompileTimeConstant;",
       "public class CompileTimeConstantExpressionMatcherTestCase {",
       "  private final int nonfinal_int;",
       "  public CompileTimeConstantExpressionMatcherTestCase(int i) { ",
@@ -106,7 +102,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "  }",
       "}"
     };
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("s1", false);
     expectedMatches.put("int2", false);
     expectedMatches.put("int3", false);
@@ -134,7 +130,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "  }",
       "}"
     };
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("s1", true);
     expectedMatches.put("s2", false);
     expectedMatches.put("s3", false);
@@ -167,7 +163,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "  }",
       "}"
     };
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("s1", true);
     expectedMatches.put("s2", false);
     expectedMatches.put("s3", false);
@@ -180,9 +176,9 @@ public class CompileTimeConstantExpressionMatcherTest {
   // and assignments to such variables are compile-time-constant.
   // For now, the annotation's target is restricted to ElementType.PARAMETER.
   @Test
-  public void testCompileTimeConstantAnnotationOnlyAllowedOnParameter() {
-    Truth.assertThat(CompileTimeConstant.class.getAnnotation(Target.class).value())
-        .isEqualTo(new ElementType[] {ElementType.PARAMETER});
+  public void testCompileTimeConstantAnnotationOnlyAllowedOnParameterOrField() {
+    assertThat(CompileTimeConstant.class.getAnnotation(Target.class).value())
+        .isEqualTo(new ElementType[] {ElementType.PARAMETER, ElementType.FIELD});
   }
 
   @Test
@@ -199,7 +195,7 @@ public class CompileTimeConstantExpressionMatcherTest {
       "}"
     };
 
-    Map<String, Boolean> expectedMatches = new HashMap<String, Boolean>();
+    Map<String, Boolean> expectedMatches = new HashMap<>();
     expectedMatches.put("bool1", false);
     expectedMatches.put("bool2", false);
     expectedMatches.put("bool3", true);
@@ -209,18 +205,24 @@ public class CompileTimeConstantExpressionMatcherTest {
   // Helper methods.
   private void assertCompilerMatchesOnAssignment(
       final Map<String, Boolean> expectedMatches, String... lines) {
+    Map<String, Boolean> unmatched = new HashMap<>(expectedMatches);
     final Matcher<ExpressionTree> matcher = new CompileTimeConstantExpressionMatcher();
     final Scanner scanner =
         new Scanner() {
           @Override
           public Void visitAssignment(AssignmentTree t, VisitorState state) {
-            ExpressionTree lhs = t.getVariable();
-            if (expectedMatches.containsKey(lhs.toString())) {
+            String lhs = t.getVariable().toString();
+            if (expectedMatches.containsKey(lhs)) {
+              unmatched.remove(lhs);
               boolean matches = matcher.matches(t.getExpression(), state);
-              if (expectedMatches.get(lhs.toString())) {
-                assertTrue("Matcher should match expression" + t.getExpression(), matches);
+              if (expectedMatches.get(lhs)) {
+                assertWithMessage("Matcher should match expression" + t.getExpression())
+                    .that(matches)
+                    .isTrue();
               } else {
-                assertFalse("Matcher should not match expression" + t.getExpression(), matches);
+                assertWithMessage("Matcher should not match expression" + t.getExpression())
+                    .that(matches)
+                    .isFalse();
               }
             }
             return super.visitAssignment(t, state);
@@ -231,5 +233,6 @@ public class CompileTimeConstantExpressionMatcherTest {
         .expectResult(Result.OK)
         .addSourceLines("test/CompileTimeConstantExpressionMatcherTestCase.java", lines)
         .doTest();
+    assertWithMessage("Not all matches were found").that(unmatched).isEmpty();
   }
 }

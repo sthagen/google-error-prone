@@ -16,8 +16,7 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
-import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
@@ -29,7 +28,6 @@ import static com.sun.source.tree.Tree.Kind.ENUM;
 import com.google.common.base.Predicate;
 import com.google.common.base.Verify;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.matchers.Description;
@@ -45,6 +43,7 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.util.Name;
 import java.lang.annotation.Annotation;
+import javax.annotation.Nullable;
 
 /**
  * Checker that ensures implementations of {@link Annotation} override equals and hashCode.
@@ -56,9 +55,7 @@ import java.lang.annotation.Annotation;
     summary =
         "Classes that implement Annotation must override equals and hashCode. Consider "
             + "using AutoAnnotation instead of implementing Annotation by hand.",
-    category = JDK,
-    severity = WARNING,
-    tags = StandardTags.LIKELY_ERROR)
+    severity = ERROR)
 public class BadAnnotationImplementation extends BugChecker implements ClassTreeMatcher {
 
   private static final Matcher<ClassTree> CLASS_TREE_MATCHER =
@@ -128,6 +125,7 @@ public class BadAnnotationImplementation extends BugChecker implements ClassTree
     return Description.NO_MATCH;
   }
 
+  @Nullable
   private static MethodSymbol getMatchingMethod(
       Type type, Name name, Predicate<MethodSymbol> predicate) {
     Scope scope = type.tsym.members();

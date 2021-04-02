@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
@@ -25,7 +24,6 @@ import static com.google.errorprone.util.ASTHelpers.getType;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.Immutable;
@@ -38,18 +36,17 @@ import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.Tree;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ImmutableEnumChecker",
     altNames = "Immutable",
-    category = JDK,
     summary = "Enums should always be immutable",
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class ImmutableEnumChecker extends BugChecker implements ClassTreeMatcher {
 
   public static final String ANNOTATED_ENUM_MESSAGE =
@@ -75,7 +72,7 @@ public class ImmutableEnumChecker extends BugChecker implements ClassTreeMatcher
     }
 
     if (ASTHelpers.hasAnnotation(symbol, Immutable.class, state)
-        && !implementsImmutableInterface(symbol)) {
+        && !implementsExemptInterface(symbol, state)) {
       AnnotationTree annotation =
           ASTHelpers.getAnnotationWithSimpleName(tree.getModifiers().getAnnotations(), "Immutable");
       if (annotation != null) {
@@ -107,8 +104,17 @@ public class ImmutableEnumChecker extends BugChecker implements ClassTreeMatcher
     return buildDescription(tree).setMessage(message);
   }
 
-  private static boolean implementsImmutableInterface(ClassSymbol symbol) {
+  private static boolean implementsExemptInterface(ClassSymbol symbol, VisitorState state) {
     return Streams.concat(symbol.getInterfaces().stream(), Stream.of(symbol.getSuperclass()))
-        .anyMatch(supertype -> supertype.asElement().getAnnotation(Immutable.class) != null);
+        .anyMatch(supertype -> hasExemptAnnotation(supertype.tsym, state));
+  }
+
+  private static final ImmutableSet<String> EXEMPT_ANNOTATIONS =
+      ImmutableSet.of(
+          "com.google.errorprone.annotations.Immutable");
+
+  private static boolean hasExemptAnnotation(Symbol symbol, VisitorState state) {
+    return EXEMPT_ANNOTATIONS.stream()
+        .anyMatch(annotation -> ASTHelpers.hasAnnotation(symbol, annotation, state));
   }
 }

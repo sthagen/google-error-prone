@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.isSameType;
@@ -53,9 +52,7 @@ import java.util.Optional;
     summary =
         "ByteBuffer.array() shouldn't be called unless ByteBuffer.arrayOffset() is used or "
             + "if the ByteBuffer was initialized using ByteBuffer.wrap() or ByteBuffer.allocate().",
-    category = JDK,
-    severity = WARNING,
-    generateExamplesFromTestCases = false)
+    severity = WARNING)
 public class ByteBufferBackingArray extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> BYTE_BUFFER_ARRAY_MATCHER =
@@ -65,9 +62,7 @@ public class ByteBufferBackingArray extends BugChecker implements MethodInvocati
       anyOf(instanceMethod().onDescendantOf(ByteBuffer.class.getName()).named("arrayOffset"));
 
   private static final Matcher<ExpressionTree> BYTE_BUFFER_ALLOWED_INITIALIZERS_MATCHER =
-      anyOf(
-          staticMethod().onClass(ByteBuffer.class.getName()).named("allocate"),
-          staticMethod().onClass(ByteBuffer.class.getName()).named("wrap"));
+      staticMethod().onClass(ByteBuffer.class.getName()).namedAnyOf("allocate", "wrap");
 
   private static final Matcher<ExpressionTree> BYTE_BUFFER_MATCHER = isSameType(ByteBuffer.class);
 

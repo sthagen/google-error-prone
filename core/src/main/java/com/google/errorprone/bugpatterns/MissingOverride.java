@@ -16,11 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
@@ -34,16 +32,15 @@ import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MissingOverride",
     summary = "method overrides method in supertype; expected @Override",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public class MissingOverride extends BugChecker implements MethodTreeMatcher {
 
   /** if true, don't warn on missing {@code @Override} annotations inside interfaces */
@@ -71,6 +68,9 @@ public class MissingOverride extends BugChecker implements MethodTreeMatcher {
     if (override == null) {
       return Description.NO_MATCH;
     }
+    if (!ASTHelpers.getGeneratedBy(state).isEmpty()) {
+      return Description.NO_MATCH;
+    }
     if (ASTHelpers.hasAnnotation(override, Deprecated.class, state)) {
       // to allow deprecated methods to be removed non-atomically, we permit overrides of
       // @Deprecated to skip the annotation
@@ -94,6 +94,7 @@ public class MissingOverride extends BugChecker implements MethodTreeMatcher {
    * Returns the {@link MethodSymbol} of the first method that sym overrides in its supertype
    * closure, or {@code null} if no such method exists.
    */
+  @Nullable
   private MethodSymbol getFirstOverride(Symbol sym, Types types) {
     ClassSymbol owner = sym.enclClass();
     if (ignoreInterfaceOverrides && owner.isInterface()) {
@@ -101,7 +102,7 @@ public class MissingOverride extends BugChecker implements MethodTreeMatcher {
       return null;
     }
     for (Type s : types.closure(owner.type)) {
-      if (s == owner.type) {
+      if (types.isSameType(s, owner.type)) {
         continue;
       }
       for (Symbol m : s.tsym.members().getSymbolsByName(sym.name)) {

@@ -16,14 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -40,13 +38,11 @@ import com.sun.tools.javac.util.List;
 import java.util.Hashtable;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "HashtableContains",
     summary = "contains() is a legacy method that is equivalent to containsValue()",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class HashtableContains extends BugChecker implements MethodInvocationTreeMatcher {
 
   static final Matcher<ExpressionTree> CONTAINS_MATCHER =
@@ -108,7 +104,8 @@ public class HashtableContains extends BugChecker implements MethodInvocationTre
     return result.build();
   }
 
-  private Fix replaceMethodName(MethodInvocationTree tree, VisitorState state, String newName) {
+  private static Fix replaceMethodName(
+      MethodInvocationTree tree, VisitorState state, String newName) {
     String source = state.getSourceForNode((JCTree) tree.getMethodSelect());
     int idx = source.lastIndexOf("contains");
     String replacement =

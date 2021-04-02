@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ReturnValueIgnoredTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(ReturnValueIgnored.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ReturnValueIgnored.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -120,6 +115,121 @@ public class ReturnValueIgnoredTest {
   }
 
   @Test
+  public void javaTime() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.time.Duration;",
+            "import java.time.LocalDate;",
+            "import java.time.ZoneId;",
+            "class Test {",
+            "  void f() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Duration.ZERO.plusDays(2);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Duration.ZERO.toDays();",
+            // We ignore parse() methods on java.time types
+            "    Duration.parse(\"PT20.345S\");",
+            "    LocalDate.parse(\"2007-12-03\");",
+            // We ignore of() methods on java.time types
+            "    LocalDate.of(1985, 5, 31);",
+            // We ignore ZoneId.of() -- it's effectively a parse() method
+            "    ZoneId.of(\"America/New_York\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void optionalStaticMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  void optional() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Optional.empty();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Optional.of(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Optional.ofNullable(null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void optionalInstanceMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  void optional() {",
+            "    Optional<Integer> optional = Optional.of(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.isPresent();",
+            "    optional.filter(v -> v > 40);",
+            "    optional.map(v -> Integer.toString(v));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void timeUnitApis() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import static java.util.concurrent.TimeUnit.MILLISECONDS;",
+            "class Test {",
+            "  void timeUnit() {",
+            "    long ms = 4200;",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    MILLISECONDS.toNanos(ms);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void issue1565_enumDeclaration() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.function.Function;",
+            "enum Test {",
+            "  A;",
+            "  void f(Function<Integer, Integer> f) {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    f.apply(0);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void issue1363_dateTimeFormatterBuilder() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.time.format.DateTimeFormatterBuilder;",
+            "class Test {",
+            "  void f() {",
+            "    DateTimeFormatterBuilder formatter = new DateTimeFormatterBuilder();",
+            "    formatter.appendZoneId();",
+            "    formatter.optionalEnd();",
+            "    formatter.padNext(5);",
+            "    formatter.parseCaseSensitive();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    formatter.toFormatter();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void issue876() {
     compilationHelper
         .addSourceLines(
@@ -133,6 +243,102 @@ public class ReturnValueIgnoredTest {
             "  abstract <T> void a(T t);",
             "  public interface E {",
             "    void run() throws Exception;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void collectionContains() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "abstract class Test {",
+            "  void test(java.util.List p) {",
+            "    // BUG: Diagnostic contains:",
+            "    p.contains(null);",
+            "  }",
+            "  void test2(java.util.Map p) {",
+            "    // BUG: Diagnostic contains:",
+            "    p.containsKey(null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReferenceToObject() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.function.Function;",
+            "abstract class Test {",
+            "  void test(Function<Integer, Long> fn) {",
+            "    foo(fn::apply);",
+            "  }",
+            "  void foo(Function<Integer, Object> fn) {",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void integers() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void f() throws Exception {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Integer.reverse(2);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    new Integer(2).doubleValue();",
+            // We ignore the following "parsing" style methods:
+            "    Integer.decode(\"1985\");",
+            "    Integer.parseInt(\"1985\");",
+            "    Integer.parseInt(\"1985\", 10);",
+            "    Integer.parseUnsignedInt(\"1985\");",
+            "    Integer.parseUnsignedInt(\"1985\", 10);",
+            "    Integer.valueOf(\"1985\");",
+            "    Integer.valueOf(\"1985\", 10);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testProtoMessageNewBuilder() {
+    compilationHelper
+        .addSourceLines(
+            "test.java",
+            "import com.google.protobuf.Duration;",
+            "class Test {",
+            "  public void proto_newBuilder() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Duration.newBuilder();",
+            "    Duration.Builder builder = Duration.newBuilder();",
+            "    Duration duration = Duration.newBuilder().setSeconds(4).build();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testProtoMessageBuildBuildPartial() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.protobuf.Duration;",
+            "final class Test {",
+            "  public void proto_build() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Duration.newBuilder().setSeconds(4).build();",
+            "    Duration duration = Duration.newBuilder().setSeconds(4).build();",
+            "  }",
+            "  public void proto_buildPartial() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Duration.newBuilder().setSeconds(4).buildPartial();",
+            "    Duration duration = Duration.newBuilder().setSeconds(4).buildPartial();",
             "  }",
             "}")
         .doTest();

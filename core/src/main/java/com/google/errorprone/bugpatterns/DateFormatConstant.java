@@ -16,16 +16,15 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.fixes.SuggestedFixes.renameVariable;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.CaseFormat;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
@@ -42,14 +41,12 @@ import java.util.Objects;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "DateFormatConstant",
-    category = JDK,
     summary = "DateFormat is not thread-safe, and should not be used as a constant field.",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class DateFormatConstant extends BugChecker implements VariableTreeMatcher {
 
   @Override
@@ -65,25 +62,28 @@ public class DateFormatConstant extends BugChecker implements VariableTreeMatche
     if (!(sym.isStatic() && sym.getModifiers().contains(Modifier.FINAL))) {
       return NO_MATCH;
     }
-    if (!name.equals(name.toUpperCase())) {
+    if (!name.equals(Ascii.toUpperCase(name))) {
       return NO_MATCH;
     }
     if (!isSubtype(getType(tree), state.getTypeFromString("java.text.DateFormat"), state)) {
       return NO_MATCH;
     }
+    SuggestedFix rename =
+        renameVariable(
+            tree,
+            CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, tree.getName().toString()),
+            state);
     return buildDescription(tree)
-        .addFix(threadLocalFix(tree, state, sym))
-        .addFix(
-            renameVariable(
-                tree,
-                CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, tree.getName().toString()),
-                state))
+        .addFix(threadLocalFix(tree, state, sym, rename))
+        .addFix(rename)
         .build();
   }
 
-  private static Fix threadLocalFix(VariableTree tree, VisitorState state, final VarSymbol sym) {
+  private static Fix threadLocalFix(
+      VariableTree tree, VisitorState state, final VarSymbol sym, SuggestedFix rename) {
     SuggestedFix.Builder fix =
         SuggestedFix.builder()
+            .merge(rename)
             .replace(
                 tree.getType(),
                 String.format("ThreadLocal<%s>", state.getSourceForNode(tree.getType())))

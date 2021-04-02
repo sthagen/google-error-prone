@@ -31,10 +31,11 @@ import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
 import com.sun.tools.javac.util.Context;
 import java.io.Serializable;
 import javax.lang.model.element.ElementKind;
-import org.checkerframework.dataflow.analysis.Analysis;
-import org.checkerframework.dataflow.cfg.CFGBuilder;
-import org.checkerframework.dataflow.cfg.ControlFlowGraph;
-import org.checkerframework.dataflow.cfg.UnderlyingAST;
+import org.checkerframework.shaded.dataflow.analysis.Analysis;
+import org.checkerframework.shaded.dataflow.analysis.ForwardAnalysisImpl;
+import org.checkerframework.shaded.dataflow.cfg.ControlFlowGraph;
+import org.checkerframework.shaded.dataflow.cfg.UnderlyingAST;
+import org.checkerframework.shaded.dataflow.cfg.builder.CFGBuilder;
 
 /**
  * An interface to the "trusting" nullness analysis. This variant "trusts" {@code Nullable}
@@ -116,7 +117,7 @@ public final class TrustingNullnessAnalysis implements Serializable {
           .setCompilationUnit(fieldDeclPath.getCompilationUnit());
 
       Analysis<Nullness, AccessPathStore<Nullness>, TrustingNullnessPropagation> analysis =
-          new Analysis<>(nullnessPropagation, javacEnv);
+          new ForwardAnalysisImpl<>(nullnessPropagation);
       analysis.performAnalysis(cfg);
       return analysis.getValue(initializer);
     } finally {
@@ -125,6 +126,6 @@ public final class TrustingNullnessAnalysis implements Serializable {
   }
 
   public static boolean hasNullableAnnotation(Symbol symbol) {
-    return Nullness.fromAnnotationsOn(symbol).orElse(null) == Nullness.NULLABLE;
+    return NullnessAnnotations.fromAnnotationsOn(symbol).orElse(null) == Nullness.NULLABLE;
   }
 }

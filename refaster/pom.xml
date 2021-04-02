@@ -19,7 +19,7 @@
     <parent>
         <artifactId>error_prone_parent</artifactId>
         <groupId>com.google.errorprone</groupId>
-        <version>2.3.2-SNAPSHOT</version>
+        <version>HEAD-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -51,14 +51,26 @@
         <dependency>
             <!-- Apache 2.0 -->
             <groupId>com.google.auto.service</groupId>
-            <artifactId>auto-service</artifactId>
-            <version>1.0-rc2</version>
-            <scope>provided</scope>
+            <artifactId>auto-service-annotations</artifactId>
+            <version>${autoservice.version}</version>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.auto.service</groupId>
+                            <artifactId>auto-service</artifactId>
+                            <version>${autoservice.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

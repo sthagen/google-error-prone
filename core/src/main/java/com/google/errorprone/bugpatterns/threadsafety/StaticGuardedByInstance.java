@@ -21,7 +21,6 @@ import static com.google.errorprone.util.ASTHelpers.stripParentheses;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
@@ -39,12 +38,11 @@ import com.sun.source.tree.UnaryTree;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
-import java.util.Map.Entry;
+import java.util.Map;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "StaticGuardedByInstance",
-    category = Category.JDK,
     summary = "Writes to static fields should not be guarded by instance locks",
     severity = SeverityLevel.WARNING,
     tags = StandardTags.FRAGILE_CODE)
@@ -63,7 +61,7 @@ public class StaticGuardedByInstance extends BugChecker implements SynchronizedT
       return Description.NO_MATCH;
     }
     Multimap<VarSymbol, Tree> writes = WriteVisitor.scan(tree.getBlock());
-    for (Entry<VarSymbol, Tree> write : writes.entries()) {
+    for (Map.Entry<VarSymbol, Tree> write : writes.entries()) {
       if (!write.getKey().isStatic()) {
         continue;
       }
@@ -118,13 +116,13 @@ public class StaticGuardedByInstance extends BugChecker implements SynchronizedT
     }
 
     @Override
-    public Void visitSynchronized(SynchronizedTree node, Void aVoid) {
+    public Void visitSynchronized(SynchronizedTree node, Void unused) {
       // don't descend into nested synchronized blocks
       return null;
     }
 
     @Override
-    public Void visitNewClass(NewClassTree node, Void aVoid) {
+    public Void visitNewClass(NewClassTree node, Void unused) {
       // don't descend into nested synchronized blocks
       return null;
     }

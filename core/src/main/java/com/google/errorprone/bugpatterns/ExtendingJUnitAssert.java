@@ -20,7 +20,6 @@ import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -35,7 +34,6 @@ import com.sun.source.tree.Tree;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.parser.Tokens.TokenKind;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.List;
 
 /** @author kayco@google.com (Kayla Walker) */
@@ -44,8 +42,7 @@ import java.util.List;
     summary =
         "When only using JUnit Assert's static methods, "
             + "you should import statically instead of extending.",
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class ExtendingJUnitAssert extends BugChecker implements ClassTreeMatcher {
 
   private static final Matcher<ExpressionTree> STATIC_ASSERT =
@@ -77,25 +74,22 @@ public class ExtendingJUnitAssert extends BugChecker implements ClassTreeMatcher
         null);
 
     Tree extendsClause = tree.getExtendsClause();
-    int startOfClass = ((JCTree) tree).getStartPosition();
     int endOfExtendsClause = state.getEndPosition(extendsClause);
-    int extendsPosInClass = endOfExtendsClause - startOfClass;
 
-    List<ErrorProneToken> tokens = state.getTokensForNode(tree);
+    List<ErrorProneToken> tokens = state.getOffsetTokensForNode(tree);
 
-    int max = 0;
+    int startPos = 0;
     for (ErrorProneToken token : tokens) {
-      if (token.pos() > extendsPosInClass) {
+      if (token.pos() > endOfExtendsClause) {
         break;
       }
       if (token.kind() == TokenKind.EXTENDS) {
         int curr = token.pos();
-        if (curr > max) {
-          max = curr;
+        if (curr > startPos) {
+          startPos = curr;
         }
       }
     }
-    int startPos = ((JCTree) tree).getStartPosition() + max;
     return fix.replace(startPos, endOfExtendsClause, "").build();
   }
 }

@@ -16,23 +16,17 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
-import static com.google.errorprone.matchers.Matchers.contains;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.sun.source.tree.Tree.Kind.LOGICAL_COMPLEMENT;
 import static com.sun.source.tree.Tree.Kind.NULL_LITERAL;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
-import com.google.errorprone.matchers.JUnitMatchers;
-import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.predicates.type.Any;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AssertTree;
 import com.sun.source.tree.BinaryTree;
@@ -52,13 +46,8 @@ import com.sun.tools.javac.tree.TreeInfo;
 @BugPattern(
     name = "UseCorrectAssertInTests",
     summary = "Java assert is used in test. For testing purposes Assert.* matchers should be used.",
-    category = JDK,
-    severity = SeverityLevel.WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SeverityLevel.WARNING)
 public class UseCorrectAssertInTests extends BugChecker implements MethodTreeMatcher {
-
-  private static final Matcher<Tree> CONTAINS_ASSERT =
-      contains((tree, state) -> tree instanceof AssertTree);
   private static final String STATIC_ASSERT_THAT_IMPORT =
       "static com.google.common.truth.Truth.assertThat";
   private static final String STATIC_ASSERT_WITH_MESSAGE_IMPORT =
@@ -68,8 +57,8 @@ public class UseCorrectAssertInTests extends BugChecker implements MethodTreeMat
   private static final String ASSERT_WITH_MESSAGE = "assertWithMessage(%s).that(%s).";
   private static final String IS_TRUE = "isTrue();";
   private static final String IS_FALSE = "isFalse();";
-  private static final String IS_SAME_AS = "isSameAs(%s);";
-  private static final String IS_NOT_SAME_AS = "isNotSameAs(%s);";
+  private static final String IS_SAME_AS = "isSameInstanceAs(%s);";
+  private static final String IS_NOT_SAME_AS = "isNotSameInstanceAs(%s);";
   private static final String IS_EQUAL_TO = "isEqualTo(%s);";
   private static final String IS_NULL = "isNull();";
   private static final String IS_NOT_NULL = "isNotNull();";
@@ -83,19 +72,22 @@ public class UseCorrectAssertInTests extends BugChecker implements MethodTreeMat
       return Description.NO_MATCH;
     }
 
-    if (ASTHelpers.isJUnitTestCode(state)
-        && JUnitMatchers.wouldRunInJUnit4.matches(methodTree, state)
-        && CONTAINS_ASSERT.matches(methodTree.getBody(), state)) {
-
-      SuggestedFix.Builder fix = SuggestedFix.builder();
-
-      for (AssertTree foundAssert : scanAsserts(methodTree)) {
-        replaceAssert(fix, foundAssert, state);
-      }
-
-      return buildDescription(methodTree).addFix(fix.build()).build();
+    // Match either JUnit tests or test-only code.
+    if (!(ASTHelpers.isJUnitTestCode(state) || state.errorProneOptions().isTestOnlyTarget())) {
+      return Description.NO_MATCH;
     }
-    return Description.NO_MATCH;
+
+    ImmutableList<AssertTree> assertions = scanAsserts(methodTree);
+    if (assertions.isEmpty()) {
+      return Description.NO_MATCH;
+    }
+
+    SuggestedFix.Builder fix = SuggestedFix.builder();
+    for (AssertTree foundAssert : assertions) {
+      replaceAssert(fix, foundAssert, state);
+    }
+    // Emit finding on the first assertion rather than on the method (b/175575632).
+    return describeMatch(assertions.get(0), fix.build());
   }
 
   private static void replaceAssert(
@@ -111,7 +103,7 @@ public class UseCorrectAssertInTests extends BugChecker implements MethodTreeMat
     }
 
     // case: "assert expr1.equals(expr2)"
-    if (instanceMethod().onClass(Any.INSTANCE).named("equals").matches(expr, state)) {
+    if (instanceMethod().anyClass().named("equals").matches(expr, state)) {
       JCMethodInvocation equalsCall = ((JCMethodInvocation) expr);
       JCExpression expr1 = ((JCFieldAccess) ((JCMethodInvocation) expr).meth).selected;
       JCExpression expr2 = equalsCall.getArguments().get(0);
@@ -180,7 +172,7 @@ public class UseCorrectAssertInTests extends BugChecker implements MethodTreeMat
           (JCExpression) expr1,
           foundAssert,
           state,
-          String.format(isEqual ? IS_SAME_AS : IS_NOT_SAME_AS, expr2));
+          String.format(isEqual ? IS_SAME_AS : IS_NOT_SAME_AS, state.getSourceForNode(expr2)));
     }
   }
 

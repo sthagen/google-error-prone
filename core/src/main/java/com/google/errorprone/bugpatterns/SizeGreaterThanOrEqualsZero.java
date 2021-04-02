@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.instanceMethod;
@@ -32,15 +31,12 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.common.collect.Table.Cell;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
-import com.google.errorprone.matchers.method.MethodMatchers.ParameterMatcher;
-import com.google.errorprone.predicates.TypePredicates;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.ExpressionTree;
@@ -63,9 +59,7 @@ import java.util.regex.Pattern;
     name = "SizeGreaterThanOrEqualsZero",
     summary =
         "Comparison of a size >= 0 is always true, did you intend to check for " + "non-emptiness?",
-    category = JDK,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTreeMatcher {
 
   private enum MethodName {
@@ -89,12 +83,12 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
           .put("android.util.SparseBooleanArray", MethodName.SIZE, false)
           .put("android.util.SparseIntArray", MethodName.SIZE, false)
           .put("android.util.SparseLongArray", MethodName.SIZE, false)
-          .put("android.support.v4.util.CircularArray", MethodName.SIZE, true)
-          .put("android.support.v4.util.CircularIntArray", MethodName.SIZE, true)
-          .put("android.support.v4.util.LongSparseArray", MethodName.SIZE, false)
-          .put("android.support.v4.util.LruCache", MethodName.SIZE, false)
-          .put("android.support.v4.util.SimpleArrayMap", MethodName.SIZE, true)
-          .put("android.support.v4.util.SparseArrayCompat", MethodName.SIZE, false)
+          .put("androidx.collection.CircularArray", MethodName.SIZE, true)
+          .put("androidx.collection.CircularIntArray", MethodName.SIZE, true)
+          .put("androidx.collection.LongSparseArray", MethodName.SIZE, false)
+          .put("androidx.collection.LruCache", MethodName.SIZE, false)
+          .put("androidx.collection.SimpleArrayMap", MethodName.SIZE, true)
+          .put("androidx.collection.SparseArrayCompat", MethodName.SIZE, false)
           .put("com.google.common.collect.FluentIterable", MethodName.SIZE, true)
           .put("com.google.common.collect.Multimap", MethodName.SIZE, true)
           .put("java.io.ByteArrayOutputStream", MethodName.SIZE, false)
@@ -116,15 +110,15 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
   private static final Matcher<ExpressionTree> SIZE_OR_LENGTH_INSTANCE_METHOD =
       anyOf(
           instanceMethod()
-              .onClass(TypePredicates.isDescendantOfAny(CLASSES.column(MethodName.SIZE).keySet()))
+              .onDescendantOfAny(CLASSES.column(MethodName.SIZE).keySet())
               .named("size"),
           instanceMethod()
-              .onClass(TypePredicates.isDescendantOfAny(CLASSES.column(MethodName.LENGTH).keySet()))
+              .onDescendantOfAny(CLASSES.column(MethodName.LENGTH).keySet())
               .named("length"));
   private static final Pattern PROTO_COUNT_METHOD_PATTERN = Pattern.compile("get(.+)Count");
-  private static final ParameterMatcher PROTO_METHOD_NAMED_GET_COUNT =
+  private static final Matcher<ExpressionTree> PROTO_METHOD_NAMED_GET_COUNT =
       instanceMethod()
-          .onClass(TypePredicates.isDescendantOf("com.google.protobuf.GeneratedMessage"))
+          .onDescendantOf("com.google.protobuf.GeneratedMessage")
           .withNameMatching(PROTO_COUNT_METHOD_PATTERN)
           .withParameters();
   private static final Matcher<ExpressionTree> PROTO_REPEATED_FIELD_COUNT_METHOD =
@@ -137,8 +131,11 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
                   STATIC_CLASSES.column(MethodName.LENGTH).keySet().stream()
                       .map(className -> staticMethod().onClass(className).named("length")))
               .collect(toImmutableList()));
-  private static final Matcher<MemberSelectTree> ARRAY_LENGTH_MATCHER =
-      (tree, state) -> ASTHelpers.getSymbol(tree) == state.getSymtab().lengthVar;
+
+  private static boolean arrayLengthMatcher(MemberSelectTree tree, VisitorState state) {
+    return ASTHelpers.getSymbol(tree) == state.getSymtab().lengthVar;
+  }
+
   private static final Matcher<ExpressionTree> HAS_EMPTY_METHOD = classHasIsEmptyFunction();
 
   @Override
@@ -164,7 +161,7 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
         return provideReplacementForProtoMethodInvocation(tree, callToSize, state);
       }
     } else if (operand instanceof MemberSelectTree) {
-      if (ARRAY_LENGTH_MATCHER.matches((MemberSelectTree) operand, state)) {
+      if (arrayLengthMatcher((MemberSelectTree) operand, state)) {
         return removeEqualsFromComparison(tree, state, expressionType);
       }
     }
@@ -246,7 +243,9 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
     String expSrc = state.getSourceForNode(protoGetSize);
     java.util.regex.Matcher protoGetCountMatcher = PROTO_COUNT_METHOD_PATTERN.matcher(expSrc);
     if (!protoGetCountMatcher.find()) {
-      throw new AssertionError(protoGetSize + " does not contain a get<RepeatedField>Count method");
+      throw new AssertionError(
+          state.getSourceForNode(protoGetSize)
+              + " does not contain a get<RepeatedField>Count method");
     }
     return describeMatch(
         tree,
@@ -266,7 +265,7 @@ public class SizeGreaterThanOrEqualsZero extends BugChecker implements BinaryTre
     return describeMatch(tree, SuggestedFix.replace(tree, replacement));
   }
 
-  private ExpressionType isGreaterThanEqualToZero(BinaryTree tree) {
+  private static ExpressionType isGreaterThanEqualToZero(BinaryTree tree) {
     ExpressionTree literalOperand;
     ExpressionType returnType;
 

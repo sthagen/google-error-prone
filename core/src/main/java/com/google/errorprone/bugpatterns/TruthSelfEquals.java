@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.TRUTH;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -25,7 +24,6 @@ import static com.google.errorprone.matchers.method.MethodMatchers.instanceMetho
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -47,9 +45,7 @@ import java.util.regex.Pattern;
     summary =
         "isEqualTo should not be used to test an object for equality with itself; the"
             + " assertion will never fail.",
-    category = TRUTH,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class TruthSelfEquals extends BugChecker implements MethodInvocationTreeMatcher {
 
   /**
@@ -61,17 +57,18 @@ public class TruthSelfEquals extends BugChecker implements MethodInvocationTreeM
    * <ul>
    *   <li>assertThat(a).isEqualTo(a)
    *   <li>assertThat(a).isNotEqualTo(a)
-   *   <li>assertThat(a).isNotSameAs(a)
-   *   <li>assertThat(a).isSameAs(a)
+   *   <li>assertThat(a).isNotSameInstanceAs(a)
+   *   <li>assertThat(a).isSameInstanceAs(a)
    *   <li>assertWithMessage(msg).that(a).isEqualTo(a)
    *   <li>assertWithMessage(msg).that(a).isNotEqualTo(a)
-   *   <li>assertWithMessage(msg).that(a).isNotSameAs(a)
-   *   <li>assertWithMessage(msg).that(a).isSameAs(a)
+   *   <li>assertWithMessage(msg).that(a).isNotSameInstanceAs(a)
+   *   <li>assertWithMessage(msg).that(a).isSameInstanceAs(a)
    * </ul>
    */
-  private static final Pattern EQUALS_SAME = Pattern.compile("(isEqualTo|isSameAs)");
+  private static final Pattern EQUALS_SAME = Pattern.compile("(isEqualTo|isSameInstanceAs)");
 
-  private static final Pattern NOT_EQUALS_NOT_SAME = Pattern.compile("(isNotEqualTo|isNotSameAs)");
+  private static final Pattern NOT_EQUALS_NOT_SAME =
+      Pattern.compile("(isNotEqualTo|isNotSameInstanceAs)");
 
   private static final Matcher<MethodInvocationTree> EQUALS_MATCHER =
       allOf(
@@ -110,7 +107,7 @@ public class TruthSelfEquals extends BugChecker implements MethodInvocationTreeM
           .setMessage(
               generateSummary(
                   ASTHelpers.getSymbol(methodInvocationTree).getSimpleName().toString(), "passes"))
-          .addFix(suggestEqualsTesterFix(methodInvocationTree, toReplace));
+          .addFix(suggestEqualsTesterFix(methodInvocationTree, toReplace, state));
     } else if (NOT_EQUALS_MATCHER.matches(methodInvocationTree, state)) {
       description.setMessage(
           generateSummary(
@@ -156,9 +153,11 @@ public class TruthSelfEquals extends BugChecker implements MethodInvocationTreeM
   }
 
   private static Fix suggestEqualsTesterFix(
-      MethodInvocationTree methodInvocationTree, ExpressionTree toReplace) {
+      MethodInvocationTree methodInvocationTree, ExpressionTree toReplace, VisitorState state) {
     String equalsTesterSuggest =
-        "new EqualsTester().addEqualityGroup(" + toReplace + ").testEquals()";
+        "new EqualsTester().addEqualityGroup("
+            + state.getSourceForNode(toReplace)
+            + ").testEquals()";
     return SuggestedFix.builder()
         .replace(methodInvocationTree, equalsTesterSuggest)
         .addImport("com.google.common.testing.EqualsTester")

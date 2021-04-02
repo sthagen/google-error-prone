@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns.threadsafety;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 /** {@link GuardedByChecker}Test */
 @RunWith(JUnit4.class)
 public class GuardedByCheckerTest {
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(GuardedByChecker.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(GuardedByChecker.class, getClass());
 
   @Test
   public void testLocked() {
@@ -325,6 +320,28 @@ public class GuardedByCheckerTest {
             "    synchronized (this.xs) { xs.add(\"\"); }",
             "    synchronized (xs) { this.xs.add(\"\"); }",
             "    synchronized (xs) { xs.add(\"\"); }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodQualifiedWithThis() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "package threadsafety;",
+            "import java.util.List;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Itself {",
+            "  @GuardedBy(\"this\")",
+            "  void f() {};",
+            "  void g() {",
+            "    // BUG: Diagnostic contains:",
+            "    // should be guarded by 'this'",
+            "    this.f();",
+            "    synchronized (this) { f(); }",
+            "    synchronized (this) { this.f(); }",
             "  }",
             "}")
         .doTest();
@@ -1432,6 +1449,30 @@ public class GuardedByCheckerTest {
         .doTest();
   }
 
+  @Ignore("b/128641856")
+  @Test
+  public void innerClassInMethod() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "package threadsafety;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "public class Test {",
+            "  public final Object mu = new Object();",
+            "  @GuardedBy(\"mu\") int i = 0;",
+            "  void f() {",
+            "    class Inner {",
+            "      @GuardedBy(\"mu\") void m() {i++;}",
+            "    }",
+            "    Inner i = new Inner();",
+            "    synchronized (mu) {",
+            "      i.m();",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
   @Test
   public void innerClassMethod_classBoundary() {
     compilationHelper
@@ -1499,7 +1540,6 @@ public class GuardedByCheckerTest {
         .doTest();
   }
 
-  @Ignore // TODO(cushon): clean up existing instances and re-enable
   @Test
   public void qualifiedMethod() {
     compilationHelper
@@ -1515,6 +1555,30 @@ public class GuardedByCheckerTest {
             "    Test t = new Test();",
             "    // BUG: Diagnostic contains: guarded by 't'",
             "    t.f();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void qualifiedMethodWrongThis_causesFinding_whenMatchOnErrorsFlagNotSet() {
+    CompilationTestHelper.newInstance(GuardedByChecker.class, getClass())
+        .addSourceLines(
+            "MemoryAllocatedInfoJava.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "public class MemoryAllocatedInfoJava {",
+            "  private static final class AllocationStats {",
+            "    @GuardedBy(\"MemoryAllocatedInfoJava.this\")",
+            "    void addAllocation(long size) {}",
+            "  }",
+            "  public void addStackTrace(long size) {",
+            "    synchronized (this) {",
+            "      AllocationStats stat = new AllocationStats();",
+            "      // BUG: Diagnostic contains: Access should be guarded by enclosing instance "
+                + "'MemoryAllocatedInfoJava' of 'stat', which is not accessible in this scope; "
+                + "instead found: 'this'",
+            "      stat.addAllocation(size);",
+            "    }",
             "  }",
             "}")
         .doTest();
@@ -1630,6 +1694,55 @@ public class GuardedByCheckerTest {
             "  public void m(Baz b) {",
             "    synchronized (mu) {",
             "      b.x++;",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void newClassBase() {
+    compilationHelper
+        .addSourceLines(
+            "Foo.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "public class Foo {",
+            "  private final Object mu = new Object();",
+            "  @GuardedBy(\"mu\") int x;",
+            "}")
+        .addSourceLines(
+            "Bar.java",
+            "public class Bar {",
+            "  void bar (Foo f) {",
+            "    // BUG: Diagnostic contains: should be guarded by 'f.mu'",
+            "    f.x = 10;",
+            "  }",
+            "  void bar () {",
+            "    // BUG: Diagnostic contains: should be guarded by 'mu'",
+            "    new Foo().x = 11;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void suppressionOnMethod() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "package threadsafety;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  final Object lock = null;",
+            "  void foo() {",
+            "    class Foo extends Object {",
+            "      @GuardedBy(\"lock\") int x;",
+            "      @SuppressWarnings(\"GuardedBy\")",
+            "      void m() {",
+            "        synchronized (lock) {",
+            "          int z = x++;",
+            "        }",
+            "      }",
             "    }",
             "  }",
             "}")

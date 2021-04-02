@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns.android;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.allOf;
@@ -50,6 +49,7 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.util.FatalError;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Modifier;
 
 /** @author epmjohnston@google.com (Emily P.M. Johnston) */
@@ -59,7 +59,6 @@ import javax.lang.model.element.Modifier;
         "Classes extending PreferenceActivity must implement isValidFragment such that it does not"
             + " unconditionally return true to prevent vulnerability to fragment injection"
             + " attacks.",
-    category = ANDROID,
     severity = WARNING,
     tags = StandardTags.LIKELY_ERROR)
 public class FragmentInjection extends BugChecker implements ClassTreeMatcher {
@@ -69,6 +68,9 @@ public class FragmentInjection extends BugChecker implements ClassTreeMatcher {
 
   @Override
   public Description matchClass(ClassTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     // Only examine classes that extend PreferenceActivity.
     Type preferenceActivityType = state.getTypeFromString("android.preference.PreferenceActivity");
     if (!isSubtype(getType(tree), preferenceActivityType, state)) {
@@ -84,7 +86,7 @@ public class FragmentInjection extends BugChecker implements ClassTreeMatcher {
               state,
               getSymbol(tree),
               state.getName("isValidFragment"),
-              ImmutableList.<Type>of(state.getTypeFromString("java.lang.String")),
+              ImmutableList.of(state.getSymtab().stringType),
               ImmutableList.<Type>of());
       methodNotImplemented = isValidFragmentMethodSymbol.owner.equals(preferenceActivityTypeSymbol);
     } catch (FatalError e) {
@@ -116,6 +118,7 @@ public class FragmentInjection extends BugChecker implements ClassTreeMatcher {
    * Return the first method tree on the given class tree that matches the given method matcher,
    * or null if one does not exist.
    */
+  @Nullable
   private static MethodTree getMethod(
       Matcher<MethodTree> methodMatcher, ClassTree classTree, VisitorState state) {
     for (Tree member : classTree.getMembers()) {

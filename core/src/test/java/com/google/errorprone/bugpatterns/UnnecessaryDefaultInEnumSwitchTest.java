@@ -17,9 +17,11 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,7 +35,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void switchCannotComplete() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -71,7 +73,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void switchCannotCompleteUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -110,7 +112,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void emptyDefault() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -145,7 +147,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void emptyDefaultUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -182,7 +184,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void defaultBreak() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -218,7 +220,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void defaultBreakUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -256,7 +258,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void completes_noUnassignedVars_priorCaseExits() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -294,7 +296,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void completes_noUnassignedVars_priorCaseExitsUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -334,7 +336,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void completes_noUnassignedVars_priorCaseDoesntExit() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -373,7 +375,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void completes_noUnassignedVars_priorCaseDoesntExitUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -485,7 +487,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void notExhaustiveUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -520,7 +522,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void notExhaustive2() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -563,7 +565,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void notExhaustive2Unrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -608,7 +610,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void unrecognizedIgnore() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "Test.java",
             "class Test {",
@@ -628,7 +630,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void defaultAboveCaseUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -710,7 +712,7 @@ public class UnnecessaryDefaultInEnumSwitchTest {
 
   @Test
   public void switchCompletesUnrecognized() {
-    BugCheckerRefactoringTestHelper.newInstance(new UnnecessaryDefaultInEnumSwitch(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(UnnecessaryDefaultInEnumSwitch.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",
@@ -748,5 +750,75 @@ public class UnnecessaryDefaultInEnumSwitchTest {
             "  }",
             "}")
         .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void messages() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  enum NormalEnum { A, B }",
+            "  enum ProtoEnum { ONE, TWO, UNRECOGNIZED }",
+            "  void normal(NormalEnum e) {",
+            "    switch (e) {",
+            "      case A:",
+            "      case B:",
+            "      // BUG: Diagnostic contains: default case can be omitted",
+            "      default:",
+            "        break;",
+            "    }",
+            "  }",
+            "  void proto(ProtoEnum e) {",
+            "    switch (e) {",
+            "      case ONE:",
+            "      case TWO:",
+            "      // BUG: Diagnostic contains: UNRECOGNIZED",
+            "      default:",
+            "        break;",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void defaultCaseKindRule() {
+    assumeTrue(RuntimeVersion.isAtLeast14());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  enum Case { ONE, TWO }",
+            "  void m(Case c) {",
+            "    switch (c) {",
+            "      case ONE -> {}",
+            "      case TWO -> {}",
+            "      // BUG: Diagnostic contains: UnnecessaryDefaultInEnumSwitch",
+            "      default -> {}",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void unrecognizedCaseKindRule() {
+    assumeTrue(RuntimeVersion.isAtLeast14());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  enum Case { ONE, TWO, UNRECOGNIZED }",
+            "  void m(Case c) {",
+            "    switch (c) {",
+            "      case ONE -> {}",
+            "      case TWO -> {}",
+            "      // BUG: Diagnostic contains: UnnecessaryDefaultInEnumSwitch",
+            "      default -> {}",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
   }
 }

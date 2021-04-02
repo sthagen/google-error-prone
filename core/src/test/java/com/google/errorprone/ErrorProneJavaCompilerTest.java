@@ -17,13 +17,13 @@
 package com.google.errorprone;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.DiagnosticTestHelper.diagnosticMessage;
+import static com.google.errorprone.FileObjects.forResources;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Locale.ENGLISH;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -44,13 +44,13 @@ import com.google.errorprone.scanner.ScannerSupplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.tools.javac.file.JavacFileManager;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -134,7 +134,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.succeeded).isFalse();
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[SelfAssignment]")));
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -165,7 +165,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[WaitNotInLoop]")));
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
 
     result =
         doCompile(
@@ -174,7 +174,7 @@ public class ErrorProneJavaCompilerTest {
             Collections.<Class<? extends BugChecker>>emptyList());
     assertThat(result.succeeded).isFalse();
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -188,7 +188,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[SelfAssignment]")));
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
 
     result =
         doCompile(
@@ -197,7 +197,7 @@ public class ErrorProneJavaCompilerTest {
             Collections.<Class<? extends BugChecker>>emptyList());
     assertThat(result.succeeded).isTrue();
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -219,7 +219,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[EmptyIf]")));
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -231,7 +231,7 @@ public class ErrorProneJavaCompilerTest {
           Collections.<Class<? extends BugChecker>>emptyList());
       fail();
     } catch (RuntimeException expected) {
-      assertThat(expected.getMessage()).contains("invalid flag");
+      assertThat(expected).hasMessageThat().contains("invalid flag");
     }
   }
 
@@ -239,7 +239,6 @@ public class ErrorProneJavaCompilerTest {
       name = "ArrayEquals",
       summary = "Reference equality used to compare arrays",
       explanation = "",
-      category = JDK,
       severity = ERROR,
       disableable = false)
   public static class UnsuppressibleArrayEquals extends ArrayEquals {}
@@ -253,7 +252,7 @@ public class ErrorProneJavaCompilerTest {
           ImmutableList.<Class<? extends BugChecker>>of(UnsuppressibleArrayEquals.class));
       fail();
     } catch (RuntimeException expected) {
-      assertThat(expected.getMessage()).contains("ArrayEquals may not be disabled");
+      assertThat(expected).hasMessageThat().contains("ArrayEquals may not be disabled");
     }
   }
 
@@ -268,7 +267,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.diagnosticHelper.getDiagnostics().size()).isGreaterThan(0);
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[BadShiftAmount]")));
-    assertTrue(matcher.matches(result.diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(result.diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -287,7 +286,7 @@ public class ErrorProneJavaCompilerTest {
     DiagnosticTestHelper diagnosticHelper = new DiagnosticTestHelper();
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(outputStream, UTF_8), true);
-    ErrorProneInMemoryFileManager fileManager = new ErrorProneInMemoryFileManager();
+    JavacFileManager fileManager = FileManagers.testFileManager();
     JavaCompiler errorProneJavaCompiler = new ErrorProneJavaCompiler();
     List<String> args =
         Lists.newArrayList(
@@ -296,10 +295,9 @@ public class ErrorProneJavaCompilerTest {
             "-proc:none",
             "-Xep:ChainingConstructorIgnoresParameter:WARN");
     List<JavaFileObject> sources =
-        fileManager.forResources(
+        forResources(
             ChainingConstructorIgnoresParameter.class,
             "testdata/ChainingConstructorIgnoresParameterPositiveCases.java");
-    fileManager.close();
 
     JavaCompiler.CompilationTask task =
         errorProneJavaCompiler.getTask(
@@ -308,16 +306,14 @@ public class ErrorProneJavaCompilerTest {
     assertThat(succeeded).isTrue();
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[ChainingConstructorIgnoresParameter]")));
-    assertTrue(matcher.matches(diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(diagnosticHelper.getDiagnostics())).isTrue();
 
     // reset state between compilations
     diagnosticHelper.clearDiagnostics();
-    fileManager = new ErrorProneInMemoryFileManager();
     sources =
-        fileManager.forResources(
+        forResources(
             ChainingConstructorIgnoresParameter.class,
             "testdata/ChainingConstructorIgnoresParameterPositiveCases.java");
-    fileManager.close();
     args.remove("-Xep:ChainingConstructorIgnoresParameter:WARN");
 
     task =
@@ -325,7 +321,7 @@ public class ErrorProneJavaCompilerTest {
             printWriter, fileManager, diagnosticHelper.collector, args, null, sources);
     succeeded = task.call();
     assertThat(succeeded).isFalse();
-    assertTrue(matcher.matches(diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(diagnosticHelper.getDiagnostics())).isTrue();
   }
 
   @Test
@@ -333,14 +329,11 @@ public class ErrorProneJavaCompilerTest {
     DiagnosticTestHelper diagnosticHelper = new DiagnosticTestHelper();
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(outputStream, UTF_8), true);
-    ErrorProneInMemoryFileManager fileManager = new ErrorProneInMemoryFileManager();
     JavaCompiler errorProneJavaCompiler = new ErrorProneJavaCompiler();
     List<String> args =
         Lists.newArrayList("-d", tempDir.getRoot().getAbsolutePath(), "-proc:none", "-Xep:EmptyIf");
     List<JavaFileObject> sources =
-        fileManager.forResources(
-            BadShiftAmount.class, "testdata/EmptyIfStatementPositiveCases.java");
-    fileManager.close();
+        forResources(BadShiftAmount.class, "testdata/EmptyIfStatementPositiveCases.java");
 
     JavaCompiler.CompilationTask task =
         errorProneJavaCompiler.getTask(
@@ -349,14 +342,13 @@ public class ErrorProneJavaCompilerTest {
     assertThat(succeeded).isFalse();
     Matcher<? super Iterable<Diagnostic<? extends JavaFileObject>>> matcher =
         hasItem(diagnosticMessage(containsString("[EmptyIf]")));
-    assertTrue(matcher.matches(diagnosticHelper.getDiagnostics()));
+    assertThat(matcher.matches(diagnosticHelper.getDiagnostics())).isTrue();
 
     diagnosticHelper.clearDiagnostics();
     args.remove("-Xep:EmptyIf");
     task =
         errorProneJavaCompiler.getTask(
             printWriter, null, diagnosticHelper.collector, args, null, sources);
-    fileManager.close();
     succeeded = task.call();
     assertThat(succeeded).isTrue();
     assertThat(diagnosticHelper.getDiagnostics()).isEmpty();
@@ -368,7 +360,6 @@ public class ErrorProneJavaCompilerTest {
           "You appear to be using methods; prefer to implement all program logic inside the main"
               + " function by flipping bits in a single long[].",
       explanation = "",
-      category = JDK,
       severity = ERROR,
       disableable = false)
   public static class DeleteMethod extends BugChecker implements ClassTreeMatcher {
@@ -390,8 +381,7 @@ public class ErrorProneJavaCompilerTest {
     assertThat(result.succeeded).isFalse();
     assertThat(result.diagnosticHelper.getDiagnostics()).hasSize(1);
     assertThat(
-            Iterables.getOnlyElement(result.diagnosticHelper.getDiagnostics())
-                .getMessage(Locale.ENGLISH))
+            Iterables.getOnlyElement(result.diagnosticHelper.getDiagnostics()).getMessage(ENGLISH))
         .contains("AssertionError: Cannot edit synthetic AST nodes");
   }
 
@@ -422,10 +412,13 @@ public class ErrorProneJavaCompilerTest {
 
   private static class CompilationResult {
     public final boolean succeeded;
+    public final String output;
     public final DiagnosticTestHelper diagnosticHelper;
 
-    public CompilationResult(boolean succeeded, DiagnosticTestHelper diagnosticHelper) {
+    public CompilationResult(
+        boolean succeeded, String output, DiagnosticTestHelper diagnosticHelper) {
       this.succeeded = succeeded;
+      this.output = output;
       this.diagnosticHelper = diagnosticHelper;
     }
   }
@@ -437,7 +430,7 @@ public class ErrorProneJavaCompilerTest {
     DiagnosticTestHelper diagnosticHelper = new DiagnosticTestHelper();
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(outputStream, UTF_8), true);
-    ErrorProneInMemoryFileManager fileManager = new ErrorProneInMemoryFileManager();
+    JavacFileManager fileManager = FileManagers.testFileManager();
 
     List<String> args = Lists.newArrayList("-d", tempDir.getRoot().getAbsolutePath(), "-proc:none");
     args.addAll(extraArgs);
@@ -453,13 +446,9 @@ public class ErrorProneJavaCompilerTest {
             diagnosticHelper.collector,
             args,
             null,
-            fileManager.forResources(getClass(), fileNames.toArray(new String[0])));
+            forResources(getClass(), fileNames.toArray(new String[0])));
 
-    try {
-      fileManager.close();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-    return new CompilationResult(task.call(), diagnosticHelper);
+    return new CompilationResult(
+        task.call(), new String(outputStream.toByteArray(), UTF_8), diagnosticHelper);
   }
 }

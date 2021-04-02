@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns.android;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MemberSelectTreeMatcher;
@@ -43,9 +41,7 @@ import javax.lang.model.element.ElementKind;
 @BugPattern(
     name = "MislabeledAndroidString",
     summary = "Certain resources in `android.R.string` have names that do not match their content",
-    category = ANDROID,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class MislabeledAndroidString extends BugChecker implements MemberSelectTreeMatcher {
 
   private static final String R_STRING_CLASSNAME = "android.R.string";
@@ -66,6 +62,9 @@ public class MislabeledAndroidString extends BugChecker implements MemberSelectT
 
   @Override
   public Description matchMemberSelect(MemberSelectTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     Symbol symbol = ASTHelpers.getSymbol(tree);
     // Match symbol's owner to android.R.string separately because couldn't get fully qualified
     // "android.R.string.yes" out of symbol, just "yes"
@@ -92,7 +91,9 @@ public class MislabeledAndroidString extends BugChecker implements MemberSelectT
                 R_STRING_CLASSNAME,
                 preferred))
         // Keep the way tree refers to android.R.string as it is but replace the identifier
-        .addFix(SuggestedFix.replace(tree, tree.getExpression() + "." + preferred))
+        .addFix(
+            SuggestedFix.replace(
+                tree, state.getSourceForNode(tree.getExpression()) + "." + preferred))
         .build();
   }
 }

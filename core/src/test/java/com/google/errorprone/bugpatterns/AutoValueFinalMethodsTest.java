@@ -30,7 +30,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AutoValueFinalMethodsTest {
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new AutoValueFinalMethods(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(AutoValueFinalMethods.class, getClass());
   private final CompilationTestHelper compilationHelper =
       CompilationTestHelper.newInstance(AutoValueFinalMethods.class, getClass());
 
@@ -119,6 +119,71 @@ public class AutoValueFinalMethodsTest {
             "  }",
             "  public boolean publicNonEqTsHcMethod(Object obj) {",
             "    return true;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testAbstractMemoizedNegativeCase() {
+    compilationHelper
+        .addSourceLines(
+            "out/Test.java",
+            "import com.google.auto.value.AutoValue;",
+            "import com.google.auto.value.extension.memoized.Memoized;",
+            "@AutoValue",
+            "abstract class Test {",
+            "  static Test create() {",
+            "    return null;",
+            "  }",
+            "  @Override",
+            "  @Memoized",
+            "  public abstract int hashCode(); ",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testDiagnosticString() {
+    compilationHelper
+        .addSourceLines(
+            "out/Test.java",
+            "import com.google.auto.value.AutoValue;",
+            "import com.google.auto.value.extension.memoized.Memoized;",
+            "@AutoValue",
+            "abstract class Test {",
+            "  static Test create() {",
+            "    return null;",
+            "  }",
+            "  @Override",
+            "  // BUG: Diagnostic contains: Make equals final in AutoValue classes",
+            "  public boolean equals(Object obj) {",
+            "    return true;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testDiagnosticStringWithMultipleMethodMatches() {
+    compilationHelper
+        .addSourceLines(
+            "out/Test.java",
+            "import com.google.auto.value.AutoValue;",
+            "import com.google.auto.value.extension.memoized.Memoized;",
+            "@AutoValue",
+            "abstract class Test {",
+            "  static Test create() {",
+            "    return null;",
+            "  }",
+            "  @Override",
+            "  // BUG: Diagnostic contains: Make equals, hashCode final in AutoValue classes",
+            "  public boolean equals(Object obj) {",
+            "    return true;",
+            "  }",
+            "  @Override",
+            "  public int hashCode() {",
+            "    return 1;",
             "  }",
             "}")
         .doTest();

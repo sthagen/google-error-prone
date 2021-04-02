@@ -16,11 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -29,7 +27,6 @@ import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import java.util.Iterator;
 import java.util.List;
@@ -44,15 +41,13 @@ import java.util.Set;
     name = "Overrides",
     altNames = "overrides",
     summary = "Varargs doesn't agree for overridden method",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class Overrides extends BugChecker implements MethodTreeMatcher {
 
   @Override
   public Description matchMethod(MethodTree methodTree, VisitorState state) {
     MethodSymbol methodSymbol = ASTHelpers.getSymbol(methodTree);
-    boolean isVarargs = (methodSymbol.flags() & Flags.VARARGS) != 0;
+    boolean isVarargs = methodSymbol.isVarArgs();
 
     Set<MethodSymbol> superMethods = ASTHelpers.findSuperMethods(methodSymbol, state.getTypes());
 

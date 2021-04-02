@@ -16,9 +16,8 @@
 
 package com.google.errorprone.predicates;
 
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
-import com.google.errorprone.predicates.type.Any;
+import static com.google.errorprone.suppliers.Suppliers.fromStrings;
+
 import com.google.errorprone.predicates.type.Array;
 import com.google.errorprone.predicates.type.DescendantOf;
 import com.google.errorprone.predicates.type.DescendantOfAny;
@@ -36,11 +35,6 @@ public final class TypePredicates {
     return Array.INSTANCE;
   }
 
-  /** Match any type. */
-  public static TypePredicate anyType() {
-    return Any.INSTANCE;
-  }
-
   /** Match types that are exactly equal. */
   public static TypePredicate isExactType(String type) {
     return isExactType(Suppliers.typeFromString(type));
@@ -51,17 +45,9 @@ public final class TypePredicates {
     return new Exact(type);
   }
 
-  private static final Function<String, Supplier<Type>> GET_TYPE =
-      new Function<String, Supplier<Type>>() {
-        @Override
-        public Supplier<Type> apply(String input) {
-          return Suppliers.typeFromString(input);
-        }
-      };
-
   /** Match types that are exactly equal to any of the given types. */
   public static TypePredicate isExactTypeAny(Iterable<String> types) {
-    return new ExactAny(Iterables.transform(types, GET_TYPE));
+    return new ExactAny(fromStrings(types));
   }
 
   /** Match sub-types of the given type. */
@@ -71,11 +57,39 @@ public final class TypePredicates {
 
   /** Match types that are a sub-type of one of the given types. */
   public static TypePredicate isDescendantOfAny(Iterable<String> types) {
-    return new DescendantOfAny(Iterables.transform(types, GET_TYPE));
+    return new DescendantOfAny(fromStrings(types));
   }
 
   /** Match sub-types of the given type. */
   public static TypePredicate isDescendantOf(String type) {
     return isDescendantOf(Suppliers.typeFromString(type));
   }
+
+  public static TypePredicate allOf(TypePredicate... predicates) {
+    return (type, state) -> {
+      for (TypePredicate predicate : predicates) {
+        if (!predicate.apply(type, state)) {
+          return false;
+        }
+      }
+      return true;
+    };
+  }
+
+  public static TypePredicate anyOf(TypePredicate... predicates) {
+    return (type, state) -> {
+      for (TypePredicate predicate : predicates) {
+        if (predicate.apply(type, state)) {
+          return true;
+        }
+      }
+      return false;
+    };
+  }
+
+  public static TypePredicate not(TypePredicate predicate) {
+    return (type, state) -> !predicate.apply(type, state);
+  }
+
+  private TypePredicates() {}
 }

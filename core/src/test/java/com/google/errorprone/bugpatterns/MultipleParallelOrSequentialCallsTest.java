@@ -23,7 +23,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** @author @mariasam (Maria Sam) on 7/6/17. */
+/**
+ * Unit tests for {@link MultipleParallelOrSequentialCalls}.
+ *
+ * @author mariasam@google.com (Maria Sam) on 7/6/17.
+ */
 @RunWith(JUnit4.class)
 public class MultipleParallelOrSequentialCallsTest {
 
@@ -51,7 +55,7 @@ public class MultipleParallelOrSequentialCallsTest {
 
   @Test
   public void testFixes() {
-    BugCheckerRefactoringTestHelper.newInstance(new MultipleParallelOrSequentialCalls(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(MultipleParallelOrSequentialCalls.class, getClass())
         .addInput("MultipleParallelOrSequentialCallsPositiveCases.java")
         .addOutput("MultipleParallelOrSequentialCallsPositiveCases_expected.java")
         .doTest(TestMode.AST_MATCH);

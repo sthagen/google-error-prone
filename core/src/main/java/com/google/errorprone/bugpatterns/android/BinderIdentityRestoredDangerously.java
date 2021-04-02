@@ -20,8 +20,6 @@ import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.findEnclosingNode;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
@@ -42,9 +40,7 @@ import com.sun.source.tree.TryTree;
         "A call to Binder.clearCallingIdentity() should be followed by "
             + "Binder.restoreCallingIdentity() in a finally block. Otherwise the wrong Binder "
             + "identity may be used by subsequent code.",
-    severity = SeverityLevel.WARNING,
-    category = Category.ANDROID,
-    providesFix = ProvidesFix.NO_FIX)
+    severity = SeverityLevel.WARNING)
 public class BinderIdentityRestoredDangerously extends BugChecker
     implements MethodInvocationTreeMatcher {
 
@@ -54,6 +50,9 @@ public class BinderIdentityRestoredDangerously extends BugChecker
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     if (!RESTORE_IDENTITY_METHOD.matches(tree, state)) {
       return NO_MATCH;
     }

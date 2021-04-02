@@ -15,18 +15,18 @@ which is also awfully strange). All this is completely nonobvious.
 Luckily, there are more readable and more performant alternatives in the factory
 methods and builders for `ImmutableList`, `ImmutableSet`, and `ImmutableMap`.
 
-The `List.of`, `Set.of`, and `Map.of` static factories [added in Java
-9](http://openjdk.java.net/jeps/269) are also a good choice.
+The `List.of`, `Set.of`, and `Map.of` static factories
+[added in Java 9](http://openjdk.java.net/jeps/269) are also a good choice.
 
 That is, prefer this:
 
-```java {.good}
+```java
 ImmutableList.of("Denmark", "Norway", "Sweden");
 ```
 
 Not this:
 
-```java {.bad}
+```java
 new ArrayList<>() {
   {
     add("Denmark");
@@ -41,6 +41,5 @@ added in a JDK 9 support `null` elements. The double-brace pattern is still best
 avoided for collections that contain null. Consider using `Arrays.asList` to
 initialize `List`s and `Set`s with `null` values, and refactoring `Map`
 initializers into a helper method.
-
 
 [dbi]: https://stackoverflow.com/questions/1958636/what-is-double-brace-initialization-in-java

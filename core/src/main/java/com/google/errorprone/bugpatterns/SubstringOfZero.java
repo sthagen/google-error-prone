@@ -19,7 +19,6 @@ package com.google.errorprone.bugpatterns;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.Fix;
@@ -32,16 +31,14 @@ import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import java.util.Objects;
 
-/** @author seibelsabrina@google.com (Sabrina Seibel) */
 /** Check for calls to String's {@code foo.substring(0)}. */
 @BugPattern(
     name = "SubstringOfZero",
     summary = "String.substring(0) returns the original String",
     explanation =
         "String.substring(int) gives you the substring from the index to the end, inclusive."
-            + "Calling that method with an index of 0 will return the same String.",
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+            + " Calling that method with an index of 0 will return the same String.",
+    severity = ERROR)
 public final class SubstringOfZero extends BugChecker implements MethodInvocationTreeMatcher {
   private static final Matcher<ExpressionTree> SUBSTRING_CALLS =
       Matchers.instanceMethod()

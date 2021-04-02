@@ -16,13 +16,13 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JUNIT;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.JUnitMatchers.JUNIT_AFTER_ANNOTATION;
 import static com.google.errorprone.matchers.JUnitMatchers.JUNIT_BEFORE_ANNOTATION;
 import static com.google.errorprone.matchers.JUnitMatchers.hasJUnit4TestCases;
 import static com.google.errorprone.matchers.JUnitMatchers.hasJUnit4TestRunner;
 import static com.google.errorprone.matchers.JUnitMatchers.isTestCaseDescendant;
+import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.assertStatement;
 import static com.google.errorprone.matchers.Matchers.assignment;
 import static com.google.errorprone.matchers.Matchers.booleanConstant;
@@ -39,12 +39,13 @@ import static com.google.errorprone.matchers.Matchers.returnStatement;
 import static com.google.errorprone.matchers.Matchers.throwStatement;
 import static com.google.errorprone.matchers.Matchers.toType;
 import static com.google.errorprone.matchers.method.MethodMatchers.anyMethod;
+import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TryTreeMatcher;
+import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.ChildMultiMatcher;
 import com.google.errorprone.matchers.ChildMultiMatcher.MatchType;
@@ -53,7 +54,6 @@ import com.google.errorprone.matchers.JUnitMatchers;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.matchers.MultiMatcher;
-import com.google.errorprone.matchers.NextStatement;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.CatchTree;
@@ -63,7 +63,6 @@ import com.sun.source.tree.EnhancedForLoopTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.ForLoopTree;
 import com.sun.source.tree.LiteralTree;
-import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.StatementTree;
@@ -72,8 +71,10 @@ import com.sun.source.tree.TryTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.WhileLoopTree;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Name;
@@ -83,9 +84,7 @@ import javax.lang.model.element.Name;
     name = "MissingFail",
     altNames = "missing-fail",
     summary = "Not calling fail() when expecting an exception masks bugs",
-    category = JUNIT,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class MissingFail extends BugChecker implements TryTreeMatcher {
 
   // Many test writers don't seem to know about `fail()`. They instead use synonyms of varying
@@ -146,7 +145,12 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
   private static final Matcher<StatementTree> JAVA_ASSERT_FALSE =
       assertStatement(ignoreParens(Matchers.anyOf(booleanLiteral(false), booleanConstant(false))));
 
-  private static final Matcher<ExpressionTree> LOG_CALL = methodInvocation(new LogMethodMatcher());
+  private static final Matcher<ExpressionTree> LOG_CALL =
+      anyOf(
+          instanceMethod()
+              .onClass((t, s) -> t.asElement().getSimpleName().toString().contains("Logger"))
+              .withAnyName(),
+          instanceMethod().anyClass().withNameMatching(Pattern.compile("log.*")));
   private static final Matcher<Tree> LOG_IN_BLOCK =
       contains(toType(ExpressionTree.class, LOG_CALL));
 
@@ -160,7 +164,7 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
       Matchers.allOf(
           ASSERT_CALL, Matchers.not(Matchers.anyOf(ASSERT_FALSE_FALSE, ASSERT_TRUE_TRUE)));
   private static final Matcher<ExpressionTree> VERIFY_CALL =
-      methodInvocation(staticMethod().onClass("org.mockito.Mockito").named("verify"));
+      staticMethod().onClass("org.mockito.Mockito").named("verify");
   private static final MultiMatcher<TryTree, Tree> ASSERT_LAST_CALL_IN_TRY =
       new ChildOfTryMatcher(
           MatchType.LAST,
@@ -184,7 +188,7 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
 
   private static final Matcher<Tree> RETURN_IN_BLOCK =
       contains(toType(StatementTree.class, returnStatement(Matchers.anything())));
-  private static final NextStatement<StatementTree> RETURN_AFTER =
+  private static final Matcher<StatementTree> RETURN_AFTER =
       nextStatement(returnStatement(Matchers.anything()));
 
   private static final Matcher<VariableTree> INAPPLICABLE_EXCEPTION =
@@ -225,37 +229,45 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
       List<? extends StatementTree> tryStatements = tree.getBlock().getStatements();
       StatementTree lastTryStatement = tryStatements.get(tryStatements.size() - 1);
 
-      String failCall = String.format("\nfail(\"Expected %s\");", exceptionToString(tree));
-      SuggestedFix.Builder fixBuilder =
-          SuggestedFix.builder().postfixWith(lastTryStatement, failCall);
-
-      // Make sure that when the fail import is added it doesn't conflict with existing ones.
-      fixBuilder.removeStaticImport("junit.framework.Assert.fail");
-      fixBuilder.removeStaticImport("junit.framework.TestCase.fail");
-      fixBuilder.addStaticImport("org.junit.Assert.fail");
-
-      return describeMatch(lastTryStatement, fixBuilder.build());
+      Optional<Fix> assertThrowsFix =
+          AssertThrowsUtils.tryFailToAssertThrows(tree, tryStatements, Optional.empty(), state);
+      Fix failFix = addFailCall(tree, lastTryStatement, state);
+      return buildDescription(lastTryStatement).addFix(assertThrowsFix).addFix(failFix).build();
     } else {
       return Description.NO_MATCH;
     }
+  }
+
+  public static Fix addFailCall(TryTree tree, StatementTree lastTryStatement, VisitorState state) {
+    String failCall = String.format("\nfail(\"Expected %s\");", exceptionToString(tree, state));
+    SuggestedFix.Builder fixBuilder =
+        SuggestedFix.builder().postfixWith(lastTryStatement, failCall);
+
+    // Make sure that when the fail import is added it doesn't conflict with existing ones.
+    fixBuilder.removeStaticImport("junit.framework.Assert.fail");
+    fixBuilder.removeStaticImport("junit.framework.TestCase.fail");
+    fixBuilder.addStaticImport("org.junit.Assert.fail");
+
+    return fixBuilder.build();
   }
 
   /**
    * Returns a string describing the exception type caught by the given try tree's catch
    * statement(s), defaulting to {@code "Exception"} if more than one exception type is caught.
    */
-  private String exceptionToString(TryTree tree) {
+  private static String exceptionToString(TryTree tree, VisitorState state) {
     if (tree.getCatches().size() != 1) {
       return "Exception";
     }
-    String exceptionType = tree.getCatches().iterator().next().getParameter().getType().toString();
-    if (exceptionType.contains("|")) {
+    Tree exceptionType = tree.getCatches().iterator().next().getParameter().getType();
+    Type type = ASTHelpers.getType(exceptionType);
+    if (type != null && type.isUnion()) {
       return "Exception";
     }
-    return exceptionType;
+    return state.getSourceForNode(exceptionType);
   }
 
-  private boolean tryTreeMatches(TryTree tree, VisitorState state) {
+  private static boolean tryTreeMatches(TryTree tree, VisitorState state) {
     if (!isInClass(tree, state, TEST_CLASS)) {
       return false;
     }
@@ -288,46 +300,50 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
       return false;
     }
 
+    if (tree.getBlock().getStatements().isEmpty()) {
+      return false;
+    }
+
     return true;
   }
 
-  private boolean hasWhileTrue(TryTree tree, VisitorState state) {
+  private static boolean hasWhileTrue(TryTree tree, VisitorState state) {
     return WHILE_TRUE_IN_BLOCK.matches(tree, state);
   }
 
-  private boolean isInClass(TryTree tree, VisitorState state, Matcher<ClassTree> classTree) {
+  private static boolean isInClass(TryTree tree, VisitorState state, Matcher<ClassTree> classTree) {
     return Matchers.enclosingNode(toType(ClassTree.class, classTree)).matches(tree, state);
   }
 
-  private boolean hasBooleanAssertVariableInCatch(TryTree tree, VisitorState state) {
+  private static boolean hasBooleanAssertVariableInCatch(TryTree tree, VisitorState state) {
     return anyCatchBlockMatches(tree, state, BOOLEAN_ASSERT_VAR_IN_BLOCK);
   }
 
-  private boolean lastTryStatementIsAssert(TryTree tree, VisitorState state) {
+  private static boolean lastTryStatementIsAssert(TryTree tree, VisitorState state) {
     return ASSERT_LAST_CALL_IN_TRY.matches(tree, state);
   }
 
-  private boolean hasFieldAssignmentInCatch(TryTree tree, VisitorState state) {
+  private static boolean hasFieldAssignmentInCatch(TryTree tree, VisitorState state) {
     return anyCatchBlockMatches(tree, state, FIELD_ASSIGNMENT_IN_BLOCK);
   }
 
-  private boolean logsInCatch(VisitorState state, TryTree tree) {
+  private static boolean logsInCatch(VisitorState state, TryTree tree) {
     return anyCatchBlockMatches(tree, state, LOG_IN_BLOCK);
   }
 
-  private boolean hasFinally(TryTree tree) {
+  private static boolean hasFinally(TryTree tree) {
     return tree.getFinallyBlock() != null;
   }
 
-  private boolean hasContinue(TryTree tree, VisitorState state) {
+  private static boolean hasContinue(TryTree tree, VisitorState state) {
     return CONTINUE_IN_BLOCK.matches(tree, state);
   }
 
-  private boolean isInLoop(VisitorState state, TryTree tree) {
+  private static boolean isInLoop(VisitorState state, TryTree tree) {
     return IN_LOOP.matches(tree, state);
   }
 
-  private boolean isInapplicableExceptionType(TryTree tree, VisitorState state) {
+  private static boolean isInapplicableExceptionType(TryTree tree, VisitorState state) {
     for (CatchTree catchTree : tree.getCatches()) {
       if (INAPPLICABLE_EXCEPTION.matches(catchTree.getParameter(), state)) {
         return true;
@@ -336,23 +352,23 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
     return false;
   }
 
-  private boolean returnsInTryCatchOrAfter(TryTree tree, VisitorState state) {
+  private static boolean returnsInTryCatchOrAfter(TryTree tree, VisitorState state) {
     return RETURN_IN_BLOCK.matches(tree, state) || RETURN_AFTER.matches(tree, state);
   }
 
-  private boolean isInInapplicableMethod(TryTree tree, VisitorState state) {
+  private static boolean isInInapplicableMethod(TryTree tree, VisitorState state) {
     return NON_TEST_METHOD.matches(tree, state);
   }
 
-  private boolean hasThrowOrFail(TryTree tree, VisitorState state) {
+  private static boolean hasThrowOrFail(TryTree tree, VisitorState state) {
     return THROW_OR_FAIL_IN_BLOCK.matches(tree, state);
   }
 
-  private boolean hasAssertInCatch(TryTree tree, VisitorState state) {
+  private static boolean hasAssertInCatch(TryTree tree, VisitorState state) {
     return anyCatchBlockMatches(tree, state, ASSERT_IN_BLOCK);
   }
 
-  private boolean hasToleratedException(TryTree tree) {
+  private static boolean hasToleratedException(TryTree tree) {
     for (CatchTree catchTree : tree.getCatches()) {
       if (catchTree.getParameter().getName().contentEquals("tolerated")) {
         return true;
@@ -361,7 +377,7 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
     return false;
   }
 
-  private boolean hasExpectedException(TryTree tree) {
+  private static boolean hasExpectedException(TryTree tree) {
     for (CatchTree catchTree : tree.getCatches()) {
       if (catchTree.getParameter().getName().contentEquals("expected")) {
         return true;
@@ -370,7 +386,8 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
     return false;
   }
 
-  private boolean anyCatchBlockMatches(TryTree tree, VisitorState state, Matcher<Tree> matcher) {
+  private static boolean anyCatchBlockMatches(
+      TryTree tree, VisitorState state, Matcher<Tree> matcher) {
     for (CatchTree catchTree : tree.getCatches()) {
       if (matcher.matches(catchTree.getBlock(), state)) {
         return true;
@@ -391,29 +408,6 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
 
       String symSimpleName = sym.getSimpleName().toString();
       return symSimpleName.startsWith("assert") || symSimpleName.startsWith("verify");
-    }
-  }
-
-  private static class LogMethodMatcher implements Matcher<ExpressionTree> {
-
-    @Override
-    public boolean matches(ExpressionTree expressionTree, VisitorState state) {
-      Symbol sym = ASTHelpers.getSymbol(expressionTree);
-      if (sym != null && sym.getSimpleName().toString().startsWith("log")) {
-        return true;
-      }
-
-      if (sym != null && sym.isStatic()) {
-        if (sym.owner.getQualifiedName().toString().contains("Logger")) {
-          return true;
-        }
-      } else if (expressionTree instanceof MemberSelectTree) {
-        if (((MemberSelectTree) expressionTree).getExpression().toString().startsWith("log")) {
-          return true;
-        }
-      }
-
-      return false;
     }
   }
 
@@ -447,7 +441,10 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
     public boolean matches(TryTree tryTree, VisitorState state) {
       MethodTree enclosingMethodTree =
           ASTHelpers.findEnclosingNode(state.getPath(), MethodTree.class);
-
+      if (enclosingMethodTree == null) {
+        // e.g. a class initializer
+        return true;
+      }
       Name name = enclosingMethodTree.getName();
       return JUnitMatchers.looksLikeJUnit3SetUp.matches(enclosingMethodTree, state)
           || JUnitMatchers.looksLikeJUnit3TearDown.matches(enclosingMethodTree, state)
@@ -476,7 +473,7 @@ public class MissingFail extends BugChecker implements TryTreeMatcher {
           && matches(methodInvocationTree.getArguments());
     }
 
-    private boolean matches(List<? extends ExpressionTree> expressionTrees) {
+    private static boolean matches(List<? extends ExpressionTree> expressionTrees) {
       Set<Integer> foundValues = new HashSet<>();
       for (Tree tree : expressionTrees) {
         if (tree instanceof LiteralTree) {

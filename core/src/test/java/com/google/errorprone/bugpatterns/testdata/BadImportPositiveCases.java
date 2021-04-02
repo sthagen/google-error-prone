@@ -15,10 +15,9 @@
  */
 package com.google.errorprone.bugpatterns.testdata;
 
-import static com.google.errorprone.bugpatterns.testdata.BadImportPositiveCases.Example.INSTANCE;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Tests for {@link BadImport}.
@@ -40,6 +39,18 @@ class BadImportPositiveCases {
     ImmutableList.Builder<Builder> builder2Raw;
   }
 
+  @Nullable
+  Builder<@Nullable Builder<@Nullable String>> parameterizedWithTypeUseAnnotationMethod() {
+    return null;
+  }
+
+  public void variableDeclarationsNestedGenericsAndTypeUseAnnotations() {
+
+    @Nullable Builder<@Nullable String> parameterizedWithTypeUseAnnotation1;
+
+    @Nullable Builder<@Nullable Builder<@Nullable String>> parameterizedWithTypeUseAnnotation2;
+  }
+
   public void newClass() {
     new Builder<String>();
     new Builder<Builder<String>>();
@@ -59,19 +70,5 @@ class BadImportPositiveCases {
 
   void classLiteral() {
     System.out.println(Builder.class);
-  }
-
-  public void enumSwitch() {
-    // BUG: Diagnostic contains: Example.INSTANCE
-    Example object = INSTANCE;
-
-    switch (object) {
-      case INSTANCE: // This line should be left alone.
-        break;
-    }
-  }
-
-  enum Example {
-    INSTANCE
   }
 }

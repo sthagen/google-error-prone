@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +25,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class PackageLocationTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(PackageLocation.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(PackageLocation.class, getClass());
 
   @Test
   public void positiveCustomRoot() {
@@ -39,7 +34,7 @@ public class PackageLocationTest {
         .addSourceLines(
             "src/main/java/a/b/A.java",
             "// BUG: Diagnostic contains: Expected package a to be declared in a directory "
-                + "ending with /a, instead found /src/main/java/a/b",
+                + "ending with a, instead found b",
             "package a;",
             "class A {}")
         .doTest();
@@ -51,7 +46,7 @@ public class PackageLocationTest {
         .addSourceLines(
             "src/main/java/A.java",
             "// BUG: Diagnostic contains: Expected package a.b.c to be declared in a directory "
-                + "ending with /a/b/c, instead found /src/main/java",
+                + "ending with a/b/c, instead found src/main/java",
             "package a.b.c;",
             "class A {}")
         .doTest();
@@ -61,9 +56,9 @@ public class PackageLocationTest {
   public void positiveTooShort() {
     compilationHelper
         .addSourceLines(
-            "b/c/d/A.java",
+            "java/b/c/d/A.java",
             "// BUG: Diagnostic contains: Expected package a.b.c.d to be declared in a directory "
-                + "ending with /a/b/c/d, instead found /b/c/d",
+                + "ending with a/b/c/d, instead found java/b/c/d",
             "package a.b.c.d;",
             "class A {}")
         .doTest();
@@ -75,7 +70,7 @@ public class PackageLocationTest {
         .addSourceLines(
             "panda/b/c/d/A.java",
             "// BUG: Diagnostic contains: Expected package a.b.c.d to be declared in a directory "
-                + "ending with /a/b/c/d, instead found /panda/b/c/d",
+                + "ending with a/b/c/d, instead found panda/b/c/d",
             "package a.b.c.d;",
             "class A {}")
         .doTest();

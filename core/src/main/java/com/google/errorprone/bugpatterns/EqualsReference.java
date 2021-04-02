@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.errorprone.BugPattern;
@@ -41,7 +40,6 @@ import java.util.Objects;
     summary =
         "== must be used in equals method to check equality to itself"
             + " or an infinite loop will occur.",
-    category = JDK,
     severity = ERROR)
 public class EqualsReference extends BugChecker implements MethodTreeMatcher {
 
@@ -62,7 +60,7 @@ public class EqualsReference extends BugChecker implements MethodTreeMatcher {
   private static class TreeScannerEquals extends TreeScanner<Void, VarSymbol> {
 
     private boolean hasIllegalEquals = false;
-    private MethodTree methodTree;
+    private final MethodTree methodTree;
 
     public TreeScannerEquals(MethodTree currMethodTree) {
       methodTree = currMethodTree;
@@ -79,10 +77,12 @@ public class EqualsReference extends BugChecker implements MethodTreeMatcher {
                   ASTHelpers.getSymbol(methodInvocationTree.getArguments().get(0)), varSymbol);
       if (methodSelectTree instanceof MemberSelectTree) {
         memberSelectTree = (MemberSelectTree) methodSelectTree;
+        ExpressionTree e = memberSelectTree.getExpression();
         // this.equals(o)
         // not using o.equals(this) because all instances of this were false positives
         // (people checked to see if o was an instance of this class)
-        if (memberSelectTree.getExpression().toString().equals("this")
+        if (e instanceof IdentifierTree
+            && ((IdentifierTree) e).getName().contentEquals("this")
             && Objects.equals(
                 ASTHelpers.getSymbol(methodTree), ASTHelpers.getSymbol(memberSelectTree))
             && hasParameterAndSameSymbol) {

@@ -19,9 +19,9 @@ package com.google.errorprone.bugpatterns.nullness;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
+import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -45,7 +45,6 @@ import com.sun.source.tree.TypeCastTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import java.util.HashSet;
@@ -61,8 +60,7 @@ import javax.annotation.Nullable;
 @BugPattern(
     name = "EqualsBrokenForNull",
     summary = "equals() implementation may throw NullPointerException when given null",
-    severity = SeverityLevel.WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SeverityLevel.WARNING)
 public class EqualsBrokenForNull extends BugChecker implements MethodTreeMatcher {
 
   @Override
@@ -101,8 +99,7 @@ public class EqualsBrokenForNull extends BugChecker implements MethodTreeMatcher
         // Track variables assigned from our parameter.
         Tree initializer = variableTree.getInitializer();
         VarSymbol symbol = getSymbol(variableTree);
-        if ((symbol.flags() & (Flags.FINAL | Flags.EFFECTIVELY_FINAL)) != 0
-            && initializer instanceof InstanceOfTree) {
+        if (isConsideredFinal(symbol) && initializer instanceof InstanceOfTree) {
           InstanceOfTree instanceOf = (InstanceOfTree) initializer;
           if (instanceOf.getExpression() instanceof IdentifierTree
               && incomingVariableSymbols.contains(getSymbol(instanceOf.getExpression()))) {
@@ -151,8 +148,7 @@ public class EqualsBrokenForNull extends BugChecker implements MethodTreeMatcher
     if (!crashesWithNull[0]) {
       return NO_MATCH;
     }
-    String stringAddition =
-        String.format("if (%s == null) { return false; }\n", varSymbol.name.toString());
+    String stringAddition = String.format("if (%s == null) { return false; }\n", varSymbol.name);
     Fix fix = SuggestedFix.prefixWith(tree.getBody().getStatements().get(0), stringAddition);
     return describeMatch(tree, fix);
   }

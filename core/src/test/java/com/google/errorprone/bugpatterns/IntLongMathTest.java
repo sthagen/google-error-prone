@@ -22,7 +22,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** {@test IntLongMath}Test. */
+/** {@link IntLongMath}Test. */
 @RunWith(JUnit4.class)
 public final class IntLongMathTest {
   private final CompilationTestHelper testHelper =
@@ -71,7 +71,7 @@ public final class IntLongMathTest {
 
   @Test
   public void refactoring() {
-    BugCheckerRefactoringTestHelper.newInstance(new IntLongMath(), getClass())
+    BugCheckerRefactoringTestHelper.newInstance(IntLongMath.class, getClass())
         .addInputLines(
             "in/Test.java",
             "class Test {",

@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.android;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -40,8 +39,8 @@ import com.sun.source.tree.Tree;
 @BugPattern(
     name = "StaticOrDefaultInterfaceMethod",
     summary =
-        "Static and default interface methods are not natively supported on older Android devices. ",
-    category = ANDROID,
+        "Static and default interface methods are not natively supported on older Android devices. "
+            ,
     severity = ERROR,
     documentSuppression = false // for slightly customized suppression documentation
     )
@@ -52,6 +51,9 @@ public class StaticOrDefaultInterfaceMethod extends BugChecker implements Method
 
   @Override
   public Description matchMethod(MethodTree tree, VisitorState state) {
+    if (!state.isAndroidCompatible()) {
+      return Description.NO_MATCH;
+    }
     if (IS_STATIC_OR_DEFAULT_METHOD_ON_INTERFACE.matches(tree, state)) {
       return describeMatch(tree);
     }

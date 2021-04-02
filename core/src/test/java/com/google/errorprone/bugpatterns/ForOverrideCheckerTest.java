@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,25 +25,20 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ForOverrideCheckerTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper =
-        CompilationTestHelper.newInstance(ForOverrideChecker.class, getClass())
-            .addSourceLines(
-                "test/ExtendMe.java",
-                "package test;",
-                "import com.google.errorprone.annotations.ForOverride;",
-                "public class ExtendMe {",
-                "  @ForOverride",
-                "  protected int overrideMe() { return 1; }",
-                "",
-                "  public final void callMe() {",
-                "    overrideMe();",
-                "  }",
-                "}");
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ForOverrideChecker.class, getClass())
+          .addSourceLines(
+              "test/ExtendMe.java",
+              "package test;",
+              "import com.google.errorprone.annotations.ForOverride;",
+              "public class ExtendMe {",
+              "  @ForOverride",
+              "  protected int overrideMe() { return 1; }",
+              "",
+              "  public final void callMe() {",
+              "    overrideMe();",
+              "  }",
+              "}");
 
   @Test
   public void testCanApplyForOverrideToProtectedMethod() {
@@ -80,7 +74,8 @@ public class ForOverrideCheckerTest {
             "package test;",
             "import com.google.errorprone.annotations.ForOverride;",
             "public class Test {",
-            "  // BUG: Diagnostic contains: must have protected or package-private visibility",
+            "  // BUG: Diagnostic contains: @ForOverride must have protected or package-private"
+                + " visibility",
             "  @ForOverride public void myMethod() {}",
             "}")
         .doTest();
@@ -94,7 +89,8 @@ public class ForOverrideCheckerTest {
             "package test;",
             "import com.google.errorprone.annotations.ForOverride;",
             "public class Test {",
-            "  // BUG: Diagnostic contains: must have protected or package-private visibility",
+            "  // BUG: Diagnostic contains: @ForOverride must have protected or package-private"
+                + " visibility",
             "  @ForOverride private void myMethod() {}",
             "}")
         .doTest();
@@ -108,7 +104,8 @@ public class ForOverrideCheckerTest {
             "package test;",
             "import com.google.errorprone.annotations.ForOverride;",
             "public interface Test {",
-            "  // BUG: Diagnostic contains: must have protected or package-private visibility",
+            "  // BUG: Diagnostic contains: @ForOverride must have protected or package-private"
+                + " visibility",
             "  @ForOverride void myMethod();",
             "}")
         .doTest();
@@ -192,6 +189,10 @@ public class ForOverrideCheckerTest {
             "  }",
             "}")
         .doTest();
+  }
+
+  @Test
+  public void testUserCanCallSuperFromOverridden_explicitQualification() {
     compilationHelper
         .addSourceLines(
             "test/Test.java",
@@ -264,7 +265,7 @@ public class ForOverrideCheckerTest {
             "test/Test.java",
             "package test2;",
             "public class Test extends test.ExtendMe {",
-            "  // BUG: Diagnostic contains: must have protected or package-private visibility",
+            "  // BUG: Diagnostic contains: overrides @ForOverride method test.ExtendMe.overrideMe",
             "  public int overrideMe() {",
             "    System.err.println(\"Capybaras are rodents.\");",
             "    return 1;",

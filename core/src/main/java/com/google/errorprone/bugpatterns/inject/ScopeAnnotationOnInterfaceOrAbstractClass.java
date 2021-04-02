@@ -16,16 +16,14 @@
 
 package com.google.errorprone.bugpatterns.inject;
 
-import static com.google.errorprone.BugPattern.Category.INJECT;
-import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
+import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.InjectMatchers.GUICE_SCOPE_ANNOTATION;
 import static com.google.errorprone.matchers.InjectMatchers.IS_DAGGER_COMPONENT;
 import static com.google.errorprone.matchers.InjectMatchers.JAVAX_SCOPE_ANNOTATION;
-import static com.google.errorprone.matchers.Matchers.hasAnnotation;
+import static com.google.errorprone.matchers.Matchers.symbolHasAnnotation;
 import static javax.lang.model.element.Modifier.ABSTRACT;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.AnnotationTreeMatcher;
@@ -42,10 +40,8 @@ import com.sun.tools.javac.code.Flags;
 /** @author sgoldfeder@google.com (Steven Goldfeder) */
 @BugPattern(
     name = "InjectScopeAnnotationOnInterfaceOrAbstractClass",
-    summary = "Scope annotation on an interface or abstact class is not allowed",
-    category = INJECT,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    summary = "Scope annotation on an interface or abstract class is not allowed",
+    severity = WARNING)
 public class ScopeAnnotationOnInterfaceOrAbstractClass extends BugChecker
     implements AnnotationTreeMatcher {
 
@@ -55,7 +51,7 @@ public class ScopeAnnotationOnInterfaceOrAbstractClass extends BugChecker
    */
   private static final Matcher<AnnotationTree> SCOPE_ANNOTATION_MATCHER =
       Matchers.<AnnotationTree>anyOf(
-          hasAnnotation(GUICE_SCOPE_ANNOTATION), hasAnnotation(JAVAX_SCOPE_ANNOTATION));
+          symbolHasAnnotation(GUICE_SCOPE_ANNOTATION), symbolHasAnnotation(JAVAX_SCOPE_ANNOTATION));
 
   private static final Matcher<ClassTree> INTERFACE_AND_ABSTRACT_TYPE_MATCHER =
       new Matcher<ClassTree>() {
@@ -78,7 +74,7 @@ public class ScopeAnnotationOnInterfaceOrAbstractClass extends BugChecker
     return Description.NO_MATCH;
   }
 
-  private Tree getCurrentlyAnnotatedNode(VisitorState state) {
+  private static Tree getCurrentlyAnnotatedNode(VisitorState state) {
     return state.getPath().getParentPath().getParentPath().getLeaf();
   }
 }

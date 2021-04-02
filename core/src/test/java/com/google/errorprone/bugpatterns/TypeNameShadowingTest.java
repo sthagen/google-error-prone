@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,14 +26,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class TypeNameShadowingTest {
 
-  private CompilationTestHelper compilationHelper;
-  private BugCheckerRefactoringTestHelper refactoring;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(TypeNameShadowing.class, getClass());
-    refactoring = BugCheckerRefactoringTestHelper.newInstance(new TypeNameShadowing(), getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(TypeNameShadowing.class, getClass());
+  private final BugCheckerRefactoringTestHelper refactoring =
+      BugCheckerRefactoringTestHelper.newInstance(TypeNameShadowing.class, getClass());
 
   @Test
   public void positiveClass() {
@@ -305,6 +300,18 @@ public class TypeNameShadowingTest {
             "  class T {}",
             "  class BadParameterName {}",
             "  <T2,BadParameterName> void f(T2 t, BadParameterName u){}",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void fieldClashOk() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  final Object T = new Object();",
+            "  <T> void doIt(T t) {}",
             "}")
         .doTest();
   }

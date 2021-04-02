@@ -17,22 +17,12 @@
 package com.google.errorprone.bugpatterns.threadsafety;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.ByteStreams;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.concurrent.LazyInit;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
-import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -1210,7 +1200,6 @@ public class ImmutableCheckerTest {
         .doTest();
   }
 
-
   // any final null reference constant is immutable, but do we actually care?
   //
   // javac makes it annoying to figure this out - since null isn't a compile-time constant,
@@ -1397,28 +1386,12 @@ public class ImmutableCheckerTest {
         .doTest();
   }
 
-  @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
-
   /** Test class annotated with @Immutable. */
   @Immutable(containerOf = {"T"})
   public static class ClassPathTest<T> {}
 
-  static void addClassToJar(JarOutputStream jos, Class<?> clazz) throws IOException {
-    String entryPath = clazz.getName().replace('.', '/') + ".class";
-    try (InputStream is = clazz.getClassLoader().getResourceAsStream(entryPath)) {
-      jos.putNextEntry(new JarEntry(entryPath));
-      ByteStreams.copy(is, jos);
-    }
-  }
-
   @Test
-  public void incompleteClassPath() throws Exception {
-    File libJar = tempFolder.newFile("lib.jar");
-    try (FileOutputStream fis = new FileOutputStream(libJar);
-        JarOutputStream jos = new JarOutputStream(fis)) {
-      addClassToJar(jos, ImmutableCheckerTest.ClassPathTest.class);
-      addClassToJar(jos, ImmutableCheckerTest.class);
-    }
+  public void incompleteClassPath() {
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -1427,7 +1400,7 @@ public class ImmutableCheckerTest {
             "  // BUG: Diagnostic contains: 'Test' has non-final field 'x'",
             "  int x;",
             "}")
-        .setArgs(Arrays.asList("-cp", libJar.toString()))
+        .withClasspath(ImmutableCheckerTest.ClassPathTest.class, ImmutableCheckerTest.class)
         .doTest();
   }
 
@@ -1577,6 +1550,53 @@ public class ImmutableCheckerTest {
             "import com.google.errorprone.annotations.ImmutableTypeParameter;",
             " // BUG: Diagnostic contains: only supported on immutable classes",
             "class A<@ImmutableTypeParameter T> {}")
+        .doTest();
+  }
+
+  @Test
+  public void immutableTypeParameter_notAllTypeVarsInstantiated() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.errorprone.annotations.ImmutableTypeParameter;",
+            "import com.google.errorprone.annotations.Immutable;",
+            "import java.util.function.Function;",
+            "class Test {",
+            "  public final <A> void f1(A transform) {}",
+            "  public <B, @ImmutableTypeParameter C> C f2(Function<B, C> fn) {",
+            "    return null;",
+            "  }",
+            "  public final <D, E> void f3(Function<D, E> fn) {",
+            "    // BUG: Diagnostic contains: instantiation of 'C' is mutable",
+            "    // 'E' is a mutable type variable",
+            "    f1(f2(fn));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  // javac does not instantiate type variables when they are not used, so we cannot check whether
+  // their instantiations are immutable.
+  @Ignore
+  @Test
+  public void immutableTypeParameter_notAllTypeVarsInstantiated_shouldFail() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.errorprone.annotations.ImmutableTypeParameter;",
+            "import com.google.errorprone.annotations.Immutable;",
+            "import java.util.function.Function;",
+            "class Test {",
+            "  public final <A> void f1(A transform) {}",
+            "  public <@ImmutableTypeParameter B, C> C f2(Function<B, C> fn) {",
+            "    return null;",
+            "  }",
+            "  public final <D, E> void f3(Function<D, E> fn) {",
+            "    // BUG: Diagnostic contains: instantiation of 'B' is mutable",
+            "    // 'D' is a mutable type variable",
+            "    f1(f2(fn));",
+            "  }",
+            "}")
         .doTest();
   }
 
@@ -1799,6 +1819,50 @@ public class ImmutableCheckerTest {
             "    g(f(i), f(i));",
             "  }",
             "}")
+        .doTest();
+  }
+
+  // regression test for b/148734874
+  @Test
+  public void immutableTypeParameter_instantiations_negative() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.errorprone.annotations.ImmutableTypeParameter;",
+            "import com.google.errorprone.annotations.Immutable;",
+            "abstract class T {",
+            "  interface S<T> {}",
+            "  interface L<T> {}",
+            "  interface A {}",
+            "  @Immutable interface B extends A {}",
+            "  @Immutable interface C extends B {}",
+            "  abstract <X, Y, Z> void h(S<X> firstType, S<Y> secondType, S<Z> thirdType);",
+            "  abstract <@ImmutableTypeParameter E extends A> S<E> f(Class<E> entityClass);",
+            "  abstract <T> S<L<T>> g(S<T> element);",
+            "  void test() {",
+            "    // BUG: Diagnostic contains: the declaration of type 'T.A' is not annotated",
+            "    h(f(A.class), g(f(B.class)), g(f(C.class)));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  // regression test for b/181262633
+  @Test
+  public void immutableTypeParameter_rawSuper() {
+    compilationHelper
+        .addSourceLines(
+            "A.java",
+            "import com.google.errorprone.annotations.ImmutableTypeParameter;",
+            "import com.google.errorprone.annotations.Immutable;",
+            "@Immutable class S<@ImmutableTypeParameter X> {}")
+        .addSourceLines(
+            "Test.java",
+            "import com.google.errorprone.annotations.ImmutableTypeParameter;",
+            "import com.google.errorprone.annotations.Immutable;",
+            "// BUG: Diagnostic contains: 'S' required instantiation of 'X' with type parameters,"
+                + " but was raw",
+            "@Immutable class T<@ImmutableTypeParameter X> extends S {}")
         .doTest();
   }
 }

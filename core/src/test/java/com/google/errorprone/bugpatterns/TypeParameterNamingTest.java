@@ -15,7 +15,7 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParameterNamingClassification.CLASS_NAME_WITH_T;
 import static com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParameterNamingClassification.LETTER_WITH_MAYBE_NUMERAL;
 import static com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParameterNamingClassification.NON_CLASS_NAME_WITH_T_SUFFIX;
@@ -24,9 +24,9 @@ import static com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParamete
 import com.google.common.truth.Subject;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.FixChoosers;
+import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.bugpatterns.TypeParameterNaming.TypeParameterNamingClassification;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -35,15 +35,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class TypeParameterNamingTest {
 
-  private CompilationTestHelper compilationHelper;
-  private BugCheckerRefactoringTestHelper refactoring;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(TypeParameterNaming.class, getClass());
-    refactoring =
-        BugCheckerRefactoringTestHelper.newInstance(new TypeParameterNaming(), getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(TypeParameterNaming.class, getClass());
+  private final BugCheckerRefactoringTestHelper refactoring =
+      BugCheckerRefactoringTestHelper.newInstance(TypeParameterNaming.class, getClass());
 
   @Test
   public void positiveCases() {
@@ -63,6 +58,7 @@ public class TypeParameterNamingTest {
     refactoring
         .addInputLines(
             "in/Test.java",
+            "/** @param <BadName> bad name */",
             "class Test<BadName> {",
             "  public <T, Foo> void method(Foo f) {",
             "    BadName bad = null;",
@@ -71,6 +67,7 @@ public class TypeParameterNamingTest {
             "}")
         .addOutputLines(
             "out/Test.java",
+            "/** @param <BadNameT> bad name */",
             "class Test<BadNameT> {",
             "  public <T, FooT> void method(FooT f) {",
             "    BadNameT bad = null;",
@@ -78,7 +75,7 @@ public class TypeParameterNamingTest {
             "  }",
             "}")
         .setFixChooser(FixChoosers.FIRST)
-        .doTest();
+        .doTest(TestMode.TEXT_MATCH);
   }
 
   @Test
@@ -87,6 +84,7 @@ public class TypeParameterNamingTest {
         .addInputLines(
             "in/Test.java",
             "class Test<BadName> {",
+            "  /** @param <Foo> foo */",
             "  public <T, Foo> void method(Foo f) {",
             "    BadName bad = null;",
             "    Foo d = f;",
@@ -95,13 +93,14 @@ public class TypeParameterNamingTest {
         .addOutputLines(
             "out/Test.java",
             "class Test<B> {",
+            "  /** @param <F> foo */",
             "  public <T, F> void method(F f) {",
             "    B bad = null;",
             "    F d = f;",
             "  }",
             "}")
         .setFixChooser(FixChoosers.SECOND)
-        .doTest();
+        .doTest(TestMode.TEXT_MATCH);
   }
 
   @Test
@@ -282,6 +281,39 @@ public class TypeParameterNamingTest {
   }
 
   @Test
+  public void negativeCases_manyNumberedTypes() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.ArrayList;",
+            "class Test<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {",
+            "  public <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> void method(Exception e) {",
+            "    T10 t = null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void refactoring_underscore() {
+    refactoring
+        .addInputLines(
+            "in/Test.java", //
+            "class Test {",
+            "  public <_T> void method(_T t) {",
+            "  }",
+            "}")
+        .addOutputLines(
+            "in/Test.java", //
+            "class Test {",
+            "  public <T> void method(T t) {",
+            "  }",
+            "}")
+        .setFixChooser(FixChoosers.FIRST)
+        .doTest(TestMode.TEXT_MATCH);
+  }
+
+  @Test
   public void classifyTypeName_singleLetter() {
     assertKindOfName("T").isEqualTo(LETTER_WITH_MAYBE_NUMERAL);
     assertKindOfName("D").isEqualTo(LETTER_WITH_MAYBE_NUMERAL);
@@ -312,7 +344,7 @@ public class TypeParameterNamingTest {
     assertKindOfName("ACanalPanamaT").isEqualTo(NON_CLASS_NAME_WITH_T_SUFFIX);
   }
 
-  private static Subject<?, TypeParameterNamingClassification> assertKindOfName(String s) {
-    return assertThat(TypeParameterNamingClassification.classify(s)).named(s);
+  private static Subject assertKindOfName(String s) {
+    return assertWithMessage(s).that(TypeParameterNamingClassification.classify(s));
   }
 }

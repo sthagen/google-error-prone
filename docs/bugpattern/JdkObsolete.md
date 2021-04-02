@@ -2,8 +2,8 @@ Some JDK APIs are obsolete and have preferred alternatives.
 
 ## `LinkedList`
 
-`LinkedList` almost never out-performs `ArrayList` or `ArrayDeque`[^1].
-If you are using `LinkedList` as a list, prefer `ArrayList`.  If you are using
+`LinkedList` almost never out-performs `ArrayList` or `ArrayDeque`[^1]. If you
+are using `LinkedList` as a list, prefer `ArrayList`. If you are using
 `LinkedList` as a stack or queue/deque, prefer `ArrayDeque`.
 
 Migration gotcha: `LinkedList` permits `null` elements; `ArrayDeque` rejects
@@ -64,3 +64,4 @@ Replaced by `NavigableSet` and `NavigableMap` in Java 6.
     the cost of copying an element in an `ArrayList`. Thus, `LinkedList`'s
     traversal cost dominates and results in poorer performance. More info:
     https://stuartmarks.wordpress.com/2015/12/18/some-java-list-benchmarks/
+

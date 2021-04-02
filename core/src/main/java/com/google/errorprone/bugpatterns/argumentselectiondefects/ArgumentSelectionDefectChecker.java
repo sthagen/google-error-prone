@@ -16,12 +16,10 @@
 
 package com.google.errorprone.bugpatterns.argumentselectiondefects;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -56,13 +54,11 @@ import java.util.function.Function;
 @BugPattern(
     name = "ArgumentSelectionDefectChecker",
     summary = "Arguments are in the wrong order or could be commented for clarity.",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class ArgumentSelectionDefectChecker extends BugChecker
     implements MethodInvocationTreeMatcher, NewClassTreeMatcher {
 
-  private final ArgumentChangeFinder argumentchangeFinder;
+  private final ArgumentChangeFinder argumentChangeFinder;
 
   public ArgumentSelectionDefectChecker() {
     this(
@@ -78,7 +74,7 @@ public class ArgumentSelectionDefectChecker extends BugChecker
 
   @VisibleForTesting
   ArgumentSelectionDefectChecker(ArgumentChangeFinder argumentChangeFinder) {
-    this.argumentchangeFinder = argumentChangeFinder;
+    this.argumentChangeFinder = argumentChangeFinder;
   }
 
   @Override
@@ -114,7 +110,7 @@ public class ArgumentSelectionDefectChecker extends BugChecker
 
   private Description visitNewClassOrMethodInvocation(InvocationInfo invocationInfo) {
 
-    Changes changes = argumentchangeFinder.findChanges(invocationInfo);
+    Changes changes = argumentChangeFinder.findChanges(invocationInfo);
 
     if (changes.isEmpty()) {
       return Description.NO_MATCH;
@@ -139,7 +135,7 @@ public class ArgumentSelectionDefectChecker extends BugChecker
    * normalised NeedlemanWunschEditDistance. Otherwise, one of the names is unknown and so we return
    * 0 distance between it and its original parameter and infinite distance between all others.
    */
-  private static final Function<ParameterPair, Double> buildDefaultDistanceFunction() {
+  private static Function<ParameterPair, Double> buildDefaultDistanceFunction() {
     return new Function<ParameterPair, Double>() {
       @Override
       public Double apply(ParameterPair pair) {

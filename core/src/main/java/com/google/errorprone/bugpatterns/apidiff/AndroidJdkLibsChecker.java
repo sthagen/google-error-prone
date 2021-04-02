@@ -16,18 +16,16 @@
 
 package com.google.errorprone.bugpatterns.apidiff;
 
-import static com.google.errorprone.BugPattern.Category.ANDROID;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
-import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.bugpatterns.apidiff.ApiDiff.ClassMemberKey;
-import java.util.Map.Entry;
-import java.util.NavigableSet;
-import java.util.TreeSet;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Checks for uses of classes, fields, or methods that are not compatible with legacy Android
@@ -38,10 +36,6 @@ import java.util.TreeSet;
     name = "AndroidJdkLibsChecker",
     altNames = {"Java7ApiChecker", "AndroidApiChecker"},
     summary = "Use of class, field, or method that is not compatible with legacy Android devices",
-    explanation =
-        "Code that needs to be compatible with Android cannot use types or members that "
-            + "only the latest or unreleased devices can handle",
-    category = ANDROID,
     severity = ERROR)
 // TODO(b/32513850): Allow Android N+ APIs, e.g., by computing API diff using android.jar
 public class AndroidJdkLibsChecker extends ApiDiffChecker {
@@ -60,51 +54,32 @@ public class AndroidJdkLibsChecker extends ApiDiffChecker {
 
   private static ApiDiff deriveApiDiff(boolean allowJava8) {
     ClassSupportInfo support = new ClassSupportInfo(allowJava8);
-    TreeSet<String> unsupportedClasses =
-        new TreeSet<>(Java7ApiChecker.API_DIFF.unsupportedClasses());
-    HashMultimap<String, ClassMemberKey> unsupportedMembers =
-        HashMultimap.create(Java7ApiChecker.API_DIFF.unsupportedMembersByClass());
+    ImmutableSet<String> unsupportedClasses =
+        ImmutableSet.<String>builder()
+            .addAll(
+                Java7ApiChecker.API_DIFF.unsupportedClasses().stream()
+                    .filter(cls -> !support.allowedPackages.contains(packageName(cls)))
+                    .filter(cls -> !support.allowedClasses.contains(cls))
+                    .collect(Collectors.toSet()))
+            .addAll(support.bannedClasses)
+            .build();
 
-    // Packages
-    for (String allowedPkg : support.allowedPackages) {
-      // Remove all classes in allowed package from blacklist.
-      for (String cls : classesStartingWithPackage(unsupportedClasses, allowedPkg)) {
-        // Filter out subpackages.
-        if (classIsInExactPackage(cls, allowedPkg)) {
-          unsupportedClasses.remove(cls);
-        }
-      }
-      // Remove all members of classes in allowed package from blacklist.
-      for (String cls :
-          classesStartingWithPackage(new TreeSet<>(unsupportedMembers.keys()), allowedPkg)) {
-        if (classIsInExactPackage(cls, allowedPkg)) {
-          unsupportedMembers.removeAll(cls);
-        }
-      }
-    }
-
-    // Classes
-    unsupportedClasses.removeAll(support.allowedClasses);
-    unsupportedClasses.addAll(support.bannedClasses);
-    support.allowedClasses.forEach(unsupportedMembers::removeAll);
-
-    // Members
-    if (!support.bannedMembers.isEmpty()) {
-      unsupportedMembers.entries().removeIf(support::memberIsWhitelisted);
-    }
-    unsupportedMembers.putAll(support.bannedMembers);
+    ImmutableMultimap<String, ClassMemberKey> unsupportedMembers =
+        ImmutableSetMultimap.<String, ClassMemberKey>builder()
+            .putAll(
+                Java7ApiChecker.API_DIFF.unsupportedMembersByClass().entries().stream()
+                    .filter(e -> !support.allowedPackages.contains(packageName(e.getKey())))
+                    .filter(e -> !support.allowedClasses.contains(e.getKey()))
+                    .filter(e -> support.bannedMembers.isEmpty() || !support.memberIsAllowed(e))
+                    .collect(Collectors.toSet()))
+            .putAll(support.bannedMembers)
+            .build();
 
     return ApiDiff.fromMembers(unsupportedClasses, unsupportedMembers);
   }
 
-  private static NavigableSet<String> classesStartingWithPackage(
-      NavigableSet<String> unsupportedClasses, String allowedPkg) {
-    return new TreeSet<>(
-        unsupportedClasses.subSet(allowedPkg, true, allowedPkg + Character.MAX_VALUE, true));
-  }
-
-  private static boolean classIsInExactPackage(String className, String packageName) {
-    return packageName.equals(className.substring(0, className.lastIndexOf('/') + 1));
+  private static String packageName(String className) {
+    return className.substring(0, className.lastIndexOf('/') + 1);
   }
 
   private static class ClassSupportInfo {
@@ -123,7 +98,7 @@ public class AndroidJdkLibsChecker extends ApiDiffChecker {
       bannedMembers = allowJava8 ? DESUGAR_BANNED_MEMBERS : ImmutableSetMultimap.of();
     }
 
-    private boolean memberIsWhitelisted(Entry<String, ClassMemberKey> member) {
+    private boolean memberIsAllowed(Map.Entry<String, ClassMemberKey> member) {
       return allowedMembers.containsEntry(member.getKey(), member.getValue())
           || allowedMembers.get(member.getKey()).stream()
               .anyMatch(
@@ -149,14 +124,17 @@ public class AndroidJdkLibsChecker extends ApiDiffChecker {
     private static final ImmutableSet<String> DESUGAR_ALLOWED_CLASSES =
         ImmutableSet.<String>builder()
             .addAll(BASE_ALLOWED_CLASSES)
+            .add("java/io/UncheckedIOException")
+            .add("java/util/ArrayList")
             .add("java/util/Collection")
             .add("java/util/Comparator")
-            .add("java/util/Comparators")
             .add("java/util/DoubleSummaryStatistics")
             .add("java/util/IntSummaryStatistics")
             .add("java/util/Iterator")
+            .add("java/util/List")
             .add("java/util/LongSummaryStatistics")
             .add("java/util/Map")
+            .add("java/util/HashMap")
             .add("java/util/Map\\$$Entry")
             .add("java/util/Objects")
             .add("java/util/Optional")
@@ -164,8 +142,20 @@ public class AndroidJdkLibsChecker extends ApiDiffChecker {
             .add("java/util/OptionalInt")
             .add("java/util/OptionalLong")
             .add("java/util/PrimitiveIterator")
+            .add("java/util/Set")
             .add("java/util/Spliterator")
+            .add("java/util/Spliterator$OfDouble")
+            .add("java/util/Spliterator$OfInt")
+            .add("java/util/Spliterator$OfLong")
+            .add("java/util/Spliterator$OfPrimitive")
+            .add("java/util/Spliterators")
+            .add("java/util/Spliterators$AbstractDoubleSpliterator")
+            .add("java/util/Spliterators$AbstractIntSpliterator")
+            .add("java/util/Spliterators$AbstractLongSpliterator")
+            .add("java/util/Spliterators$AbstractSpliterator")
             .add("java/util/StringJoiner")
+            .add("java/util/concurrent/ConcurrentHashMap")
+            .add("java/util/concurrent/ConcurrentMap")
             .add("java/util/concurrent/atomic/AtomicInteger")
             .add("java/util/concurrent/atomic/AtomicLong")
             .add("java/util/concurrent/atomic/AtomicReference")
@@ -179,6 +169,7 @@ public class AndroidJdkLibsChecker extends ApiDiffChecker {
             .put("java/util/Arrays", ClassMemberKey.create("stream", ""))
             .put("java/util/Date", ClassMemberKey.create("from", ""))
             .put("java/util/GregorianCalendar", ClassMemberKey.create("from", ""))
+            .put("java/util/TimeZone", ClassMemberKey.create("getTimeZone", ""))
             .put("java/lang/Integer", ClassMemberKey.create("sum", ""))
             .put("java/lang/Long", ClassMemberKey.create("sum", ""))
             .put("java/lang/Double", ClassMemberKey.create("sum", ""))

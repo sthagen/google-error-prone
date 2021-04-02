@@ -15,6 +15,7 @@
 package com.google.errorprone.bugpatterns.threadsafety;
 
 import static com.google.errorprone.bugpatterns.threadsafety.IllegalGuardedBy.checkGuardedBy;
+import static java.util.Objects.requireNonNull;
 
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.util.ASTHelpers;
@@ -34,8 +35,6 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
 import javax.lang.model.element.ElementKind;
 
 /**
@@ -49,6 +48,7 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
   private final Tree decl;
   private final JCTree.JCCompilationUnit compilationUnit;
   private final Context context;
+  private final VisitorState visitorState;
   private final Types types;
 
   public static GuardedBySymbolResolver from(Tree tree, VisitorState visitorState) {
@@ -56,25 +56,39 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
         ASTHelpers.getSymbol(tree).owner.enclClass(),
         visitorState.getPath().getCompilationUnit(),
         visitorState.context,
-        tree);
+        tree,
+        visitorState);
   }
 
   public static GuardedBySymbolResolver from(
-      ClassSymbol owner, CompilationUnitTree compilationUnit, Context context, Tree leaf) {
-    return new GuardedBySymbolResolver(owner, compilationUnit, context, leaf);
+      ClassSymbol owner,
+      CompilationUnitTree compilationUnit,
+      Context context,
+      Tree leaf,
+      VisitorState visitorState) {
+    return new GuardedBySymbolResolver(owner, compilationUnit, context, leaf, visitorState);
   }
 
   private GuardedBySymbolResolver(
-      ClassSymbol enclosingClass, CompilationUnitTree compilationUnit, Context context, Tree leaf) {
+      ClassSymbol enclosingClass,
+      CompilationUnitTree compilationUnit,
+      Context context,
+      Tree leaf,
+      VisitorState visitorState) {
     this.compilationUnit = (JCCompilationUnit) compilationUnit;
-    this.enclosingClass = enclosingClass;
+    this.enclosingClass = requireNonNull(enclosingClass);
     this.context = context;
-    this.types = Types.instance(context);
+    this.types = visitorState.getTypes();
     this.decl = leaf;
+    this.visitorState = visitorState;
   }
 
   public Context context() {
     return context;
+  }
+
+  public VisitorState visitorState() {
+    return visitorState;
   }
 
   public ClassSymbol enclosingClass() {
@@ -150,7 +164,7 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
     }
     for (Type t : types.closure(classSymbol.type)) {
       Scope scope = t.tsym.members();
-      for (Symbol sym : scope.getSymbolsByName(getName(name))) {
+      for (Symbol sym : scope.getSymbolsByName(visitorState.getName(name))) {
         if (sym.getKind().equals(kind)) {
           return type.cast(sym);
         }
@@ -184,7 +198,7 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
     return null;
   }
 
-  private static enum SearchSuperTypes {
+  private enum SearchSuperTypes {
     YES,
     NO
   }
@@ -223,7 +237,7 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
     return null;
   }
 
-  private Symbol getLexicallyEnclosing(ClassSymbol symbol, String name) {
+  private static Symbol getLexicallyEnclosing(ClassSymbol symbol, String name) {
     Symbol current = symbol.owner;
     while (true) {
       if (current == null || current.getSimpleName().contentEquals(name)) {
@@ -240,12 +254,8 @@ public class GuardedBySymbolResolver implements GuardedByBinder.Resolver {
 
   private Symbol attribIdent(String name) {
     Attr attr = Attr.instance(context);
-    TreeMaker tm = TreeMaker.instance(context);
-    return attr.attribIdent(tm.Ident(getName(name)), compilationUnit);
-  }
-
-  private Name getName(String name) {
-    return Names.instance(context).fromString(name);
+    TreeMaker tm = visitorState.getTreeMaker();
+    return attr.attribIdent(tm.Ident(visitorState.getName(name)), compilationUnit);
   }
 
   @Override

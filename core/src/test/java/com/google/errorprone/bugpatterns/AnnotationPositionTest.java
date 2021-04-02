@@ -16,9 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
+import static org.junit.Assume.assumeTrue;
+
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
-import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -35,13 +38,15 @@ public final class AnnotationPositionTest {
         "import java.lang.annotation.ElementType;",
         "import java.lang.annotation.Target;",
         "@Target({ElementType.TYPE_USE, ElementType.METHOD, ElementType.TYPE})",
-        "@interface TypeUse {}"
+        "@interface TypeUse {",
+        "  String value() default \"\";",
+        "}"
       };
 
   private static final String[] nonTypeUseLines = new String[] {"@interface NonTypeUse {}"};
 
   private final BugCheckerRefactoringTestHelper refactoringHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new AnnotationPosition(), getClass())
+      BugCheckerRefactoringTestHelper.newInstance(AnnotationPosition.class, getClass())
           .addInputLines("TypeUse.java", typeUseLines)
           .expectUnchanged()
           .addInputLines("NonTypeUse.java", nonTypeUseLines)
@@ -65,7 +70,7 @@ public final class AnnotationPositionTest {
             "interface Test {",
             "  @Override public boolean equals(Object o);",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -85,7 +90,7 @@ public final class AnnotationPositionTest {
             "  @NonTypeUse",
             "  public void foo();",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -107,13 +112,13 @@ public final class AnnotationPositionTest {
             "  // TODO: fix",
             "  public void foo();",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
   public void negatives() {
-    helper
-        .addSourceLines(
+    refactoringHelper
+        .addInputLines(
             "Test.java",
             "interface Test {",
             "  /** Javadoc */",
@@ -127,18 +132,20 @@ public final class AnnotationPositionTest {
             "  // comment",
             "  public boolean quux();",
             "}")
-        .doTest();
+        .expectUnchanged()
+        .doTest(TEXT_MATCH);
   }
 
   @Test
   public void negative_parameter() {
-    helper
-        .addSourceLines(
+    refactoringHelper
+        .addInputLines(
             "Test.java",
             "interface Test {",
             "  public boolean foo(final @NonTypeUse String s);",
             "}")
-        .doTest();
+        .expectUnchanged()
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -165,7 +172,7 @@ public final class AnnotationPositionTest {
             "  @NonTypeUse public @TypeUse String baz();",
             "  @NonTypeUse public static @TypeUse int quux() { return 1; }",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -182,31 +189,47 @@ public final class AnnotationPositionTest {
             "  /** Javadoc */",
             "  @NonTypeUse public static @TypeUse int foo = 1;",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
   public void classes() {
     refactoringHelper
-        .addInputLines("Test.java", "public @NonTypeUse", "interface Test {}")
-        .addOutputLines("Test.java", "@NonTypeUse", "public interface Test {}")
-        .doTest(TestMode.TEXT_MATCH);
+        .addInputLines(
+            "Test.java", //
+            "public @NonTypeUse",
+            "interface Test {}")
+        .addOutputLines(
+            "Test.java", //
+            "@NonTypeUse",
+            "public interface Test {}")
+        .doTest(TEXT_MATCH);
   }
 
   @Test
   public void class_typeUseBeforeModifiers() {
     refactoringHelper
-        .addInputLines("Test.java", "public @TypeUse interface Test {}")
-        .addOutputLines("Test.java", "@TypeUse", "public interface Test {}")
-        .doTest(TestMode.TEXT_MATCH);
+        .addInputLines(
+            "Test.java", //
+            "public @TypeUse interface Test {}")
+        .addOutputLines(
+            "Test.java", //
+            "@TypeUse",
+            "public interface Test {}")
+        .doTest(TEXT_MATCH);
   }
 
   @Test
   public void class_intermingledJavadoc() {
     refactoringHelper
-        .addInputLines("Test.java", "@NonTypeUse public /** Javadoc */ final class Test {}")
-        .addOutputLines("Test.java", "/** Javadoc */", "@NonTypeUse public final class Test {}")
-        .doTest(TestMode.TEXT_MATCH);
+        .addInputLines(
+            "Test.java", //
+            "@NonTypeUse public /** Javadoc */ final class Test {}")
+        .addOutputLines(
+            "Test.java", //
+            "/** Javadoc */",
+            "@NonTypeUse public final class Test {}")
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -224,7 +247,23 @@ public final class AnnotationPositionTest {
             "  @NonTypeUse public static @TypeUse int foo() { return 1; }",
             "  @NonTypeUse public static @TypeUse int bar() { return 1; }",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void betweenModifiersWithValue() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "class Test {",
+            "  public final @TypeUse(\"foo\") int foo(final int a) { return 1; }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "class Test {",
+            "  public final @TypeUse(\"foo\") int foo(final int a) { return 1; }",
+            "}")
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -245,7 +284,7 @@ public final class AnnotationPositionTest {
             "  /* a */ @NonTypeUse public /* b */ /* c */ static @TypeUse "
                 + "/* d */ /* e */ int quux() { return 1; }",
             "}")
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -254,13 +293,46 @@ public final class AnnotationPositionTest {
         .addSourceLines(
             "Test.java",
             "interface Test {",
-            "  // BUG: Diagnostic contains: @Override is not a type annotation",
+            "  // BUG: Diagnostic contains: @Override is not a TYPE_USE annotation",
             "  public @Override boolean equals(Object o);",
-            "  // BUG: Diagnostic contains: @Override, @NonTypeUse are not type annotations",
+            "  // BUG: Diagnostic contains: @Override, @NonTypeUse are not TYPE_USE annotations",
             "  public @Override @NonTypeUse int hashCode();",
             "  // BUG: Diagnostic contains: Javadocs should appear before any modifiers",
             "  @NonTypeUse /** Javadoc */ public boolean bar();",
             "}")
         .doTest();
+  }
+
+  @Test
+  public void diagnostic() {
+    helper
+        .addSourceLines(
+            "Test.java", //
+            "interface Test {",
+            "  // BUG: Diagnostic contains: is a TYPE_USE",
+            "  public @TypeUse static int foo = 1;",
+            "}")
+        .doTest();
+  }
+
+  // TODO(b/168625474): 'sealed' doesn't have a TokenKind
+  @Test
+  public void sealedInterface() {
+    assumeTrue(RuntimeVersion.isAtLeast15());
+    refactoringHelper
+        .addInputLines(
+            "Test.java", //
+            "/** Javadoc! */",
+            "sealed @Deprecated interface Test {",
+            "  final class A implements Test {}",
+            "}")
+        .addOutputLines(
+            "Test.java", //
+            "/** Javadoc! */",
+            "sealed @Deprecated interface Test {",
+            "  final class A implements Test {}",
+            "}")
+        .setArgs("--enable-preview", "--release", Integer.toString(RuntimeVersion.release()))
+        .doTest(TEXT_MATCH);
   }
 }

@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.collect.ImmutableList;
@@ -30,13 +29,11 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
 import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
-import com.sun.tools.javac.tree.JCTree;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "UnusedAnonymousClass",
     summary = "Instance created but never used",
-    category = JDK,
     severity = ERROR)
 public class UnusedAnonymousClass extends BugChecker implements NewClassTreeMatcher {
 
@@ -70,21 +67,20 @@ public class UnusedAnonymousClass extends BugChecker implements NewClassTreeMatc
           break;
       }
     }
-    if (!sideEffectFreeConstructor(((JCTree) newClassTree.getIdentifier()).type.tsym, state)) {
+    if (!sideEffectFreeConstructor(ASTHelpers.getType(newClassTree.getIdentifier()).tsym, state)) {
       return Description.NO_MATCH;
     }
     return describeMatch(newClassTree);
   }
 
-  // Types that are known to have side effect free constructors.
-  private static final ImmutableList<String> TYPE_WHITELIST =
+  private static final ImmutableList<String> TYPES_WITH_SIDE_EFFECT_FREE_CONSTRUCTORS =
       ImmutableList.of(Thread.class.getName());
 
-  private boolean sideEffectFreeConstructor(TypeSymbol classType, VisitorState state) {
+  private static boolean sideEffectFreeConstructor(TypeSymbol classType, VisitorState state) {
     if (classType.isInterface()) {
       return true;
     }
-    for (String typeName : TYPE_WHITELIST) {
+    for (String typeName : TYPES_WITH_SIDE_EFFECT_FREE_CONSTRUCTORS) {
       if (ASTHelpers.isSameType(classType.type, state.getTypeFromString(typeName), state)) {
         return true;
       }

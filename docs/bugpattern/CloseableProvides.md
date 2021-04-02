@@ -28,8 +28,8 @@ There are a number of issues with this approach as it relates to resource
 management:
 
 *   If multiple Client classes are constructed, multiple output streams are
-    opened against the same file, and writes to the file may clash with
-    each other.
+    opened against the same file, and writes to the file may clash with each
+    other.
 *   It's not clear which class has the responsibility of closing the
     `FileOutputStream` resource:
 
@@ -51,7 +51,7 @@ management:
 The preferred solution is to not inject closable resources, but instead, objects
 that can expose short-lived closable resources that are used as necessary. The
 following example uses Guava's
-[CharSource](https://github.com/google/guava/wiki/IOExplained#sources-and-sinks)
+[CharSink](https://github.com/google/guava/wiki/IOExplained#sources-and-sinks)
 as the resource manager object:
 
 ```java

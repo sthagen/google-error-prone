@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 
 import com.google.common.base.Ascii;
@@ -27,15 +26,18 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.BugPattern.LinkType;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TypeParameterTreeMatcher;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.names.NamingConventions;
 import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.TypeParameterTree;
+import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.TypeVariableSymbol;
 import java.util.ArrayList;
@@ -57,16 +59,15 @@ import javax.lang.model.element.Name;
     summary =
         "Type parameters must be a single letter with an optional numeric suffix,"
             + " or an UpperCamelCase name followed by the letter 'T'.",
-    category = JDK,
     severity = SUGGESTION,
     tags = StandardTags.STYLE,
     linkType = LinkType.CUSTOM,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION,
     link = "https://google.github.io/styleguide/javaguide.html#s5.2.8-type-variable-names"
     )
 public class TypeParameterNaming extends BugChecker implements TypeParameterTreeMatcher {
 
   private static final Pattern TRAILING_DIGIT_EXTRACTOR = Pattern.compile("^(.*?)(\\d+)$");
+  private static final Pattern SINGLE_PLUS_MAYBE_DIGITS = Pattern.compile("[A-Z]\\d*");
 
   private static String upperCamelToken(String s) {
     return "" + Ascii.toUpperCase(s.charAt(0)) + (s.length() == 1 ? "" : s.substring(1));
@@ -98,7 +99,6 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
     /** Anything else. */
     UNCLASSIFIED(false);
 
-    private static final Pattern SINGLE_PLUS_MAYBE_DIGIT = Pattern.compile("[A-Z]\\d?");
     private final boolean isValidName;
 
     TypeParameterNamingClassification(boolean isValidName) {
@@ -106,7 +106,7 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
     }
 
     public static TypeParameterNamingClassification classify(String name) {
-      if (SINGLE_PLUS_MAYBE_DIGIT.matcher(name).matches()) {
+      if (SINGLE_PLUS_MAYBE_DIGITS.matcher(name).matches()) {
         return LETTER_WITH_MAYBE_NUMERAL;
       }
 
@@ -139,23 +139,34 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
     Description.Builder descriptionBuilder =
         buildDescription(tree).setMessage(errorMessage(tree.getName(), classification));
 
+    TreePath enclosingPath = enclosingMethodOrClass(state.getPath());
+
     if (classification != TypeParameterNamingClassification.NON_CLASS_NAME_WITH_T_SUFFIX) {
       descriptionBuilder.addFix(
-          TypeParameterShadowing.renameTypeVariable(
+          SuggestedFixes.renameTypeParameter(
               tree,
               state.getPath().getParentPath().getLeaf(),
               suggestedNameFollowedWithT(tree.getName().toString()),
-              state));
+              state.withPath(enclosingPath)));
     }
 
     return descriptionBuilder
         .addFix(
-            TypeParameterShadowing.renameTypeVariable(
+            SuggestedFixes.renameTypeParameter(
                 tree,
                 state.getPath().getParentPath().getLeaf(),
                 suggestedSingleLetter(tree.getName().toString(), tree),
-                state))
+                state.withPath(enclosingPath)))
         .build();
+  }
+
+  private static TreePath enclosingMethodOrClass(TreePath path) {
+    for (TreePath parent = path; parent != null; parent = parent.getParentPath()) {
+      if (parent.getLeaf() instanceof MethodTree || parent.getLeaf() instanceof ClassTree) {
+        return parent;
+      }
+    }
+    return path;
   }
 
   private static String errorMessage(Name name, TypeParameterNamingClassification classification) {
@@ -194,7 +205,8 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
   }
 
   private static String suggestedSingleLetter(String id, Tree tree) {
-    char firstLetter = id.charAt(0);
+    char firstLetter =
+        Ascii.toUpperCase(NamingConventions.splitToLowercaseTerms(id).get(0).charAt(0));
     Symbol sym = ASTHelpers.getSymbol(tree);
     List<TypeVariableSymbol> enclosingTypeSymbols = typeVariablesEnclosing(sym);
 
@@ -216,7 +228,7 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
   // T -> T2
   // T2 -> T3
   // T -> T4 (if T2 and T3 already exist)
-  // TODO(siyuanl) : combine this method with TypeParameterShadowing.replacementTypeVarName
+  // TODO(user) : combine this method with TypeParameterShadowing.replacementTypeVarName
   private static String firstLetterReplacementName(String name, List<String> superTypeVars) {
     String firstLetterOfBase = Character.toString(name.charAt(0));
     int typeVarNum = 2;
@@ -280,7 +292,7 @@ public class TypeParameterNaming extends BugChecker implements TypeParameterTree
     // UPPERCASE => UppercaseT
     if (tokens.size() == 1) {
       String token = tokens.get(0);
-      if (token.toUpperCase().equals(identifier)) {
+      if (Ascii.toUpperCase(token).equals(identifier)) {
         return upperCamelToken(token) + "T";
       }
     }

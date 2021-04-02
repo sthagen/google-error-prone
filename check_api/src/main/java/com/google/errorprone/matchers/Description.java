@@ -45,8 +45,6 @@ public class Description {
       new Description(
           null, "<no match>", "<no match>", "<no match>", ImmutableList.<Fix>of(), SUGGESTION);
 
-  private static final String UNDEFINED_CHECK_NAME = "Undefined";
-
   /** The position of the match. */
   public final DiagnosticPosition position;
 
@@ -94,24 +92,11 @@ public class Description {
         : String.format("%s", rawMessage);
   }
 
-  /** TODO(cushon): Remove this constructor and ensure that there's always a check name. */
-  @Deprecated
-  public Description(
-      Tree node, String message, Fix suggestedFix, BugPattern.SeverityLevel severity) {
-    this(
-        (DiagnosticPosition) node,
-        UNDEFINED_CHECK_NAME,
-        message,
-        message,
-        ImmutableList.of(suggestedFix),
-        severity);
-  }
-
   private Description(
       DiagnosticPosition position,
       String checkName,
       String rawMessage,
-      String linkUrl,
+      @Nullable String linkUrl,
       List<Fix> fixes,
       SeverityLevel severity) {
     this.position = position;
@@ -132,6 +117,7 @@ public class Description {
    * Construct the link text to include in the compiler error message. Returns null if there is no
    * link.
    */
+  @Nullable
   private static String linkTextForDiagnostic(String linkUrl) {
     return isNullOrEmpty(linkUrl) ? null : "  (see " + linkUrl + ")";
   }
@@ -162,7 +148,7 @@ public class Description {
   public static class Builder {
     private final DiagnosticPosition position;
     private final String name;
-    private final String linkUrl;
+    private String linkUrl;
     private final SeverityLevel severity;
     private final ImmutableList.Builder<Fix> fixListBuilder = ImmutableList.builder();
     private String rawMessage;
@@ -185,7 +171,7 @@ public class Description {
      * decreasing preference. Adding an empty fix is a no-op.
      *
      * @param fix a suggested fix for this problem
-     * @throws IllegalArgumentException if {@code fix} is {@code null}
+     * @throws NullPointerException if {@code fix} is {@code null}
      */
     public Builder addFix(Fix fix) {
       checkNotNull(fix, "fix must not be null");
@@ -200,7 +186,7 @@ public class Description {
      * added in order of decreasing preference. Adding an empty fix is a no-op.
      *
      * @param fix a suggested fix for this problem
-     * @throws IllegalArgumentException if {@code fix} is {@code null}
+     * @throws NullPointerException if {@code fix} is {@code null}
      */
     public Builder addFix(Optional<? extends Fix> fix) {
       checkNotNull(fix, "fix must not be null");
@@ -212,7 +198,7 @@ public class Description {
      * Add each fix in order.
      *
      * @param fixes a list of suggested fixes for this problem
-     * @throws IllegalArgumentException if {@code fixes} or any of its elements are {@code null}
+     * @throws NullPointerException if {@code fixes} or any of its elements are {@code null}
      */
     public Builder addAllFixes(List<? extends Fix> fixes) {
       checkNotNull(fixes, "fixes must not be null");
@@ -229,10 +215,18 @@ public class Description {
      * @param message A custom error message without the check name ("[checkname]") or link
      */
     public Builder setMessage(String message) {
-      if (message == null) {
-        throw new IllegalArgumentException("message must not be null");
-      }
+      checkNotNull(message, "message must not be null");
       this.rawMessage = message;
+      return this;
+    }
+
+    /**
+     * Set a custom link URL. The custom URL will be used instead of the default one which forms
+     * part of the {@code @}BugPattern.
+     */
+    public Builder setLinkUrl(String linkUrl) {
+      checkNotNull(linkUrl, "linkUrl must not be null");
+      this.linkUrl = linkUrl;
       return this;
     }
 

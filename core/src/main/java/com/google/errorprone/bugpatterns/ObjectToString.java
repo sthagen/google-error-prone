@@ -16,13 +16,10 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.fixes.SuggestedFixes;
@@ -33,6 +30,7 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.util.Names;
+import java.util.Optional;
 
 /**
  * Warns against calling toString() on Objects which don't have toString() method overridden and
@@ -45,9 +43,7 @@ import com.sun.tools.javac.util.Names;
     summary =
         "Calling toString on Objects that don't override toString() doesn't"
             + " provide useful information",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.NO_FIX)
+    severity = WARNING)
 public class ObjectToString extends AbstractToString {
 
   private static boolean finalNoOverrides(Type type, VisitorState state) {
@@ -60,7 +56,7 @@ public class ObjectToString extends AbstractToString {
       return false;
     }
     Types types = state.getTypes();
-    Names names = Names.instance(state.context);
+    Names names = state.getNames();
     // find Object.toString
     MethodSymbol toString =
         (MethodSymbol) state.getSymtab().objectType.tsym.members().findFirst(names.toString);
@@ -84,23 +80,20 @@ public class ObjectToString extends AbstractToString {
 
   @Override
   protected Optional<String> descriptionMessageForDefaultMatch(Type type, VisitorState state) {
-    String format =
-        "%1$s is final and does not override Object.toString, so converting it to a string"
-            + " will print its identity (e.g. `%2$s@ 4488aabb`) instead of useful information.";
     return Optional.of(
         String.format(
-            format,
-            SuggestedFixes.prettyType(state, /* fix= */ null, type),
-            type.tsym.getSimpleName()));
+            "%1$s is final and does not override Object.toString, so converting it to a string"
+                + " will print its identity (e.g. `%2$s@4488aabb`) instead of useful information.",
+            SuggestedFixes.prettyType(type, state), type.tsym.getSimpleName()));
   }
 
   @Override
   protected Optional<Fix> implicitToStringFix(ExpressionTree tree, VisitorState state) {
-    return Optional.absent();
+    return Optional.empty();
   }
 
   @Override
   protected Optional<Fix> toStringFix(Tree parent, ExpressionTree tree, VisitorState state) {
-    return Optional.absent();
+    return Optional.empty();
   }
 }

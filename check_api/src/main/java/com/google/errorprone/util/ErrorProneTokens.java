@@ -31,11 +31,16 @@ import com.sun.tools.javac.util.Position.LineMap;
 
 /** A utility for tokenizing and preserving comments. */
 public class ErrorProneTokens {
-
+  private final int offset;
   private final CommentSavingTokenizer commentSavingTokenizer;
   private final ScannerFactory scannerFactory;
 
   public ErrorProneTokens(String source, Context context) {
+    this(source, 0, context);
+  }
+
+  public ErrorProneTokens(String source, int offset, Context context) {
+    this.offset = offset;
     scannerFactory = ScannerFactory.instance(context);
     char[] buffer = source == null ? new char[] {} : source.toCharArray();
     commentSavingTokenizer = new CommentSavingTokenizer(scannerFactory, buffer, buffer.length);
@@ -50,14 +55,23 @@ public class ErrorProneTokens {
     ImmutableList.Builder<ErrorProneToken> tokens = ImmutableList.builder();
     do {
       scanner.nextToken();
-      tokens.add(new ErrorProneToken(scanner.token()));
+      tokens.add(new ErrorProneToken(scanner.token(), offset));
     } while (scanner.token().kind != TokenKind.EOF);
     return tokens.build();
   }
 
   /** Returns the tokens for the given source text, including comments. */
   public static ImmutableList<ErrorProneToken> getTokens(String source, Context context) {
-    return new ErrorProneTokens(source, context).getTokens();
+    return getTokens(source, 0, context);
+  }
+
+  /**
+   * Returns the tokens for the given source text, including comments, indicating the offset of the
+   * source within the overall file.
+   */
+  public static ImmutableList<ErrorProneToken> getTokens(
+      String source, int offset, Context context) {
+    return new ErrorProneTokens(source, offset, context).getTokens();
   }
 
   /** A {@link JavaTokenizer} that saves comments. */
@@ -68,9 +82,27 @@ public class ErrorProneTokens {
 
     @Override
     protected Comment processComment(int pos, int endPos, CommentStyle style) {
-      char[] buf = reader.getRawCharacters(pos, endPos);
+      char[] buf = getRawCharactersReflectively(pos, endPos);
       return new CommentWithTextAndPosition(
           pos, endPos, new AccessibleReader(fac, buf, buf.length), style);
+    }
+
+    private char[] getRawCharactersReflectively(int beginIndex, int endIndex) {
+      Object instance;
+      try {
+        instance = JavaTokenizer.class.getDeclaredField("reader").get(this);
+      } catch (ReflectiveOperationException e) {
+        instance = this;
+      }
+      try {
+        return (char[])
+            instance
+                .getClass()
+                .getMethod("getRawCharacters", int.class, int.class)
+                .invoke(instance, beginIndex, endIndex);
+      } catch (ReflectiveOperationException e) {
+        throw new LinkageError(e.getMessage(), e);
+      }
     }
   }
 
@@ -90,6 +122,14 @@ public class ErrorProneTokens {
       this.endPos = endPos;
       this.reader = reader;
       this.style = style;
+    }
+
+    public int getPos() {
+      return pos;
+    }
+
+    public int getEndPos() {
+      return endPos;
     }
 
     /**

@@ -25,15 +25,12 @@ import static com.google.errorprone.matchers.Matchers.annotations;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
-import com.google.errorprone.fixes.SuggestedFix.Builder;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.MultiMatcher;
@@ -48,13 +45,11 @@ import java.util.List;
 /** @author Nick Glorioso (glorioso@google.com) */
 @BugPattern(
     name = "QualifierOrScopeOnInjectMethod",
-    category = Category.INJECT,
     summary =
         "Qualifiers/Scope annotations on @Inject methods don't have any effect."
             + " Move the qualifier annotation to the binding location.",
     severity = SeverityLevel.WARNING,
-    tags = StandardTags.LIKELY_ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.LIKELY_ERROR)
 public class QualifierOrScopeOnInjectMethod extends BugChecker implements MethodTreeMatcher {
 
   private static final MultiMatcher<MethodTree, AnnotationTree> QUALIFIER_ANNOTATION_FINDER =
@@ -74,7 +69,7 @@ public class QualifierOrScopeOnInjectMethod extends BugChecker implements Method
       return Description.NO_MATCH;
     }
 
-    Builder fixBuilder = SuggestedFix.builder();
+    SuggestedFix.Builder fixBuilder = SuggestedFix.builder();
     List<AnnotationTree> matchingAnnotations = qualifierAnnotations.matchingNodes();
 
     // If we're looking at an @Inject constructor, move the scope annotation to the class instead,
@@ -108,7 +103,7 @@ public class QualifierOrScopeOnInjectMethod extends BugChecker implements Method
     return describeMatch(matchingAnnotations.get(0), fixBuilder.build());
   }
 
-  private static void deleteAll(List<AnnotationTree> scopes, Builder fixBuilder) {
+  private static void deleteAll(List<AnnotationTree> scopes, SuggestedFix.Builder fixBuilder) {
     scopes.forEach(fixBuilder::delete);
   }
 }

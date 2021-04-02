@@ -63,7 +63,7 @@ public class MustBeClosedCheckerPositiveCases {
     }
   }
 
-  static interface Lambda {
+  interface Lambda {
 
     Closeable expression();
   }
@@ -163,5 +163,30 @@ public class MustBeClosedCheckerPositiveCases {
   void twrStream() {
     // BUG: Diagnostic contains:
     try (Stream<String> stream = new CloseableFoo().stream()) {}
+  }
+
+  void constructorsTransitivelyRequiredAnnotation() {
+    abstract class Parent implements AutoCloseable {
+      @MustBeClosed
+      Parent() {}
+
+      // BUG: Diagnostic contains: Invoked constructor is marked @MustBeClosed
+      Parent(int i) {
+        this();
+      }
+    }
+
+    // BUG: Diagnostic contains: Implicitly invoked constructor is marked @MustBeClosed
+    abstract class ChildDefaultConstructor extends Parent {}
+
+    abstract class ChildExplicitConstructor extends Parent {
+      // BUG: Diagnostic contains: Invoked constructor is marked @MustBeClosed
+      ChildExplicitConstructor() {}
+
+      // BUG: Diagnostic contains: Invoked constructor is marked @MustBeClosed
+      ChildExplicitConstructor(int a) {
+        super();
+      }
+    }
   }
 }

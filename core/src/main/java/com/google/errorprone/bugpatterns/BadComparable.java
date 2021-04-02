@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
@@ -28,7 +27,6 @@ import static com.google.errorprone.matchers.MethodVisibility.Visibility.PUBLIC;
 import static com.google.errorprone.suppliers.Suppliers.INT_TYPE;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TypeCastTreeMatcher;
@@ -50,10 +48,8 @@ import com.sun.tools.javac.code.TypeTag;
 @BugPattern(
     name = "BadComparable",
     summary = "Possible sign flip from narrowing conversion",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class BadComparable extends BugChecker implements TypeCastTreeMatcher {
   /** Matcher for the overriding method of 'int java.lang.Comparable.compareTo(T other)' */
   private static final Matcher<MethodTree> COMPARABLE_METHOD_MATCHER =
@@ -82,9 +78,10 @@ public class BadComparable extends BugChecker implements TypeCastTreeMatcher {
    * when they're not the same, in which case we prefer the type of the expression. This ensures
    * that a byte/short subtracted from another byte/short isn't regarded as an int.
    */
-  private static Type getTypeOfSubtract(BinaryTree expression) {
+  private static Type getTypeOfSubtract(BinaryTree expression, VisitorState state) {
     Type expressionType = ASTHelpers.getType(expression.getLeftOperand());
-    if (!expressionType.equals(ASTHelpers.getType(expression.getRightOperand()))) {
+    if (!ASTHelpers.isSameType(
+        expressionType, ASTHelpers.getType(expression.getRightOperand()), state)) {
       return ASTHelpers.getType(expression);
     }
     return expressionType;
@@ -94,7 +91,7 @@ public class BadComparable extends BugChecker implements TypeCastTreeMatcher {
    * Matches if this is a narrowing integral cast between signed types where the expression is a
    * subtract.
    */
-  private boolean matches(TypeCastTree tree, VisitorState state) {
+  private static boolean matches(TypeCastTree tree, VisitorState state) {
     Type treeType = ASTHelpers.getType(tree.getType());
 
     // If the cast isn't narrowing to an int then don't implicate it in the bug pattern.
@@ -110,7 +107,7 @@ public class BadComparable extends BugChecker implements TypeCastTreeMatcher {
 
     // Ensure the expression type is wider and signed (ie a long) than the cast type ignoring
     // boxing.
-    Type expressionType = getTypeOfSubtract((BinaryTree) expression);
+    Type expressionType = getTypeOfSubtract((BinaryTree) expression, state);
     TypeTag expressionTypeTag = state.getTypes().unboxedTypeOrType(expressionType).getTag();
     return (expressionTypeTag == TypeTag.LONG);
   }
@@ -143,9 +140,19 @@ public class BadComparable extends BugChecker implements TypeCastTreeMatcher {
     ExpressionTree rhs = subtract.getRightOperand();
     Fix fix;
     if (ASTHelpers.getType(lhs).isPrimitive()) {
-      fix = SuggestedFix.replace(tree, "Long.compare(" + lhs + ", " + rhs + ")");
+      fix =
+          SuggestedFix.replace(
+              tree,
+              "Long.compare("
+                  + state.getSourceForNode(lhs)
+                  + ", "
+                  + state.getSourceForNode(rhs)
+                  + ")");
     } else {
-      fix = SuggestedFix.replace(tree, lhs + ".compareTo(" + rhs + ")");
+      fix =
+          SuggestedFix.replace(
+              tree,
+              state.getSourceForNode(lhs) + ".compareTo(" + state.getSourceForNode(rhs) + ")");
     }
     return describeMatch(tree, fix);
   }

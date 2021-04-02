@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.GUAVA;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 
 import com.google.common.util.concurrent.AsyncFunction;
@@ -26,9 +25,7 @@ import com.google.errorprone.BugPattern;
 @BugPattern(
     name = "AsyncFunctionReturnsNull",
     summary = "AsyncFunction should not return a null Future, only a Future whose result is null.",
-    category = GUAVA,
-    severity = ERROR,
-    generateExamplesFromTestCases = false)
+    severity = ERROR)
 public final class AsyncFunctionReturnsNull extends AbstractAsyncTypeReturnsNull {
   public AsyncFunctionReturnsNull() {
     super(AsyncFunction.class);

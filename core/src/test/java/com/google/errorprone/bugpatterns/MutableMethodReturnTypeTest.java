@@ -276,9 +276,10 @@ public class MutableMethodReturnTypeTest {
             "Test.java",
             "import com.google.common.collect.ImmutableList;",
             "import com.google.common.collect.ImmutableSet;",
+            "import java.util.Collection;",
             "class Test {",
             "  // BUG: Diagnostic contains: ImmutableCollection<String> foo()",
-            "  final Iterable<String> foo() {",
+            "  final Collection<String> foo() {",
             "    if (true) {",
             "      return ImmutableList.of();",
             "    } else {",
@@ -325,6 +326,109 @@ public class MutableMethodReturnTypeTest {
             "    } else {",
             "      return ImmutableMap.of();",
             "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void returnTypeList_insideAnonymousNested_suggestsImmutableList() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import com.google.inject.Provider;",
+            "import java.util.List;",
+            "class Test {",
+            "  private static final int getFooLength() {",
+            "    final Provider<List<String>> fooProvider = ",
+            "      new Provider<List<String>>() {",
+            "        @Override",
+            "        // BUG: Diagnostic contains: ImmutableList<String> get",
+            "        public List<String> get() {",
+            "          return ImmutableList.of(\"foo\", \"bar\");",
+            "        }",
+            "      };",
+            "    List<String> foo = fooProvider.get();",
+            "    return foo.size();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void returnTypeList_anonymousLambda_suggestsNothing() {
+    testHelper
+        .addSourceLines(
+            "ApplyInterface.java",
+            "import java.util.function.Function;",
+            "import java.util.List;",
+            "public interface ApplyInterface {",
+            "  int applyAndGetSize(Function<String, List<String>> fun);",
+            "}")
+        .addSourceLines(
+            "ApplyImpl.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import java.util.function.Function;",
+            "import java.util.List;",
+            "public class ApplyImpl implements ApplyInterface {",
+            "  public int applyAndGetSize(Function<String, List<String>> fun) {",
+            "    List<String> result = fun.apply(\"foo,bar\");",
+            "    return result.size();",
+            "  }",
+            "}")
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import java.util.function.Function;",
+            "import java.util.List;",
+            "class Test {",
+            "  private static final ApplyInterface APPLY = new ApplyImpl();",
+            "  private int doApply() {",
+            "    int result = APPLY.applyAndGetSize(str -> {",
+            "        ImmutableList<String> res = ImmutableList.of(str, str);",
+            "        return res;",
+            "      });",
+            "    return result;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void overridingMethod_specialNotice() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import com.google.inject.Provider;",
+            "import java.util.List;",
+            "class Test {",
+            "  private static final int getFooLength() {",
+            "    final Provider<List<String>> fooProvider = ",
+            "      new Provider<List<String>>() {",
+            "        @Override",
+            "        // BUG: Diagnostic contains: narrow the return type",
+            "        public List<String> get() {",
+            "          return ImmutableList.of(\"foo\", \"bar\");",
+            "        }",
+            "      };",
+            "    List<String> foo = fooProvider.get();",
+            "    return foo.size();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void negative_iterable() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "class Test {",
+            "  final Iterable<String> foo() {",
+            "    return ImmutableList.of();",
             "  }",
             "}")
         .doTest();

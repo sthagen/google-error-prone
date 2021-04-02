@@ -16,17 +16,16 @@
 
 package com.google.errorprone.bugpatterns.argumentselectiondefects;
 
-import static com.google.errorprone.BugPattern.Category.JUNIT;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.MethodInvocationTree;
+import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import java.util.function.Function;
@@ -46,16 +45,14 @@ import javax.lang.model.element.ElementKind;
 @BugPattern(
     name = "AssertEqualsArgumentOrderChecker",
     summary = "Arguments are swapped in assertEquals-like call",
-    category = JUNIT,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class AssertEqualsArgumentOrderChecker extends BugChecker
     implements MethodInvocationTreeMatcher {
 
   private final ArgumentChangeFinder argumentchangeFinder =
       ArgumentChangeFinder.builder()
           .setDistanceFunction(buildDistanceFunction())
-          .addHeuristic(changeMustBeBetterThanOriginal())
+          .addHeuristic(AssertEqualsArgumentOrderChecker::changeMustBeBetterThanOriginal)
           .addHeuristic(new CreatesDuplicateCallHeuristic())
           .addHeuristic(new NameInCommentHeuristic())
           .build();
@@ -143,8 +140,8 @@ public class AssertEqualsArgumentOrderChecker extends BugChecker
     return false;
   }
 
-  private static Heuristic changeMustBeBetterThanOriginal() {
-    return (changes, node, sym, state) ->
-        changes.totalAssignmentCost() < changes.totalOriginalCost();
+  private static boolean changeMustBeBetterThanOriginal(
+      Changes changes, Tree node, MethodSymbol sym, VisitorState state) {
+    return changes.totalAssignmentCost() < changes.totalOriginalCost();
   }
 }

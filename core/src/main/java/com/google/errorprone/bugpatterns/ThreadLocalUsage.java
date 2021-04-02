@@ -29,7 +29,6 @@ import static com.google.errorprone.util.ASTHelpers.isSubtype;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
 import com.google.errorprone.matchers.Description;
@@ -42,12 +41,11 @@ import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ThreadLocalUsage",
     summary = "ThreadLocals should be stored in static fields",
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class ThreadLocalUsage extends BugChecker implements NewClassTreeMatcher {
 
   private static final Matcher<ExpressionTree> NEW_THREAD_LOCAL =
@@ -103,7 +101,7 @@ public class ThreadLocalUsage extends BugChecker implements NewClassTreeMatcher 
           "java.lang.Double");
 
   /** Ignore some common ThreadLocal type arguments that are fine to have per-instance copies of. */
-  private boolean wellKnownTypeArgument(NewClassTree tree, VisitorState state) {
+  private static boolean wellKnownTypeArgument(NewClassTree tree, VisitorState state) {
     Type type = getType(tree);
     if (type == null) {
       return false;

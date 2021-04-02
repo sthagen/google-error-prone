@@ -17,20 +17,17 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getLast;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.SwitchTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
-import com.google.errorprone.util.ErrorProneTokens;
 import com.google.errorprone.util.Reachability;
 import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.SwitchTree;
@@ -38,17 +35,15 @@ import com.sun.tools.javac.code.Type;
 import java.util.Optional;
 import javax.lang.model.element.ElementKind;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MissingDefault",
-    category = JDK,
     summary =
         "The Google Java Style Guide requires that each switch statement includes a default"
             + " statement group, even if it contains no code. (This requirement is lifted for any"
             + " switch statement that covers all values of an enum.)",
     severity = WARNING,
-    tags = StandardTags.STYLE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.STYLE)
 public class MissingDefault extends BugChecker implements SwitchTreeMatcher {
   @Override
   public Description matchSwitch(SwitchTree tree, VisitorState state) {
@@ -82,15 +77,13 @@ public class MissingDefault extends BugChecker implements SwitchTreeMatcher {
       return NO_MATCH;
     }
     // If `default` case is empty, and last in switch, add `// fall out` comment
-    // TODO(epmjohnston): Maybe move comment logic to go/bugpattern/FallThrough
+    // TODO(epmjohnston): Maybe move comment logic to https://errorprone.info/bugpattern/FallThrough
     int idx = tree.getCases().indexOf(defaultCase);
     if (idx != tree.getCases().size() - 1) {
       return NO_MATCH;
     }
-    int end = state.getEndPosition(tree);
-    if (ErrorProneTokens.getTokens(
-            state.getSourceCode().subSequence(state.getEndPosition(defaultCase), end).toString(),
-            state.context)
+    if (state
+        .getOffsetTokens(state.getEndPosition(defaultCase), state.getEndPosition(tree))
         .stream()
         .anyMatch(t -> !t.comments().isEmpty())) {
       return NO_MATCH;

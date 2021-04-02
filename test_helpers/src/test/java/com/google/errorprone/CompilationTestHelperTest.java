@@ -17,7 +17,6 @@
 package com.google.errorprone;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static org.junit.Assert.assertThrows;
@@ -31,7 +30,6 @@ import com.google.errorprone.matchers.Description;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ReturnTree;
 import com.sun.tools.javac.main.Main.Result;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -40,12 +38,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class CompilationTestHelperTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(ReturnTreeChecker.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(ReturnTreeChecker.class, getClass());
 
   @Test
   public void fileWithNoBugMarkersAndNoErrorsShouldPass() {
@@ -67,7 +61,7 @@ public class CompilationTestHelperTest {
                         "  }",
                         "}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Saw unexpected error on line 3");
+    assertThat(expected).hasMessageThat().contains("Saw unexpected error on line 3");
   }
 
   @Test
@@ -84,7 +78,7 @@ public class CompilationTestHelperTest {
                         "  public void doIt() {}",
                         "}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Did not see an error on line 3");
+    assertThat(expected).hasMessageThat().contains("Did not see an error on line 3");
   }
 
   @Test
@@ -102,7 +96,7 @@ public class CompilationTestHelperTest {
                         "}")
                     .expectErrorMessage("X", Predicates.containsPattern(""))
                     .doTest());
-    assertThat(expected.getMessage()).contains("Did not see an error on line 3");
+    assertThat(expected).hasMessageThat().contains("Did not see an error on line 3");
   }
 
   @Test
@@ -150,7 +144,7 @@ public class CompilationTestHelperTest {
                         "  }",
                         "}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Did not see an error on line 3");
+    assertThat(expected).hasMessageThat().contains("Did not see an error on line 3");
   }
 
   @Test
@@ -170,7 +164,7 @@ public class CompilationTestHelperTest {
                         "}")
                     .expectErrorMessage("X", Predicates.containsPattern(""))
                     .doTest());
-    assertThat(expected.getMessage()).contains("Did not see an error on line 3");
+    assertThat(expected).hasMessageThat().contains("Did not see an error on line 3");
   }
 
   @Test
@@ -247,8 +241,7 @@ public class CompilationTestHelperTest {
                         "    return}",
                         "}")
                     .doTest());
-    assertThat(expected.getMessage())
-        .contains("Test program failed to compile with non Error Prone error");
+    assertThat(expected).hasMessageThat().contains("error: illegal start of expression");
   }
 
   @Test
@@ -269,7 +262,7 @@ public class CompilationTestHelperTest {
                     .expectResult(Result.ERROR)
                     .addSourceLines("Test.java", "public class Test {}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Expected compilation result ERROR, but was OK");
+    assertThat(expected).hasMessageThat().contains("Expected compilation result ERROR, but was OK");
   }
 
   @Test
@@ -306,7 +299,7 @@ public class CompilationTestHelperTest {
                         "  }",
                         "}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Expected no diagnostics produced, but found 1");
+    assertThat(expected).hasMessageThat().contains("Expected no diagnostics produced, but found 1");
   }
 
   @Test
@@ -327,7 +320,7 @@ public class CompilationTestHelperTest {
                         "}")
                     .expectErrorMessage("X", Predicates.containsPattern(""))
                     .doTest());
-    assertThat(expected.getMessage()).contains("Expected no diagnostics produced, but found 1");
+    assertThat(expected).hasMessageThat().contains("Expected no diagnostics produced, but found 1");
   }
 
   @Test
@@ -341,7 +334,6 @@ public class CompilationTestHelperTest {
                     .addSourceLines("Test.java", "public class Test {}")
                     .setArgs(
                         ImmutableList.of("-Xep:ReturnTreeChecker:Squirrels")) // Bad flag crashes.
-                    .ignoreJavacErrors()
                     .doTest());
     assertThat(expected)
         .hasMessageThat()
@@ -374,14 +366,13 @@ public class CompilationTestHelperTest {
                     .addSourceLines(
                         "Test.java", " // BUG: Diagnostic matches: X", "public class Test {}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("No expected error message with key [X]");
+    assertThat(expected).hasMessageThat().contains("No expected error message with key [X]");
   }
 
   @BugPattern(
       name = "ReturnTreeChecker",
       summary = "Method may return normally.",
       explanation = "Consider mutating some global state instead.",
-      category = JDK,
       severity = ERROR)
   public static class ReturnTreeChecker extends BugChecker implements ReturnTreeMatcher {
     @Override
@@ -399,14 +390,13 @@ public class CompilationTestHelperTest {
                 CompilationTestHelper.newInstance(PackageTreeChecker.class, getClass())
                     .addSourceLines("test/Test.java", "package test;", "public class Test {}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Package declaration found");
+    assertThat(expected).hasMessageThat().contains("Package declaration found");
   }
 
   @BugPattern(
       name = "PackageTreeChecker",
       summary = "Package declaration found",
       explanation = "Prefer to use the default package for everything.",
-      category = JDK,
       severity = ERROR)
   public static class PackageTreeChecker extends BugChecker implements CompilationUnitTreeMatcher {
     @Override
@@ -419,15 +409,12 @@ public class CompilationTestHelperTest {
   }
 
   @BugPattern(
-      name = "ThisCheckerCannotBeInstantiated",
-      summary = "A checker that Error Prone can't instantiate.",
-      category = JDK,
+      name = "PrivateConstructorChecker",
+      summary = "A checker that Error Prone can't instantiate because its constructor is private.",
       severity = ERROR)
-  public static class ThisCheckerCannotBeInstantiated extends BugChecker
+  public static class PrivateConstructorChecker extends BugChecker
       implements CompilationUnitTreeMatcher {
-    // One way to create a non-instantiable checker is to make it a non-static nested class.
-    // Here, we just make the constructor private.
-    private ThisCheckerCannotBeInstantiated() {}
+    private PrivateConstructorChecker() {}
 
     @Override
     public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
@@ -436,18 +423,135 @@ public class CompilationTestHelperTest {
   }
 
   @Test
-  public void cannotInstantiateChecker() {
+  public void cannotInstantiateCheckerWithPrivateConstructor() {
     AssertionError expected =
         assertThrows(
             AssertionError.class,
             () ->
-                CompilationTestHelper.newInstance(ThisCheckerCannotBeInstantiated.class, getClass())
+                CompilationTestHelper.newInstance(PrivateConstructorChecker.class, getClass())
                     .addSourceLines(
                         "test/Test.java",
                         "package test;",
                         "// BUG: Diagnostic contains:",
                         "public class Test {}")
                     .doTest());
-    assertThat(expected.getMessage()).contains("Could not instantiate BugChecker");
+    assertThat(expected).hasMessageThat().contains("Could not instantiate BugChecker");
+    assertThat(expected)
+        .hasMessageThat()
+        .contains("Are both the class and the zero-arg constructor public?");
+  }
+
+  @BugPattern(
+      name = "PrivateChecker",
+      summary =
+          "A checker that Error Prone can't instantiate because it is private and has a default"
+              + " constructor.",
+      severity = ERROR)
+  private static class PrivateChecker extends BugChecker implements CompilationUnitTreeMatcher {
+
+    // By JLS 8.8.9, if there are no constructor declarations, then a default constructor with the
+    // same access modifier as the class is implicitly declared.  So here there is a default
+    // constructor with private access.
+
+    @Override
+    public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
+      return NO_MATCH;
+    }
+  }
+
+  @Test
+  public void cannotInstantiatePrivateChecker() {
+    AssertionError expected =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                CompilationTestHelper.newInstance(PrivateChecker.class, getClass())
+                    .addSourceLines(
+                        "test/Test.java",
+                        "package test;",
+                        "// BUG: Diagnostic contains:",
+                        "public class Test {}")
+                    .doTest());
+    assertThat(expected).hasMessageThat().contains("Could not instantiate BugChecker");
+    assertThat(expected)
+        .hasMessageThat()
+        .contains("Are both the class and the zero-arg constructor public?");
+  }
+
+  @BugPattern(
+      name = "PrivateCheckerWithPublicConstructor",
+      summary =
+          "A checker that Error Prone can't instantiate because the class is private even though"
+              + " the constructor is public.",
+      severity = ERROR)
+  private static class PrivateCheckerWithPublicConstructor extends BugChecker
+      implements CompilationUnitTreeMatcher {
+    public PrivateCheckerWithPublicConstructor() {}
+
+    @Override
+    public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
+      return NO_MATCH;
+    }
+  }
+
+  @Test
+  public void cannotInstantiatePrivateCheckerWithPublicConstructor() {
+    AssertionError expected =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                CompilationTestHelper.newInstance(
+                        PrivateCheckerWithPublicConstructor.class, getClass())
+                    .addSourceLines(
+                        "test/Test.java",
+                        "package test;",
+                        "// BUG: Diagnostic contains:",
+                        "public class Test {}")
+                    .doTest());
+    assertThat(expected).hasMessageThat().contains("Could not instantiate BugChecker");
+    assertThat(expected)
+        .hasMessageThat()
+        .contains("Are both the class and the zero-arg constructor public?");
+  }
+
+  /** Test classes used for withClassPath tests */
+  public static class WithClassPath extends WithClassPathSuper {}
+
+  public static class WithClassPathSuper {}
+
+  @Test
+  public void withClassPath_success() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import " + WithClassPath.class.getCanonicalName() + ";",
+            "class Test extends WithClassPath {}")
+        .withClasspath(
+            CompilationTestHelperTest.class, WithClassPath.class, WithClassPathSuper.class)
+        .doTest();
+  }
+
+  @Test
+  public void withClassPath_failure() {
+    // disable checkWellFormed
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import " + WithClassPath.class.getCanonicalName() + ";",
+            "// BUG: Diagnostic contains: cannot access "
+                + WithClassPathSuper.class.getCanonicalName(),
+            "class Test extends WithClassPath {}")
+        .withClasspath(CompilationTestHelperTest.class, WithClassPath.class)
+        .matchAllDiagnostics()
+        .expectResult(Result.ERROR)
+        .doTest();
+  }
+
+  @Test
+  public void onlyCallDoTestOnce() {
+    compilationHelper.addSourceLines("Test.java", "public class Test {}").doTest();
+    IllegalStateException expected =
+        assertThrows(IllegalStateException.class, () -> compilationHelper.doTest());
+    assertThat(expected).hasMessageThat().contains("doTest");
   }
 }

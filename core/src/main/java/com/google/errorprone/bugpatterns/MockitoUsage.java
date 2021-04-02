@@ -16,13 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.MOCKITO;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -35,13 +33,11 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
 import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "MockitoUsage",
     summary = "Missing method call for verify(mock) here",
-    category = MOCKITO,
-    severity = ERROR,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = ERROR)
 public class MockitoUsage extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final String MESSAGE_FORMAT = "Missing method call for %s here";
@@ -55,7 +51,7 @@ public class MockitoUsage extends BugChecker implements MethodInvocationTreeMatc
               .withSignature("<T>verify(T,org.mockito.verification.VerificationMode)"));
 
   private static final Matcher<ExpressionTree> NEVER_METHOD =
-      staticMethod().onClass("org.mockito.Mockito").withSignature("never()");
+      staticMethod().onClass("org.mockito.Mockito").named("never").withParameters();
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
@@ -81,7 +77,7 @@ public class MockitoUsage extends BugChecker implements MethodInvocationTreeMatc
    *   <li>Finally, offer to delete the mock statement.
    * </ul>
    */
-  private void buildFix(
+  private static void buildFix(
       Description.Builder builder, MethodInvocationTree tree, VisitorState state) {
     MethodInvocationTree mockitoCall = tree;
     List<? extends ExpressionTree> args = mockitoCall.getArguments();
@@ -101,7 +97,8 @@ public class MockitoUsage extends BugChecker implements MethodInvocationTreeMatc
       builder.addFix(
           SuggestedFix.builder()
               .addStaticImport("org.mockito.Mockito.verifyZeroInteractions")
-              .replace(tree, String.format("verifyZeroInteractions(%s)", mock))
+              .replace(
+                  tree, String.format("verifyZeroInteractions(%s)", state.getSourceForNode(mock)))
               .build());
     }
     // Always suggest the naive semantics-preserving option, which is just to

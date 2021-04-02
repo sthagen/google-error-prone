@@ -24,87 +24,85 @@ import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.dataflow.AccessPath;
 import com.google.errorprone.dataflow.AccessPathStore;
 import com.google.errorprone.dataflow.AccessPathValues;
-import com.google.errorprone.dataflow.LocalVariableValues;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import org.checkerframework.dataflow.analysis.ConditionalTransferResult;
-import org.checkerframework.dataflow.analysis.RegularTransferResult;
-import org.checkerframework.dataflow.analysis.TransferFunction;
-import org.checkerframework.dataflow.analysis.TransferInput;
-import org.checkerframework.dataflow.analysis.TransferResult;
-import org.checkerframework.dataflow.cfg.UnderlyingAST;
-import org.checkerframework.dataflow.cfg.node.ArrayAccessNode;
-import org.checkerframework.dataflow.cfg.node.ArrayCreationNode;
-import org.checkerframework.dataflow.cfg.node.ArrayTypeNode;
-import org.checkerframework.dataflow.cfg.node.AssertionErrorNode;
-import org.checkerframework.dataflow.cfg.node.AssignmentNode;
-import org.checkerframework.dataflow.cfg.node.BitwiseAndNode;
-import org.checkerframework.dataflow.cfg.node.BitwiseComplementNode;
-import org.checkerframework.dataflow.cfg.node.BitwiseOrNode;
-import org.checkerframework.dataflow.cfg.node.BitwiseXorNode;
-import org.checkerframework.dataflow.cfg.node.BooleanLiteralNode;
-import org.checkerframework.dataflow.cfg.node.CaseNode;
-import org.checkerframework.dataflow.cfg.node.CharacterLiteralNode;
-import org.checkerframework.dataflow.cfg.node.ClassDeclarationNode;
-import org.checkerframework.dataflow.cfg.node.ClassNameNode;
-import org.checkerframework.dataflow.cfg.node.ConditionalAndNode;
-import org.checkerframework.dataflow.cfg.node.ConditionalNotNode;
-import org.checkerframework.dataflow.cfg.node.ConditionalOrNode;
-import org.checkerframework.dataflow.cfg.node.DoubleLiteralNode;
-import org.checkerframework.dataflow.cfg.node.EqualToNode;
-import org.checkerframework.dataflow.cfg.node.ExplicitThisLiteralNode;
-import org.checkerframework.dataflow.cfg.node.FieldAccessNode;
-import org.checkerframework.dataflow.cfg.node.FloatLiteralNode;
-import org.checkerframework.dataflow.cfg.node.FloatingDivisionNode;
-import org.checkerframework.dataflow.cfg.node.FloatingRemainderNode;
-import org.checkerframework.dataflow.cfg.node.FunctionalInterfaceNode;
-import org.checkerframework.dataflow.cfg.node.GreaterThanNode;
-import org.checkerframework.dataflow.cfg.node.GreaterThanOrEqualNode;
-import org.checkerframework.dataflow.cfg.node.ImplicitThisLiteralNode;
-import org.checkerframework.dataflow.cfg.node.InstanceOfNode;
-import org.checkerframework.dataflow.cfg.node.IntegerDivisionNode;
-import org.checkerframework.dataflow.cfg.node.IntegerLiteralNode;
-import org.checkerframework.dataflow.cfg.node.IntegerRemainderNode;
-import org.checkerframework.dataflow.cfg.node.LambdaResultExpressionNode;
-import org.checkerframework.dataflow.cfg.node.LeftShiftNode;
-import org.checkerframework.dataflow.cfg.node.LessThanNode;
-import org.checkerframework.dataflow.cfg.node.LessThanOrEqualNode;
-import org.checkerframework.dataflow.cfg.node.LocalVariableNode;
-import org.checkerframework.dataflow.cfg.node.LongLiteralNode;
-import org.checkerframework.dataflow.cfg.node.MarkerNode;
-import org.checkerframework.dataflow.cfg.node.MethodAccessNode;
-import org.checkerframework.dataflow.cfg.node.MethodInvocationNode;
-import org.checkerframework.dataflow.cfg.node.NarrowingConversionNode;
-import org.checkerframework.dataflow.cfg.node.Node;
-import org.checkerframework.dataflow.cfg.node.NotEqualNode;
-import org.checkerframework.dataflow.cfg.node.NullChkNode;
-import org.checkerframework.dataflow.cfg.node.NullLiteralNode;
-import org.checkerframework.dataflow.cfg.node.NumericalAdditionNode;
-import org.checkerframework.dataflow.cfg.node.NumericalMinusNode;
-import org.checkerframework.dataflow.cfg.node.NumericalMultiplicationNode;
-import org.checkerframework.dataflow.cfg.node.NumericalPlusNode;
-import org.checkerframework.dataflow.cfg.node.NumericalSubtractionNode;
-import org.checkerframework.dataflow.cfg.node.ObjectCreationNode;
-import org.checkerframework.dataflow.cfg.node.PackageNameNode;
-import org.checkerframework.dataflow.cfg.node.ParameterizedTypeNode;
-import org.checkerframework.dataflow.cfg.node.PrimitiveTypeNode;
-import org.checkerframework.dataflow.cfg.node.ReturnNode;
-import org.checkerframework.dataflow.cfg.node.ShortLiteralNode;
-import org.checkerframework.dataflow.cfg.node.SignedRightShiftNode;
-import org.checkerframework.dataflow.cfg.node.StringConcatenateAssignmentNode;
-import org.checkerframework.dataflow.cfg.node.StringConcatenateNode;
-import org.checkerframework.dataflow.cfg.node.StringConversionNode;
-import org.checkerframework.dataflow.cfg.node.StringLiteralNode;
-import org.checkerframework.dataflow.cfg.node.SuperNode;
-import org.checkerframework.dataflow.cfg.node.SynchronizedNode;
-import org.checkerframework.dataflow.cfg.node.TernaryExpressionNode;
-import org.checkerframework.dataflow.cfg.node.ThrowNode;
-import org.checkerframework.dataflow.cfg.node.TypeCastNode;
-import org.checkerframework.dataflow.cfg.node.UnsignedRightShiftNode;
-import org.checkerframework.dataflow.cfg.node.VariableDeclarationNode;
-import org.checkerframework.dataflow.cfg.node.WideningConversionNode;
+import org.checkerframework.shaded.dataflow.analysis.ConditionalTransferResult;
+import org.checkerframework.shaded.dataflow.analysis.ForwardTransferFunction;
+import org.checkerframework.shaded.dataflow.analysis.RegularTransferResult;
+import org.checkerframework.shaded.dataflow.analysis.TransferInput;
+import org.checkerframework.shaded.dataflow.analysis.TransferResult;
+import org.checkerframework.shaded.dataflow.cfg.UnderlyingAST;
+import org.checkerframework.shaded.dataflow.cfg.node.ArrayAccessNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ArrayCreationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ArrayTypeNode;
+import org.checkerframework.shaded.dataflow.cfg.node.AssertionErrorNode;
+import org.checkerframework.shaded.dataflow.cfg.node.AssignmentNode;
+import org.checkerframework.shaded.dataflow.cfg.node.BitwiseAndNode;
+import org.checkerframework.shaded.dataflow.cfg.node.BitwiseComplementNode;
+import org.checkerframework.shaded.dataflow.cfg.node.BitwiseOrNode;
+import org.checkerframework.shaded.dataflow.cfg.node.BitwiseXorNode;
+import org.checkerframework.shaded.dataflow.cfg.node.BooleanLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.CaseNode;
+import org.checkerframework.shaded.dataflow.cfg.node.CharacterLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ClassDeclarationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ClassNameNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ConditionalAndNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ConditionalNotNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ConditionalOrNode;
+import org.checkerframework.shaded.dataflow.cfg.node.DoubleLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.EqualToNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ExplicitThisNode;
+import org.checkerframework.shaded.dataflow.cfg.node.FieldAccessNode;
+import org.checkerframework.shaded.dataflow.cfg.node.FloatLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.FloatingDivisionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.FloatingRemainderNode;
+import org.checkerframework.shaded.dataflow.cfg.node.FunctionalInterfaceNode;
+import org.checkerframework.shaded.dataflow.cfg.node.GreaterThanNode;
+import org.checkerframework.shaded.dataflow.cfg.node.GreaterThanOrEqualNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ImplicitThisNode;
+import org.checkerframework.shaded.dataflow.cfg.node.InstanceOfNode;
+import org.checkerframework.shaded.dataflow.cfg.node.IntegerDivisionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.IntegerLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.IntegerRemainderNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LambdaResultExpressionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LeftShiftNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LessThanNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LessThanOrEqualNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LocalVariableNode;
+import org.checkerframework.shaded.dataflow.cfg.node.LongLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.MarkerNode;
+import org.checkerframework.shaded.dataflow.cfg.node.MethodAccessNode;
+import org.checkerframework.shaded.dataflow.cfg.node.MethodInvocationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NarrowingConversionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.Node;
+import org.checkerframework.shaded.dataflow.cfg.node.NotEqualNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NullChkNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NullLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NumericalAdditionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NumericalMinusNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NumericalMultiplicationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NumericalPlusNode;
+import org.checkerframework.shaded.dataflow.cfg.node.NumericalSubtractionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ObjectCreationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.PackageNameNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ParameterizedTypeNode;
+import org.checkerframework.shaded.dataflow.cfg.node.PrimitiveTypeNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ReturnNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ShortLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.SignedRightShiftNode;
+import org.checkerframework.shaded.dataflow.cfg.node.StringConcatenateAssignmentNode;
+import org.checkerframework.shaded.dataflow.cfg.node.StringConcatenateNode;
+import org.checkerframework.shaded.dataflow.cfg.node.StringConversionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.StringLiteralNode;
+import org.checkerframework.shaded.dataflow.cfg.node.SuperNode;
+import org.checkerframework.shaded.dataflow.cfg.node.SynchronizedNode;
+import org.checkerframework.shaded.dataflow.cfg.node.TernaryExpressionNode;
+import org.checkerframework.shaded.dataflow.cfg.node.ThrowNode;
+import org.checkerframework.shaded.dataflow.cfg.node.TypeCastNode;
+import org.checkerframework.shaded.dataflow.cfg.node.UnsignedRightShiftNode;
+import org.checkerframework.shaded.dataflow.cfg.node.VariableDeclarationNode;
+import org.checkerframework.shaded.dataflow.cfg.node.WideningConversionNode;
 
 /**
  * A default implementation of a transfer function for nullability analysis with more convenient
@@ -126,7 +124,7 @@ import org.checkerframework.dataflow.cfg.node.WideningConversionNode;
  * @author cpovirk@google.com (Chris Povirk)
  */
 abstract class AbstractNullnessPropagationTransfer
-    implements TransferFunction<Nullness, AccessPathStore<Nullness>> {
+    implements ForwardTransferFunction<Nullness, AccessPathStore<Nullness>> {
   @Override
   public AccessPathStore<Nullness> initialStore(
       UnderlyingAST underlyingAST, List<LocalVariableNode> parameters) {
@@ -177,8 +175,8 @@ abstract class AbstractNullnessPropagationTransfer
     return NULLABLE;
   }
 
-  /** "Summary" method called by default for every {@code ThisLiteralNode}. */
-  Nullness visitThisLiteral() {
+  /** "Summary" method called by default for every {@code ThisNode}. */
+  Nullness visitThis() {
     return NULLABLE;
   }
 
@@ -277,7 +275,7 @@ abstract class AbstractNullnessPropagationTransfer
     return updateRegularStore(result, input, updates);
   }
 
-  Nullness visitLocalVariable(LocalVariableNode node, LocalVariableValues<Nullness> store) {
+  Nullness visitLocalVariable(LocalVariableNode node, AccessPathValues<Nullness> store) {
     return NULLABLE;
   }
 
@@ -363,7 +361,7 @@ abstract class AbstractNullnessPropagationTransfer
   }
 
   @CheckReturnValue
-  private TransferResult<Nullness, AccessPathStore<Nullness>> updateRegularStore(
+  private static TransferResult<Nullness, AccessPathStore<Nullness>> updateRegularStore(
       Nullness value, TransferInput<?, AccessPathStore<Nullness>> input, ReadableUpdates updates) {
     ResultingStore newStore = updateStore(input.getRegularStore(), updates);
     return new RegularTransferResult<>(value, newStore.store, newStore.storeChanged);
@@ -764,25 +762,25 @@ abstract class AbstractNullnessPropagationTransfer
   }
 
   @Override
-  public final TransferResult<Nullness, AccessPathStore<Nullness>> visitImplicitThisLiteral(
-      ImplicitThisLiteralNode node, TransferInput<Nullness, AccessPathStore<Nullness>> input) {
-    Nullness value = visitImplicitThisLiteral();
+  public final TransferResult<Nullness, AccessPathStore<Nullness>> visitImplicitThis(
+      ImplicitThisNode node, TransferInput<Nullness, AccessPathStore<Nullness>> input) {
+    Nullness value = visitImplicitThis();
     return noStoreChanges(value, input);
   }
 
-  Nullness visitImplicitThisLiteral() {
-    return visitThisLiteral();
+  Nullness visitImplicitThis() {
+    return visitThis();
   }
 
   @Override
-  public final TransferResult<Nullness, AccessPathStore<Nullness>> visitExplicitThisLiteral(
-      ExplicitThisLiteralNode node, TransferInput<Nullness, AccessPathStore<Nullness>> input) {
-    Nullness value = visitExplicitThisLiteral();
+  public final TransferResult<Nullness, AccessPathStore<Nullness>> visitExplicitThis(
+      ExplicitThisNode node, TransferInput<Nullness, AccessPathStore<Nullness>> input) {
+    Nullness value = visitExplicitThis();
     return noStoreChanges(value, input);
   }
 
-  Nullness visitExplicitThisLiteral() {
-    return visitThisLiteral();
+  Nullness visitExplicitThis() {
+    return visitThis();
   }
 
   @Override
@@ -1039,7 +1037,7 @@ abstract class AbstractNullnessPropagationTransfer
       AccessPathStore<Nullness> oldStore, ReadableUpdates... updates) {
     AccessPathStore.Builder<Nullness> builder = oldStore.toBuilder();
     for (ReadableUpdates update : updates) {
-      for (Entry<AccessPath, Nullness> entry : update.values.entrySet()) {
+      for (Map.Entry<AccessPath, Nullness> entry : update.values.entrySet()) {
 
         builder.setInformation(entry.getKey(), entry.getValue());
       }

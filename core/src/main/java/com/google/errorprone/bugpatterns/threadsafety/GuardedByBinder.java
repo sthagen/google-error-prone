@@ -41,14 +41,14 @@ import javax.lang.model.element.Name;
  *
  * @author cushon@google.com (Liam Miller-Cushon)
  */
-public class GuardedByBinder {
+public final class GuardedByBinder {
 
   /**
    * Creates a {@link GuardedByExpression} from a bound AST node, or returns {@code
    * Optional.empty()} if the AST node doesn't correspond to a 'simple' lock expression.
    */
   public static Optional<GuardedByExpression> bindExpression(
-      JCTree.JCExpression exp, VisitorState visitorState) {
+      JCTree.JCExpression exp, VisitorState visitorState, GuardedByFlags flags) {
     try {
       return Optional.of(
           bind(
@@ -57,14 +57,16 @@ public class GuardedByBinder {
                   ALREADY_BOUND_RESOLVER,
                   ASTHelpers.getSymbol(visitorState.findEnclosing(ClassTree.class)),
                   visitorState.getTypes(),
-                  Names.instance(visitorState.context))));
+                  visitorState.getNames(),
+                  flags)));
     } catch (IllegalGuardedBy expected) {
       return Optional.empty();
     }
   }
 
   /** Creates a {@link GuardedByExpression} from a string, given the resolution context. */
-  static Optional<GuardedByExpression> bindString(String string, GuardedBySymbolResolver resolver) {
+  static Optional<GuardedByExpression> bindString(
+      String string, GuardedBySymbolResolver resolver, GuardedByFlags flags) {
     try {
       return Optional.of(
           bind(
@@ -72,8 +74,9 @@ public class GuardedByBinder {
               BinderContext.of(
                   resolver,
                   resolver.enclosingClass(),
-                  Types.instance(resolver.context()),
-                  Names.instance(resolver.context()))));
+                  resolver.visitorState().getTypes(),
+                  resolver.visitorState().getNames(),
+                  flags)));
     } catch (IllegalGuardedBy expected) {
       return Optional.empty();
     }
@@ -84,17 +87,20 @@ public class GuardedByBinder {
     final ClassSymbol thisClass;
     final Types types;
     final Names names;
+    final GuardedByFlags flags;
 
-    public BinderContext(Resolver resolver, ClassSymbol thisClass, Types types, Names names) {
+    public BinderContext(
+        Resolver resolver, ClassSymbol thisClass, Types types, Names names, GuardedByFlags flags) {
       this.resolver = resolver;
       this.thisClass = thisClass;
       this.types = types;
       this.names = names;
+      this.flags = flags;
     }
 
     public static BinderContext of(
-        Resolver resolver, ClassSymbol thisClass, Types types, Names names) {
-      return new BinderContext(resolver, thisClass, types, names);
+        Resolver resolver, ClassSymbol thisClass, Types types, Names names, GuardedByFlags flags) {
+      return new BinderContext(resolver, thisClass, types, names, flags);
     }
   }
 
@@ -221,11 +227,8 @@ public class GuardedByBinder {
           checkGuardedBy(base != null, "Bad expression: %s", node.getExpression());
           Symbol sym = context.resolver.resolveSelect(base, node);
           checkGuardedBy(sym != null, "Could not resolve: %s", node);
-          // TODO(cushon): allow MethodSymbol here once clean-up is done
-          checkGuardedBy(
-              sym instanceof Symbol.VarSymbol /* || sym instanceof Symbol.MethodSymbol*/,
-              "Bad member symbol: %s",
-              sym.getClass());
+          boolean condition = sym instanceof Symbol.VarSymbol || sym instanceof Symbol.MethodSymbol;
+          checkGuardedBy(condition, "Bad member symbol: %s", sym.getClass());
           return bindSelect(normalizeBase(context, sym, base), sym);
         }
 
@@ -328,4 +331,6 @@ public class GuardedByBinder {
           return null;
         }
       };
+
+  private GuardedByBinder() {}
 }

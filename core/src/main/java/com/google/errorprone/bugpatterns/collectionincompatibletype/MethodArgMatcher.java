@@ -17,21 +17,27 @@
 package com.google.errorprone.bugpatterns.collectionincompatibletype;
 
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
+import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.common.collect.Iterables;
 import com.google.errorprone.VisitorState;
+import com.google.errorprone.fixes.Fix;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Type;
 import java.util.Collection;
+import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * Matches an instance method like {@link Collection#contains}, for which we just need to compare
  * the method argument's type to the receiver's type argument. This is the common case.
  */
-class MethodArgMatcher extends AbstractCollectionIncompatibleTypeMatcher {
+final class MethodArgMatcher extends AbstractCollectionIncompatibleTypeMatcher {
 
   private final Matcher<ExpressionTree> methodMatcher;
   private final String typeName;
@@ -44,7 +50,7 @@ class MethodArgMatcher extends AbstractCollectionIncompatibleTypeMatcher {
    * @param typeArgIndex The index of the type argument that should match the method argument
    * @param methodArgIndex The index of the method argument that should match the type argument
    */
-  public MethodArgMatcher(String typeName, String signature, int typeArgIndex, int methodArgIndex) {
+  MethodArgMatcher(String typeName, String signature, int typeArgIndex, int methodArgIndex) {
     this.methodMatcher = instanceMethod().onDescendantOf(typeName).withSignature(signature);
     this.typeName = typeName;
     this.typeArgIndex = typeArgIndex;
@@ -61,9 +67,21 @@ class MethodArgMatcher extends AbstractCollectionIncompatibleTypeMatcher {
     return Iterables.get(tree.getArguments(), methodArgIndex);
   }
 
+  @Nullable
+  @Override
+  ExpressionTree extractSourceTree(MemberReferenceTree tree, VisitorState state) {
+    return tree;
+  }
+
   @Override
   Type extractSourceType(MethodInvocationTree tree, VisitorState state) {
-    return ASTHelpers.getType(extractSourceTree(tree, state));
+    return getType(extractSourceTree(tree, state));
+  }
+
+  @Nullable
+  @Override
+  Type extractSourceType(MemberReferenceTree tree, VisitorState state) {
+    return state.getTypes().findDescriptorType(getType(tree)).getParameterTypes().get(0);
   }
 
   @Override
@@ -73,5 +91,28 @@ class MethodArgMatcher extends AbstractCollectionIncompatibleTypeMatcher {
         state.getSymbolFromString(typeName),
         typeArgIndex,
         state.getTypes());
+  }
+
+  @Nullable
+  @Override
+  Type extractTargetType(MemberReferenceTree tree, VisitorState state) {
+    return extractTypeArgAsMemberOfSupertype(
+        ASTHelpers.getReceiverType(tree),
+        state.getSymbolFromString(typeName),
+        typeArgIndex,
+        state.getTypes());
+  }
+
+  @Override
+  Optional<Fix> buildFix(MatchResult result) {
+    return Optional.of(SuggestedFix.prefixWith(result.sourceTree(), "(Object) "));
+  }
+
+  @Override
+  public String message(MatchResult result, String sourceType, String targetType) {
+    return String.format(
+        "Argument '%s' should not be passed to this method; its type %s is not compatible "
+            + "with its collection's type argument %s",
+        result.sourceTree(), sourceType, targetType);
   }
 }

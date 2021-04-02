@@ -16,8 +16,8 @@
 
 package com.google.errorprone.bugpatterns;
 
+import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,12 +26,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class MisusedWeekYearTest {
 
-  private CompilationTestHelper compilationHelper;
-
-  @Before
-  public void setUp() {
-    compilationHelper = CompilationTestHelper.newInstance(MisusedWeekYear.class, getClass());
-  }
+  private final CompilationTestHelper compilationHelper =
+      CompilationTestHelper.newInstance(MisusedWeekYear.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -46,5 +42,25 @@ public class MisusedWeekYearTest {
   @Test
   public void testNegativeCases() {
     compilationHelper.addSourceFile("MisusedWeekYearNegativeCases.java").doTest();
+  }
+
+  @Test
+  public void testRefactoring() {
+    BugCheckerRefactoringTestHelper.newInstance(MisusedWeekYear.class, getClass())
+        .addInputLines(
+            "Test.java",
+            "import java.time.format.DateTimeFormatter;",
+            "class Test {", //
+            "  private static final String PATTERN = \"YYYY\";",
+            "  static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(PATTERN);",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "import java.time.format.DateTimeFormatter;",
+            "class Test {", //
+            "  private static final String PATTERN = \"yyyy\";",
+            "  static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(PATTERN);",
+            "}")
+        .doTest();
   }
 }

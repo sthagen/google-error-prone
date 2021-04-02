@@ -116,7 +116,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.Name;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
@@ -515,9 +515,11 @@ public class UTemplater extends SimpleTreeVisitor<Tree, Void> {
   public UClassDecl visitClass(ClassTree tree, Void v) {
     ImmutableList.Builder<UMethodDecl> decls = ImmutableList.builder();
     for (MethodTree decl : Iterables.filter(tree.getMembers(), MethodTree.class)) {
-      if (decl.getReturnType() != null) {
-        decls.add(visitMethod(decl, null));
+      if (ASTHelpers.isGeneratedConstructor(decl)) {
+        // skip synthetic constructors
+        continue;
       }
+      decls.add(visitMethod(decl, null));
     }
     return UClassDecl.create(decls.build());
   }
@@ -668,8 +670,7 @@ public class UTemplater extends SimpleTreeVisitor<Tree, Void> {
    * generics better.
    */
   @SuppressWarnings("unchecked")
-  private static <T> Class<? extends T> asSubclass(Class<?> klass, TypeToken<T> token)
-      throws ClassCastException {
+  private static <T> Class<? extends T> asSubclass(Class<?> klass, TypeToken<T> token) {
     if (!token.isSupertypeOf(klass)) {
       throw new ClassCastException(klass + " is not assignable to " + token);
     }
@@ -920,11 +921,11 @@ public class UTemplater extends SimpleTreeVisitor<Tree, Void> {
   public static ImmutableClassToInstanceMap<Annotation> annotationMap(Symbol symbol) {
     ImmutableClassToInstanceMap.Builder<Annotation> builder = ImmutableClassToInstanceMap.builder();
     for (Compound compound : symbol.getAnnotationMirrors()) {
-      Name qualifiedAnnotationType =
-          ((TypeElement) compound.getAnnotationType().asElement()).getQualifiedName();
+      String annotationClassName =
+          classNameFrom((TypeElement) compound.getAnnotationType().asElement());
       try {
         Class<? extends Annotation> annotationClazz =
-            Class.forName(qualifiedAnnotationType.toString()).asSubclass(Annotation.class);
+            Class.forName(annotationClassName).asSubclass(Annotation.class);
         builder.put(
             (Class) annotationClazz,
             AnnotationProxyMaker.generateAnnotation(compound, annotationClazz));
@@ -933,5 +934,20 @@ public class UTemplater extends SimpleTreeVisitor<Tree, Void> {
       }
     }
     return builder.build();
+  }
+
+  // Class.forName() needs nested classes as "foo.Bar$Baz$Quux", not "foo.Bar.Baz.Quux"
+  // (which is what getQualifiedName() returns).
+  private static String classNameFrom(TypeElement type) {
+    // Get the full type name (e.g. "foo.Bar.Baz.Quux") before walking up the hierarchy.
+    String typeName = type.getQualifiedName().toString();
+    // Find outermost enclosing type (e.g. "foo.Bar" in our example), possibly several levels up.
+    // Packages enclose types, so we cannot just wait until we hit null.
+    while (type.getEnclosingElement().getKind() == ElementKind.CLASS) {
+      type = (TypeElement) type.getEnclosingElement();
+    }
+    // Start with outermost class name and append remainder of full type name with '.' -> '$'
+    String className = type.getQualifiedName().toString();
+    return className + typeName.substring(className.length()).replace('.', '$');
   }
 }

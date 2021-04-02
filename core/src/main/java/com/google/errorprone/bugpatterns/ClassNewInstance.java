@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 
@@ -25,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -50,23 +48,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ClassNewInstance",
-    category = JDK,
     summary =
         "Class.newInstance() bypasses exception checking; prefer"
             + " getDeclaredConstructor().newInstance()",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class ClassNewInstance extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> NEW_INSTANCE =
@@ -91,7 +86,7 @@ public class ClassNewInstance extends BugChecker implements MethodInvocationTree
 
   // if the match occurrs inside the body of a try statement with existing catch clauses
   // update or add a catch block to handle the new exceptions
-  private boolean fixExceptions(final VisitorState state, SuggestedFix.Builder fix) {
+  private static boolean fixExceptions(final VisitorState state, SuggestedFix.Builder fix) {
     TryTree tryTree = null;
     OUTER:
     for (TreePath path = state.getPath(); path != null; path = path.getParentPath()) {
@@ -195,7 +190,7 @@ public class ClassNewInstance extends BugChecker implements MethodInvocationTree
 
   // if there wasn't a try/catch to add new catch clauses to, update the enclosing
   // method declaration's throws clause to declare the new checked exceptions
-  private void fixThrows(VisitorState state, SuggestedFix.Builder fix) {
+  private static void fixThrows(VisitorState state, SuggestedFix.Builder fix) {
     MethodTree methodTree = state.findEnclosing(MethodTree.class);
     if (methodTree == null || methodTree.getThrows().isEmpty()) {
       return;
@@ -237,7 +232,8 @@ public class ClassNewInstance extends BugChecker implements MethodInvocationTree
    * method throws clauses), determine which handlers are for reflective exceptions, and whether all
    * exceptions thrown by {#link Constructor#newInstance} are handled.
    */
-  private <T> UnhandledResult<T> unhandled(ImmutableMap<Type, T> handles, VisitorState state) {
+  private static <T> UnhandledResult<T> unhandled(
+      ImmutableMap<Type, T> handles, VisitorState state) {
     LinkedHashSet<Type> toHandle = new LinkedHashSet<>();
     for (Class<?> e :
         Arrays.asList(
@@ -261,12 +257,7 @@ public class ClassNewInstance extends BugChecker implements MethodInvocationTree
           type.isUnion()
               ? ((Type.UnionClassType) type).getAlternativeTypes()
               : Collections.singleton(type)) {
-        Iterator<Type> it = toHandle.iterator();
-        while (it.hasNext()) {
-          if (ASTHelpers.isSubtype(it.next(), precise, state)) {
-            it.remove();
-          }
-        }
+        toHandle.removeIf((Type elem) -> ASTHelpers.isSubtype(elem, precise, state));
       }
     }
     return new UnhandledResult<>(ImmutableSet.copyOf(toHandle), newHandles.build());

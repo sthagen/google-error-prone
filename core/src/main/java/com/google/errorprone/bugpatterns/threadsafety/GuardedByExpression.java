@@ -156,7 +156,7 @@ public abstract class GuardedByExpression {
      *   final Object lock = new Object();
      *   class Middle {
      *     class Inner {
-     *       @GuardedBy("lock") // resolves to 'this.outer$.outer$.lock'
+     *       {@code @}GuardedBy("lock") // resolves to 'this.outer$.outer$.lock'
      *       int x;
      *     }
      *   }
@@ -249,7 +249,7 @@ public abstract class GuardedByExpression {
   }
 
   /** {@link GuardedByExpression} kind. */
-  public static enum Kind {
+  public enum Kind {
     THIS,
     CLASS_LITERAL,
     TYPE_LITERAL,

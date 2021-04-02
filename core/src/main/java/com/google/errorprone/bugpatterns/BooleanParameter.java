@@ -20,12 +20,13 @@ import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Streams.forEachPair;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.sun.tools.javac.parser.Tokens.Comment.CommentStyle.BLOCK;
 
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
@@ -35,26 +36,24 @@ import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.google.errorprone.util.Comments;
 import com.google.errorprone.util.ErrorProneToken;
-import com.google.errorprone.util.ErrorProneTokens;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.TypeTag;
-import com.sun.tools.javac.tree.JCTree;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "BooleanParameter",
     summary = "Use parameter comments to document ambiguous literals",
-    severity = SUGGESTION,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = SUGGESTION)
 public class BooleanParameter extends BugChecker
     implements MethodInvocationTreeMatcher, NewClassTreeMatcher {
 
@@ -86,23 +85,17 @@ public class BooleanParameter extends BugChecker
     if (NamedParameterComment.containsSyntheticParameterName(sym)) {
       return;
     }
-    int start = ((JCTree) tree).getStartPosition();
+    int start = getStartPosition(tree);
     int end = state.getEndPosition(getLast(arguments));
-    String source = state.getSourceCode().subSequence(start, end).toString();
-    Deque<ErrorProneToken> tokens =
-        new ArrayDeque<>(ErrorProneTokens.getTokens(source, state.context));
+    Deque<ErrorProneToken> tokens = new ArrayDeque<>(state.getOffsetTokens(start, end));
     forEachPair(
         sym.getParameters().stream(),
         arguments.stream(),
-        (p, c) -> checkParameter(p, c, start, tokens, state));
+        (p, c) -> checkParameter(p, c, tokens, state));
   }
 
   private void checkParameter(
-      VarSymbol paramSym,
-      ExpressionTree a,
-      int start,
-      Deque<ErrorProneToken> tokens,
-      VisitorState state) {
+      VarSymbol paramSym, ExpressionTree a, Deque<ErrorProneToken> tokens, VisitorState state) {
     if (!isBooleanLiteral(a)) {
       return;
     }
@@ -118,16 +111,14 @@ public class BooleanParameter extends BugChecker
     if (EXCLUDED_NAMES.contains(name)) {
       return;
     }
-    while (!tokens.isEmpty()
-        && ((start + tokens.peekFirst().pos()) < ((JCTree) a).getStartPosition())) {
+    while (!tokens.isEmpty() && tokens.getFirst().pos() < getStartPosition(a)) {
       tokens.removeFirst();
     }
     if (tokens.isEmpty()) {
       return;
     }
-    Range<Integer> argRange =
-        Range.closedOpen(((JCTree) a).getStartPosition(), state.getEndPosition(a));
-    if (!argRange.contains(start + tokens.peekFirst().pos())) {
+    Range<Integer> argRange = Range.closedOpen(getStartPosition(a), state.getEndPosition(a));
+    if (!argRange.contains(tokens.getFirst().pos())) {
       return;
     }
     if (hasParameterComment(tokens.removeFirst())) {
@@ -156,7 +147,8 @@ public class BooleanParameter extends BugChecker
     // Consider single-argument booleans for classes whose names contain "Boolean" to be self-
     // documenting. This is aimed at classes like AtomicBoolean which simply wrap a value.
     if (tree instanceof NewClassTree) {
-      return ((NewClassTree) tree).getIdentifier().toString().toLowerCase().contains("boolean");
+      Symbol symbol = ASTHelpers.getSymbol(((NewClassTree) tree).getIdentifier());
+      return symbol != null && Ascii.toLowerCase(symbol.getSimpleName()).contains("boolean");
     }
     return true;
   }

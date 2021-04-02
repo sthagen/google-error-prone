@@ -25,7 +25,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class TestExceptionCheckerTest {
   private final BugCheckerRefactoringTestHelper testHelper =
-      BugCheckerRefactoringTestHelper.newInstance(new TestExceptionChecker(), getClass());
+      BugCheckerRefactoringTestHelper.newInstance(TestExceptionChecker.class, getClass());
 
   @Test
   public void positive() {
@@ -55,17 +55,19 @@ public class TestExceptionCheckerTest {
             "class ExceptionTest {",
             "  @Test(timeout = 0L)",
             "  public void test() throws Exception {",
-            "    Path p = Paths.get(\"NOSUCH\");",
-            "    Files.readAllBytes(p);",
-            "    assertThrows(IOException.class, () -> Files.readAllBytes(p));",
-            "    assertThat(Files.exists(p)).isFalse();",
+            "    assertThrows(IOException.class, () -> {",
+            "      Path p = Paths.get(\"NOSUCH\");",
+            "      Files.readAllBytes(p);",
+            "      Files.readAllBytes(p);",
+            "      assertThat(Files.exists(p)).isFalse();",
+            "    });",
             "  }",
             "}")
         .doTest();
   }
 
   @Test
-  public void positive_markerException() {
+  public void positive_markerAnnotation() {
     testHelper
         .addInputLines(
             "in/ExceptionTest.java",
@@ -91,16 +93,18 @@ public class TestExceptionCheckerTest {
             "class ExceptionTest {",
             "  @Test",
             "  public void test() throws Exception {",
-            "    Path p = Paths.get(\"NOSUCH\");",
-            "    assertThrows(IOException.class, () -> Files.readAllBytes(p));",
-            "    assertThat(Files.exists(p)).isFalse();",
+            "    assertThrows(IOException.class, () -> {",
+            "      Path p = Paths.get(\"NOSUCH\");",
+            "      Files.readAllBytes(p);",
+            "      assertThat(Files.exists(p)).isFalse();",
+            "    });",
             "  }",
             "}")
         .doTest();
   }
 
   @Test
-  public void negative() {
+  public void oneStatement() {
     testHelper
         .addInputLines(
             "in/ExceptionTest.java",
@@ -113,7 +117,42 @@ public class TestExceptionCheckerTest {
             "    Files.readAllBytes(Paths.get(\"NOSUCH\"));",
             "  }",
             "}")
-        .expectUnchanged()
+        .addOutputLines(
+            "in/ExceptionTest.java",
+            "import static org.junit.Assert.assertThrows;",
+            "import java.io.IOException;",
+            "import java.nio.file.*;",
+            "import org.junit.Test;",
+            "class ExceptionTest {",
+            "  @Test",
+            "  public void test() throws Exception {",
+            "    assertThrows(IOException.class, () -> Files.readAllBytes(Paths.get(\"NOSUCH\")));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void empty() {
+    testHelper
+        .addInputLines(
+            "in/ExceptionTest.java",
+            "import java.io.IOException;",
+            "import org.junit.Test;",
+            "class ExceptionTest {",
+            "  @Test(expected = IOException.class)",
+            "  public void test() throws Exception {",
+            "  }",
+            "}")
+        .addOutputLines(
+            "in/ExceptionTest.java",
+            "import java.io.IOException;",
+            "import org.junit.Test;",
+            "class ExceptionTest {",
+            "  @Test",
+            "  public void test() throws Exception {",
+            "  }",
+            "}")
         .doTest();
   }
 }

@@ -62,30 +62,34 @@ public class CanBeStaticAnalyzer extends TreeScanner {
   private CanBeStaticAnalyzer(Symbol owner, VisitorState state) {
     this.owner = owner;
     this.state = state;
-    this.names = Names.instance(state.context);
+    this.names = state.getNames();
   }
 
   @Override
   public void visitIdent(JCTree.JCIdent tree) {
     // check for unqualified references to instance members (fields and methods) declared
     // in an enclosing scope
-    if (tree.sym.isStatic()) {
+    Symbol sym = tree.sym;
+    if (sym == null) {
       return;
     }
-    switch (tree.sym.getKind()) {
+    if (sym.isStatic()) {
+      return;
+    }
+    switch (sym.getKind()) {
       case TYPE_PARAMETER:
         // declaring a class as non-static just to access a type parameter is silly -
         // why not just re-declare the type parameter instead of capturing it?
         // TODO(cushon): consider making the suggestion anyways, maybe with a fix?
         // fall through
       case FIELD:
-        if (!isOwnedBy(tree.sym, owner, state.getTypes())) {
+        if (!isOwnedBy(sym, owner, state.getTypes())) {
           canPossiblyBeStatic = false;
         }
         break;
       case METHOD:
-        if (!isOwnedBy(tree.sym, owner, state.getTypes())) {
-          outerReferences.add((MethodSymbol) tree.sym);
+        if (!isOwnedBy(sym, owner, state.getTypes())) {
+          outerReferences.add((MethodSymbol) sym);
         }
         break;
       case CLASS:
@@ -99,7 +103,7 @@ public class CanBeStaticAnalyzer extends TreeScanner {
     }
   }
 
-  private boolean isOwnedBy(Symbol sym, Symbol owner, Types types) {
+  private static boolean isOwnedBy(Symbol sym, Symbol owner, Types types) {
     if (sym.owner == owner) {
       return true;
     }
@@ -120,13 +124,13 @@ public class CanBeStaticAnalyzer extends TreeScanner {
   // }
   private class TypeVariableScanner extends Types.SimpleVisitor<Void, Void> {
     @Override
-    public Void visitTypeVar(Type.TypeVar t, Void aVoid) {
+    public Void visitTypeVar(Type.TypeVar t, Void unused) {
       canPossiblyBeStatic = false;
       return null;
     }
 
     @Override
-    public Void visitClassType(Type.ClassType t, Void aVoid) {
+    public Void visitClassType(Type.ClassType t, Void unused) {
       for (Type a : t.getTypeArguments()) {
         a.accept(this, null);
       }

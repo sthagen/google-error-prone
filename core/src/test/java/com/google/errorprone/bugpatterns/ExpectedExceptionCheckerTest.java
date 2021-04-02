@@ -25,9 +25,12 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ExpectedExceptionCheckerTest {
 
+  private final BugCheckerRefactoringTestHelper testHelper =
+      BugCheckerRefactoringTestHelper.newInstance(ExpectedExceptionChecker.class, getClass());
+
   @Test
   public void expect() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -84,15 +87,12 @@ public class ExpectedExceptionCheckerTest {
             "    }",
             "  }",
             "}")
-        // TODO(cushon): remove this once we update to a version of Truth that includes
-        // hasMessageThat()
-        .allowBreakingChanges()
         .doTest();
   }
 
   @Test
   public void noExceptionType() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -129,8 +129,10 @@ public class ExpectedExceptionCheckerTest {
             "  @Test",
             "  public void test() throws Exception {",
             "    Path p = Paths.get(\"NOSUCH\");",
-            "    Files.readAllBytes(p);",
-            "    Throwable thrown = assertThrows(Throwable.class, () -> Files.readAllBytes(p));",
+            "    Throwable thrown = assertThrows(Throwable.class, () -> {",
+            "      Files.readAllBytes(p);",
+            "      Files.readAllBytes(p);",
+            "    });",
             "    assertThat(thrown, CoreMatchers.is(CoreMatchers.instanceOf(IOException.class)));",
             "  }",
             "}")
@@ -139,7 +141,7 @@ public class ExpectedExceptionCheckerTest {
 
   @Test
   public void noExpectations() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -183,7 +185,7 @@ public class ExpectedExceptionCheckerTest {
 
   @Test
   public void nonExpressionStatement() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -217,8 +219,8 @@ public class ExpectedExceptionCheckerTest {
             "  @Test",
             "  public void test() throws Exception {",
             "    Path p = Paths.get(\"NOSUCH\");",
-            "    Files.readAllBytes(p);",
             "    assertThrows(IOException.class, () -> {",
+            "      Files.readAllBytes(p);",
             "      if (true) Files.readAllBytes(p);",
             "    });",
             "  }",
@@ -229,7 +231,7 @@ public class ExpectedExceptionCheckerTest {
   // https://github.com/hamcrest/JavaHamcrest/issues/27
   @Test
   public void isA_hasCauseThat() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -274,15 +276,12 @@ public class ExpectedExceptionCheckerTest {
             "    assertThat(Files.exists(p)).isFalse();",
             "  }",
             "}")
-        // TODO(cushon): remove this once we update to a version of Truth that includes
-        // hasCauseThat()
-        .allowBreakingChanges()
         .doTest();
   }
 
   @Test
   public void typedMatcher() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -332,7 +331,7 @@ public class ExpectedExceptionCheckerTest {
 
   @Test
   public void nothingButAsserts() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -351,7 +350,6 @@ public class ExpectedExceptionCheckerTest {
         .addOutputLines(
             "out/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
-            "import static org.junit.Assert.assertThrows;",
             "import org.junit.Rule;",
             "import org.junit.Test;",
             "import org.junit.rules.ExpectedException;",
@@ -360,7 +358,7 @@ public class ExpectedExceptionCheckerTest {
             "  @Test",
             "  public void test() throws Exception {",
             "    assertThat(false).isFalse();",
-            "    assertThrows(RuntimeException.class, () -> assertThat(true).isTrue());",
+            "    assertThat(true).isTrue();",
             "  }",
             "}")
         .doTest();
@@ -368,7 +366,7 @@ public class ExpectedExceptionCheckerTest {
 
   @Test
   public void removeExplicitFail() {
-    BugCheckerRefactoringTestHelper.newInstance(new ExpectedExceptionChecker(), getClass())
+    testHelper
         .addInputLines(
             "in/ExceptionTest.java",
             "import static com.google.common.truth.Truth.assertThat;",
@@ -417,8 +415,6 @@ public class ExpectedExceptionCheckerTest {
             "  @Rule ExpectedException thrown = ExpectedException.none();",
             "  @Test",
             "  public void testThrow() throws Exception {",
-            "    thrown.expect(IOException.class);",
-            "    throw new IOException();",
             "  }",
             "  @Test",
             "  public void one() throws Exception {",
@@ -431,6 +427,39 @@ public class ExpectedExceptionCheckerTest {
             "    Path p = Paths.get(\"NOSUCH\");",
             "    assertThrows(IOException.class, () -> Files.readAllBytes(p));",
             "    assertThat(Files.exists(p)).isFalse();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  // https://github.com/google/error-prone/issues/1072
+  @Test
+  public void i1072() {
+    testHelper
+        .addInputLines(
+            "in/ExceptionTest.java",
+            "import org.junit.Rule;",
+            "import org.junit.Test;",
+            "import org.junit.rules.ExpectedException;",
+            "class ExceptionTest {",
+            "  @Rule ExpectedException thrown = ExpectedException.none();",
+            "  @Test",
+            "  public void testThrow(Class<? extends Throwable> clazz) throws Exception {",
+            "    thrown.expect(clazz);",
+            "    clazz.toString();",
+            "  }",
+            "}")
+        .addOutputLines(
+            "in/ExceptionTest.java",
+            "import static org.junit.Assert.assertThrows;",
+            "import org.junit.Rule;",
+            "import org.junit.Test;",
+            "import org.junit.rules.ExpectedException;",
+            "class ExceptionTest {",
+            "  @Rule ExpectedException thrown = ExpectedException.none();",
+            "  @Test",
+            "  public void testThrow(Class<? extends Throwable> clazz) throws Exception {",
+            "    assertThrows(Throwable.class, () -> clazz.toString());",
             "  }",
             "}")
         .doTest();

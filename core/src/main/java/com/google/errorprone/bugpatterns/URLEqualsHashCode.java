@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyOf;
@@ -24,7 +23,6 @@ import static com.google.errorprone.matchers.method.MethodMatchers.instanceMetho
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
@@ -34,7 +32,6 @@ import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.NewClassTreeMatcher;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
-import com.google.errorprone.predicates.TypePredicates;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
@@ -57,7 +54,6 @@ import java.util.List;
     summary =
         "Avoid hash-based containers of java.net.URL--the containers rely on equals() and"
             + " hashCode(), which cause java.net.URL to make blocking internet connections.",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.FRAGILE_CODE)
 public class URLEqualsHashCode extends BugChecker
@@ -81,11 +77,8 @@ public class URLEqualsHashCode extends BugChecker
                       ImmutableMap.class.getName(),
                       HashBiMap.class.getName()),
               instanceMethod()
-                  .onClass(
-                      TypePredicates.isExactTypeAny(
-                          ImmutableList.of(
-                              ImmutableSet.Builder.class.getName(),
-                              ImmutableMap.Builder.class.getName())))
+                  .onExactClassAny(
+                      ImmutableSet.Builder.class.getName(), ImmutableMap.Builder.class.getName())
                   .named("build")),
           CONTAINER_MATCHER);
 

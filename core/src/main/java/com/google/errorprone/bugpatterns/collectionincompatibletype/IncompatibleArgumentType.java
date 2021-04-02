@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns.collectionincompatibletype;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.bugpatterns.collectionincompatibletype.AbstractCollectionIncompatibleTypeMatcher.extractTypeArgAsMemberOfSupertype;
 
@@ -27,7 +26,8 @@ import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.CompatibleWith;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
-import com.google.errorprone.bugpatterns.EqualsIncompatibleType;
+import com.google.errorprone.bugpatterns.TypeCompatibilityUtils;
+import com.google.errorprone.bugpatterns.TypeCompatibilityUtils.TypeCompatibilityReport;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.ASTHelpers;
 import com.google.errorprone.util.Signatures;
@@ -50,7 +50,6 @@ import javax.lang.model.element.TypeParameterElement;
 @BugPattern(
     name = "IncompatibleArgumentType",
     summary = "Passing argument to a generic method with an incompatible type.",
-    category = JDK,
     severity = ERROR)
 public class IncompatibleArgumentType extends BugChecker implements MethodInvocationTreeMatcher {
 
@@ -58,7 +57,8 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
   // null requiredType: I found the type variable, but I can't bind it to any type
   @AutoValue
   abstract static class RequiredType {
-    abstract @Nullable Type type();
+    @Nullable
+    abstract Type type();
 
     static RequiredType create(Type type) {
       return new AutoValue_IncompatibleArgumentType_RequiredType(type);
@@ -83,7 +83,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
     // The unbound MethodSymbol for bar(), with type parameters <A> and <B>
     MethodSymbol declaredMethod = ASTHelpers.getSymbol(methodInvocationTree);
     if (arguments.isEmpty() || declaredMethod == null) {
-      return null;
+      return Description.NO_MATCH;
     }
 
     List<RequiredType> requiredTypesAtCallSite =
@@ -121,17 +121,18 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
       Type argType = ASTHelpers.getType(argument);
       if (requiredType.type() != null) {
         // Report a violation for this type
-        EqualsIncompatibleType.TypeCompatibilityReport report =
-            EqualsIncompatibleType.compatibilityOfTypes(requiredType.type(), argType, state);
+        TypeCompatibilityReport report =
+            TypeCompatibilityUtils.compatibilityOfTypes(requiredType.type(), argType, state);
         if (!report.compatible()) {
-          state.reportMatch(describeViolation(argument, argType, requiredType.type(), types));
+          state.reportMatch(
+              describeViolation(argument, argType, requiredType.type(), types, state));
         }
       }
     }
   }
 
   private Description describeViolation(
-      ExpressionTree argument, Type argType, Type requiredType, Types types) {
+      ExpressionTree argument, Type argType, Type requiredType, Types types, VisitorState state) {
     // For the error message, use simple names instead of fully qualified names unless they are
     // identical.
     String sourceType = Signatures.prettyType(argType);
@@ -145,7 +146,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
         String.format(
             "Argument '%s' should not be passed to this method. Its type %s is not"
                 + " compatible with the required type: %s.",
-            argument, sourceType, targetType);
+            state.getSourceForNode(argument), sourceType, targetType);
 
     return buildDescription(argument).setMessage(msg).build();
   }
@@ -153,7 +154,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
   // Return whether this method contains any @CompatibleWith annotations. If there are none, the
   // caller should explore super-methods.
   @CheckReturnValue
-  private boolean populateTypesToEnforce(
+  private static boolean populateTypesToEnforce(
       MethodSymbol declaredMethod,
       Type calledMethodType,
       Type calledReceiverType,
@@ -197,7 +198,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
   @Nullable
   @CheckReturnValue
   // From calledReceiverType
-  private RequiredType resolveRequiredTypeForThisCall(
+  private static RequiredType resolveRequiredTypeForThisCall(
       VisitorState state,
       Type calledMethodType,
       Type calledReceiverType,
@@ -214,7 +215,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
     return requiredType;
   }
 
-  private RequiredType resolveTypeFromGenericMethod(
+  private static RequiredType resolveTypeFromGenericMethod(
       Type calledMethodType, MethodSymbol declaredMethod, String typeArgName) {
     int tyargIndex = findTypeArgInList(declaredMethod, typeArgName);
     return tyargIndex == -1
@@ -254,7 +255,7 @@ public class IncompatibleArgumentType extends BugChecker implements MethodInvoca
   // class Foo<X> { void something(@CW("X") Object x); }
   // new Foo<String>().something(123);
   @Nullable
-  private RequiredType resolveTypeFromClass(
+  private static RequiredType resolveTypeFromClass(
       Type calledType, ClassSymbol clazzSymbol, String typeArgName, VisitorState state) {
     // Try on the class
     int tyargIndex = findTypeArgInList(clazzSymbol, typeArgName);

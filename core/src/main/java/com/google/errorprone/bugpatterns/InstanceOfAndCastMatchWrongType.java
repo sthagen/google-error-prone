@@ -16,13 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.TypeCastTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
@@ -44,7 +43,6 @@ import com.sun.source.tree.UnaryTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.tree.JCTree;
 import javax.annotation.Nullable;
 
 /**
@@ -54,9 +52,7 @@ import javax.annotation.Nullable;
 @BugPattern(
     name = "InstanceOfAndCastMatchWrongType",
     summary = "Casting inside an if block should be plausibly consistent with the instanceof type",
-    category = JDK,
-    severity = WARNING,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    severity = WARNING)
 public class InstanceOfAndCastMatchWrongType extends BugChecker implements TypeCastTreeMatcher {
 
   @Override
@@ -68,10 +64,10 @@ public class InstanceOfAndCastMatchWrongType extends BugChecker implements TypeC
       return Description.NO_MATCH;
     }
     if (castingMatcher.matches(typeCastTree, visitorState)) {
-      return buildDescription(typeCastTree)
-          .addFix(
-              SuggestedFix.replace(castingMatcher.nodeToReplace, typeCastTree.getType().toString()))
-          .build();
+      return describeMatch(
+          typeCastTree,
+          SuggestedFix.replace(
+              castingMatcher.nodeToReplace, visitorState.getSourceForNode(typeCastTree.getType())));
     }
     return Description.NO_MATCH;
   }
@@ -127,7 +123,7 @@ public class InstanceOfAndCastMatchWrongType extends BugChecker implements TypeC
         treeScannerInstanceOfWrongType.scan(
             ifTree.getThenStatement(), instanceOfTree.getExpression());
         int pos = treeScannerInstanceOfWrongType.earliestStart;
-        if (pos < ((JCTree) tree).getStartPosition()) {
+        if (pos < getStartPosition(tree)) {
           return false;
         }
 

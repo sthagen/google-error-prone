@@ -17,10 +17,12 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
+import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
@@ -29,7 +31,6 @@ import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Symbol;
 import javax.lang.model.element.Name;
 
-/** @author kayco@google.com (Kayla Walker) & seibelsabrina@google.com (Sabrina Seibel) */
 /** Check for variables and types with the same name */
 @BugPattern(
     name = "VariableNameSameAsType",
@@ -60,7 +61,7 @@ public class VariableNameSameAsType extends BugChecker implements VariableTreeMa
         String.format(
             "Variable named %s has the type %s. Calling methods using \"%s.something\" are "
                 + "difficult to distinguish between static and instance methods.",
-            varName, varTree.getType(), varName);
+            varName, SuggestedFixes.prettyType(getType(varTree), /* state= */ null), varName);
     return buildDescription(varTree).setMessage(message).build();
   }
 }

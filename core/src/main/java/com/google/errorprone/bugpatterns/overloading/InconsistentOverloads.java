@@ -25,7 +25,6 @@ import static java.util.stream.Collectors.groupingBy;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.Category;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -65,8 +64,6 @@ import java.util.Optional;
     summary =
         "The ordering of parameters in overloaded methods should be as consistent as possible (when"
             + " viewed from left to right)",
-    generateExamplesFromTestCases = false,
-    category = Category.JDK,
     severity = SeverityLevel.WARNING)
 public final class InconsistentOverloads extends BugChecker implements ClassTreeMatcher {
 
@@ -161,6 +158,6 @@ public final class InconsistentOverloads extends BugChecker implements ClassTree
    * <p>The only purpose of this method is to avoid doing a hacky casting to {@link JCTree}.
    */
   private static int getStartPosition(Tree tree) {
-    return ((JCTree) tree).getStartPosition();
+    return ASTHelpers.getStartPosition(tree);
   }
 }

@@ -16,14 +16,13 @@
 
 package com.google.errorprone.bugpatterns.threadsafety;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -54,15 +53,13 @@ import javax.annotation.Nullable;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 // TODO(cushon): allow @LazyInit on fields as a suppression mechanism?
 @BugPattern(
     name = "DoubleCheckedLocking",
     summary = "Double-checked locking on non-volatile fields is unsafe",
-    category = JDK,
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public class DoubleCheckedLocking extends BugChecker implements IfTreeMatcher {
   @Override
   public Description matchIf(IfTree outerIf, VisitorState state) {
@@ -101,7 +98,7 @@ public class DoubleCheckedLocking extends BugChecker implements IfTreeMatcher {
     return builder.build();
   }
 
-  private static final ImmutableSet<String> IMMUTABLE_WHITELIST =
+  private static final ImmutableSet<String> IMMUTABLE_PRIMITIVES =
       ImmutableSet.of(
           java.lang.Boolean.class.getName(),
           java.lang.Byte.class.getName(),
@@ -131,7 +128,7 @@ public class DoubleCheckedLocking extends BugChecker implements IfTreeMatcher {
       default:
         break;
     }
-    return IMMUTABLE_WHITELIST.contains(
+    return IMMUTABLE_PRIMITIVES.contains(
         state.getTypes().erasure(type).tsym.getQualifiedName().toString());
   }
 
@@ -159,7 +156,7 @@ public class DoubleCheckedLocking extends BugChecker implements IfTreeMatcher {
     if (expr == null) {
       return Description.NO_MATCH;
     }
-    if (expr.getStartPosition() > ((JCTree) info.innerIf()).getStartPosition()) {
+    if (expr.getStartPosition() > getStartPosition(info.innerIf())) {
       return Description.NO_MATCH;
     }
     if (!(expr.getExpression() instanceof JCAssign)) {

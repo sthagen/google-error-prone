@@ -16,7 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.toType;
@@ -38,11 +37,10 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import java.util.Optional;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "IdentityBinaryExpression",
     altNames = "SelfEquality",
-    category = JDK,
     summary = "A binary expression where both operands are the same is usually incorrect.",
     severity = ERROR)
 public class IdentityBinaryExpression extends BugChecker implements BinaryTreeMatcher {
@@ -53,6 +51,7 @@ public class IdentityBinaryExpression extends BugChecker implements BinaryTreeMa
           staticMethod().anyClass().namedAnyOf("assertTrue", "assertFalse", "assertThat"));
 
   @Override
+  @SuppressWarnings("TreeToString")
   public Description matchBinary(BinaryTree tree, VisitorState state) {
     if (constValue(tree.getLeftOperand()) != null) {
       switch (tree.getKind()) {
@@ -105,14 +104,17 @@ public class IdentityBinaryExpression extends BugChecker implements BinaryTreeMa
       default:
         return NO_MATCH;
     }
+    // toString rather than getSourceForNode is intentional.
     if (!tree.getLeftOperand().toString().equals(tree.getRightOperand().toString())) {
       return NO_MATCH;
     }
     switch (tree.getKind()) {
-      case EQUAL_TO:
+      case NOT_EQUAL_TO:
+        // X != X is only true when X is NaN, so suggest isNaN(X)
         replacement = isNanReplacement(tree, state).orElse(replacement);
         break;
-      case NOT_EQUAL_TO:
+      case EQUAL_TO:
+        // X == X is true unless X is NaN, so suggest !isNaN(X)
         replacement = isNanReplacement(tree, state).map(r -> "!" + r).orElse(replacement);
         break;
       default: // fall out

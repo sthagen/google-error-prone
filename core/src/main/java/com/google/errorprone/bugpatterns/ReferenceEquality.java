@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.errorprone.BugPattern.Category.JDK;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 
 import com.google.errorprone.BugPattern;
@@ -33,11 +32,10 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.util.Name;
 
-/** @author cushon@google.com (Liam Miller-Cushon) */
+/** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "ReferenceEquality",
     summary = "Comparison using reference equality instead of value equality",
-    category = JDK,
     severity = WARNING,
     tags = StandardTags.FRAGILE_CODE)
 public class ReferenceEquality extends AbstractReferenceEquality {
@@ -71,7 +69,7 @@ public class ReferenceEquality extends AbstractReferenceEquality {
     return true;
   }
 
-  private boolean inEqualsOrCompareTo(Type classType, Type type, VisitorState state) {
+  private static boolean inEqualsOrCompareTo(Type classType, Type type, VisitorState state) {
     MethodTree methodTree = ASTHelpers.findEnclosingNode(state.getPath(), MethodTree.class);
     if (methodTree == null) {
       return false;
@@ -82,8 +80,10 @@ public class ReferenceEquality extends AbstractReferenceEquality {
     }
     Symbol compareTo = getOnlyMember(state, state.getSymtab().comparableType, "compareTo");
     Symbol equals = getOnlyMember(state, state.getSymtab().objectType, "equals");
-    if (!sym.overrides(compareTo, classType.tsym, state.getTypes(), /* checkResult= */ false)
-        && !sym.overrides(equals, classType.tsym, state.getTypes(), /* checkResult= */ false)) {
+    if (!(sym.getSimpleName().contentEquals("compareTo")
+            && sym.overrides(compareTo, classType.tsym, state.getTypes(), /* checkResult= */ false))
+        && !(sym.getSimpleName().contentEquals("equals")
+            && sym.overrides(equals, classType.tsym, state.getTypes(), /* checkResult= */ false))) {
       return false;
     }
     if (!ASTHelpers.isSameType(type, classType, state)) {

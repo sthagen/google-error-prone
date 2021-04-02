@@ -25,11 +25,11 @@ import static com.google.errorprone.matchers.method.MethodMatchers.instanceMetho
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.BugPattern.ProvidesFix;
 import com.google.errorprone.BugPattern.StandardTags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.ClassTreeMatcher;
@@ -65,8 +65,7 @@ import javax.lang.model.element.ElementKind;
         "Including fields in hashCode which are not compared in equals violates "
             + "the contract of hashCode.",
     severity = WARNING,
-    tags = StandardTags.FRAGILE_CODE,
-    providesFix = ProvidesFix.REQUIRES_HUMAN_ATTENTION)
+    tags = StandardTags.FRAGILE_CODE)
 public final class InconsistentHashCode extends BugChecker implements ClassTreeMatcher {
 
   public static final String MESSAGE =
@@ -76,13 +75,11 @@ public final class InconsistentHashCode extends BugChecker implements ClassTreeM
 
   /** Non-static methods that we might expect to see in #hashCode, and allow. */
   private static final Matcher<ExpressionTree> HASH_CODE_METHODS =
-      instanceMethod().onDescendantOf("java.lang.Object").named("hashCode").withParameters();
+      instanceMethod().anyClass().named("hashCode").withParameters();
 
   /** Non-static methods that we might expect to see in #equals, and allow. */
   private static final Matcher<ExpressionTree> EQUALS_METHODS =
-      anyOf(
-          instanceMethod().onDescendantOf("java.lang.Object").named("getClass"),
-          instanceEqualsInvocation());
+      anyOf(instanceMethod().anyClass().named("getClass"), instanceEqualsInvocation());
 
   @Override
   public Description matchClass(ClassTree tree, VisitorState state) {
@@ -132,7 +129,7 @@ public final class InconsistentHashCode extends BugChecker implements ClassTreeM
     ImmutableSet<Symbol> fieldsInEquals = equalsScanner.accessedFields();
     Set<Symbol> difference = new HashSet<>(Sets.difference(fieldsInHashCode, fieldsInEquals));
     // Special-case the situation where #hashCode uses a field containing `hash` for memoization.
-    difference.removeIf(f -> f.toString().toLowerCase().contains("hash"));
+    difference.removeIf(f -> Ascii.toLowerCase(f.toString()).contains("hash"));
     String message = String.format(MESSAGE, difference);
     // Skip cases where equals and hashCode compare the same fields, or equals compares none (and
     // so is probably checking reference equality).
@@ -199,7 +196,10 @@ public final class InconsistentHashCode extends BugChecker implements ClassTreeM
     @Override
     public Void visitMemberSelect(MemberSelectTree tree, Void unused) {
       ExpressionTree receiver = getReceiver(tree);
-      if (receiver == null || receiver.toString().equals("this")) {
+      ExpressionTree e = tree.getExpression();
+      if (receiver == null
+          || (e instanceof IdentifierTree
+              && ((IdentifierTree) e).getName().contentEquals("this"))) {
         Symbol symbol = ((JCFieldAccess) tree).sym;
         handleSymbol(symbol);
       }
@@ -214,7 +214,8 @@ public final class InconsistentHashCode extends BugChecker implements ClassTreeM
     }
 
     private void handleSymbol(Symbol symbol) {
-      if (symbol.getKind() == ElementKind.FIELD
+      if (symbol != null
+          && symbol.getKind() == ElementKind.FIELD
           && !symbol.isStatic()
           && symbol.owner.equals(classSymbol)) {
         String name = symbol.name.toString();

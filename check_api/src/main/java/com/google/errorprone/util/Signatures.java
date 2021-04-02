@@ -30,7 +30,7 @@ import com.sun.tools.javac.util.Name;
 import java.util.Arrays;
 
 /** Signature generation. */
-public class Signatures {
+public final class Signatures {
 
   /** Returns the binary names of the class. */
   public static String classDescriptor(Type type, Types types) {
@@ -87,15 +87,23 @@ public class Signatures {
    */
   public static String prettyMethodSignature(ClassSymbol origin, MethodSymbol m) {
     StringBuilder sb = new StringBuilder();
-    if (!m.owner.equals(origin)) {
-      sb.append(m.owner.getSimpleName()).append('.');
+    if (m.isConstructor()) {
+      Name name = m.owner.enclClass().getSimpleName();
+      if (name.isEmpty()) {
+        // use the superclass name of anonymous classes
+        name = m.owner.enclClass().getSuperclass().asElement().getSimpleName();
+      }
+      sb.append(name);
+    } else {
+      if (!m.owner.equals(origin)) {
+        sb.append(m.owner.getSimpleName()).append('.');
+      }
+      sb.append(m.getSimpleName());
     }
-    sb.append(m.isConstructor() ? origin.getSimpleName() : m.getSimpleName()).append('(');
     sb.append(
         m.getParameters().stream()
             .map(v -> v.type.accept(PRETTY_TYPE_VISITOR, null))
-            .collect(joining(", ")));
-    sb.append(')');
+            .collect(joining(", ", "(", ")")));
     return sb.toString();
   }
 
@@ -107,7 +115,7 @@ public class Signatures {
   private static final Type.Visitor<String, Void> PRETTY_TYPE_VISITOR =
       new DefaultTypeVisitor<String, Void>() {
         @Override
-        public String visitWildcardType(Type.WildcardType t, Void aVoid) {
+        public String visitWildcardType(Type.WildcardType t, Void unused) {
           StringBuilder sb = new StringBuilder();
           sb.append(t.kind);
           if (t.kind != BoundKind.UNBOUND) {
@@ -137,7 +145,7 @@ public class Signatures {
         }
 
         @Override
-        public String visitArrayType(Type.ArrayType t, Void aVoid) {
+        public String visitArrayType(Type.ArrayType t, Void unused) {
           return t.elemtype.accept(this, null) + "[]";
         }
 
@@ -146,4 +154,6 @@ public class Signatures {
           return t.toString();
         }
       };
+
+  private Signatures() {}
 }
