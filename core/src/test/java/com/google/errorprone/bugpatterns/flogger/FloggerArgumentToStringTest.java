@@ -53,6 +53,7 @@ public class FloggerArgumentToStringTest {
             "    logger.atInfo().log(\"hello %S\", Integer.toHexString(42));",
             "    logger.atInfo().log(\"hello %s\", Arrays.asList(1, 2));",
             "    logger.atInfo().log(\"hello %s\", Arrays.asList(xs));",
+            "    logger.atInfo().log(\"hello %s\", Arrays.toString(xs));",
             "    logger.atInfo().log(\"hello %s\", Long.toHexString(l));",
             "    logger.atInfo().log(\"%%s\", Ascii.toUpperCase(world));",
             "  }",
@@ -75,6 +76,7 @@ public class FloggerArgumentToStringTest {
             "    logger.atInfo().log(\"hello %X\", 42);",
             "    logger.atInfo().log(\"hello %s\", Arrays.asList(1, 2));",
             "    logger.atInfo().log(\"hello %s\", xs);",
+            "    logger.atInfo().log(\"hello %s\", xs);",
             "    logger.atInfo().log(\"hello %x\", l);",
             "    logger.atInfo().log(\"%%s\", Ascii.toUpperCase(world));",
             "  }",
@@ -92,6 +94,30 @@ public class FloggerArgumentToStringTest {
             "  private static final FluentLogger logger = FluentLogger.forEnclosingClass();",
             "  public void f(String world) {",
             "    logger.atInfo().log(\"hello '%s'\", world);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void selfToString() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "import com.google.common.flogger.FluentLogger;",
+            "class Test {",
+            "  private static final FluentLogger logger = FluentLogger.forEnclosingClass();",
+            "  public void f() {",
+            "    logger.atInfo().log(\"hello '%s'\", toString());",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "import com.google.common.flogger.FluentLogger;",
+            "class Test {",
+            "  private static final FluentLogger logger = FluentLogger.forEnclosingClass();",
+            "  public void f() {",
+            "    logger.atInfo().log(\"hello '%s'\", this);",
             "  }",
             "}")
         .doTest();

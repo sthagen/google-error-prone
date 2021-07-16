@@ -21,6 +21,7 @@ import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyMethod;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.Matchers.not;
+import static com.google.errorprone.matchers.Matchers.nothing;
 import static com.google.errorprone.matchers.Matchers.packageStartsWith;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
@@ -39,6 +40,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 
 /** @author alexeagle@google.com (Alex Eagle) */
 @BugPattern(
@@ -106,30 +108,20 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
       return false;
     }
     Symbol symbol = ASTHelpers.getSymbol(tree);
-    if (symbol instanceof MethodSymbol) {
-      MethodSymbol methodSymbol = (MethodSymbol) symbol;
-      if (methodSymbol.owner.packge().getQualifiedName().toString().startsWith("java.time")
-          && methodSymbol.getModifiers().contains(Modifier.PUBLIC)) {
-        if (ALLOWED_JAVA_TIME_METHODS.matches(tree, state)) {
-          return false;
-        }
-        return true;
-      }
-    }
-    return false;
+    return symbol instanceof MethodSymbol
+        && symbol.owner.packge().getQualifiedName().toString().startsWith("java.time")
+        && symbol.getModifiers().contains(Modifier.PUBLIC)
+        && !ALLOWED_JAVA_TIME_METHODS.matches(tree, state);
   }
 
   /**
-   * Methods in {@link java.util.function} are pure, and their returnvalues should not be discarded.
+   * Methods in {@link java.util.function} are pure, and their return values should not be
+   * discarded.
    */
   private static boolean functionalMethod(ExpressionTree tree, VisitorState state) {
     Symbol symbol = ASTHelpers.getSymbol(tree);
     return symbol instanceof MethodSymbol
-        && ((MethodSymbol) symbol)
-            .owner
-            .packge()
-            .getQualifiedName()
-            .contentEquals("java.util.function");
+        && symbol.owner.packge().getQualifiedName().contentEquals("java.util.function");
   }
 
   /**
@@ -190,6 +182,69 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
               .named("valueOf")
               .withParameters("java.lang.String", "int"));
 
+  // TODO(kak): we may want to change this to an opt-out list per class (e.g., check _all_ of the
+  // methods on `java.util.Collection`, except this set. That would be much more future-proof.
+  // However, we need to make sure we're only checking the APIs defined on the interface, and not
+  // all methods on the descendant type.
+
+  /** APIs to check on the {@link java.util.Collection} interface. */
+  private static final Matcher<ExpressionTree> COLLECTION_METHODS =
+      anyOf(
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("contains")
+              .withParameters("java.lang.Object"),
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("containsAll")
+              .withParameters("java.util.Collection"),
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("isEmpty")
+              .withNoParameters(),
+          instanceMethod().onDescendantOf("java.util.Collection").named("size").withNoParameters(),
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("stream")
+              .withNoParameters(),
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("toArray")
+              .withNoParameters(),
+          instanceMethod()
+              .onDescendantOf("java.util.Collection")
+              .named("toArray")
+              .withParameters("java.util.function.IntFunction"));
+
+  /** APIs to check on the {@link java.util.Map} interface. */
+  // TODO(b/188207175): consider adding Map.get() and Map.getOrDefault()
+  private static final Matcher<ExpressionTree> MAP_METHODS =
+      anyOf(
+          instanceMethod()
+              .onDescendantOf("java.util.Map")
+              .namedAnyOf("containsKey", "containsValue")
+              .withParameters("java.lang.Object"),
+          instanceMethod()
+              .onDescendantOf("java.util.Map")
+              .namedAnyOf("isEmpty", "size", "entrySet", "keySet", "values"),
+          staticMethod().onClass("java.util.Map").namedAnyOf("of", "copyOf", "entry", "ofEntries"));
+
+  /** APIs to check on the {@link java.lang.Iterable} interface. */
+  private static final Matcher<ExpressionTree> ITERABLE_METHODS =
+      anyOf(
+          instanceMethod()
+              .onDescendantOf("java.lang.Iterable")
+              .named("iterator")
+              .withNoParameters(),
+          instanceMethod()
+              .onDescendantOf("java.lang.Iterable")
+              .named("spliterator")
+              .withNoParameters());
+
+  /** APIs to check on the {@link java.util.Iterator} interface. */
+  private static final Matcher<ExpressionTree> ITERATOR_METHODS =
+      instanceMethod().onDescendantOf("java.util.Iterator").named("hasNext").withNoParameters();
+
   /**
    * The return values of primitive types (e.g., {@link java.lang.Integer}) should always be checked
    * (except for parsing-type methods and void-returning methods, which won't be checked by
@@ -205,8 +260,14 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
   private static final Matcher<ExpressionTree> OPTIONAL_METHODS =
       anyOf(
           staticMethod().onClass("java.util.Optional"),
-          instanceMethod().onExactClass("java.util.Optional").named("isPresent"),
-          instanceMethod().onExactClass("java.util.Optional").named("isEmpty"));
+          instanceMethod().onExactClass("java.util.Optional").namedAnyOf("isEmpty", "isPresent"));
+
+  /**
+   * The return values of {@link java.util.Optional} methods should always be checked (except for
+   * void-returning ones, which won't be checked by AbstractReturnValueIgnored).
+   */
+  private static final Matcher<ExpressionTree> MORE_OPTIONAL_METHODS =
+      anyMethod().onClass("java.util.Optional");
 
   /**
    * The return values of {@link java.util.concurrent.TimeUnit} methods should always be checked.
@@ -227,6 +288,17 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
               .onDescendantOf(PROTO_MESSAGE + ".Builder")
               .namedAnyOf("build", "buildPartial"));
 
+  private static final Matcher<ExpressionTree> OBJECT_METHODS =
+      anyOf(
+          instanceMethod()
+              .onDescendantOf("java.lang.Object")
+              .namedAnyOf("getClass", "hashCode", "clone", "toString")
+              .withNoParameters(),
+          instanceMethod()
+              .onDescendantOf("java.lang.Object")
+              .namedAnyOf("equals")
+              .withParameters("java.lang.Object"));
+
   private static final Matcher<? super ExpressionTree> SPECIALIZED_MATCHER =
       anyOf(
           RETURNS_SAME_TYPE,
@@ -237,30 +309,33 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
           PRIMITIVE_METHODS,
           ARRAYS_METHODS,
           OPTIONAL_METHODS,
+          TIME_UNIT_METHODS,
           ReturnValueIgnored::javaTimeTypes,
-          instanceMethod()
-              .onDescendantOf("java.util.Collection")
-              .named("contains")
-              .withParameters("java.lang.Object"),
-          instanceMethod()
-              .onDescendantOf("java.util.Collection")
-              .named("containsAll")
-              .withParameters("java.util.Collection"),
-          instanceMethod()
-              .onDescendantOf("java.util.Map")
-              .namedAnyOf("containsKey", "containsValue")
-              .withParameters("java.lang.Object"));
+          COLLECTION_METHODS,
+          MAP_METHODS,
+          ITERABLE_METHODS,
+          ITERATOR_METHODS);
 
   private final Matcher<? super ExpressionTree> matcher;
 
   public ReturnValueIgnored(ErrorProneFlags flags) {
-    boolean checkTimeUnit = flags.getBoolean("ReturnValueIgnored:TimeUnit").orElse(true);
+    boolean checkOptional = flags.getBoolean("ReturnValueIgnored:MoreOptional").orElse(true);
+    boolean objectMethods = flags.getBoolean("ReturnValueIgnored:ObjectMethods").orElse(true);
+
     this.matcher =
-        checkTimeUnit ? anyOf(SPECIALIZED_MATCHER, TIME_UNIT_METHODS) : SPECIALIZED_MATCHER;
+        anyOf(
+            SPECIALIZED_MATCHER,
+            checkOptional ? MORE_OPTIONAL_METHODS : nothing(),
+            objectMethods ? OBJECT_METHODS : nothing());
   }
 
   @Override
   public Matcher<? super ExpressionTree> specializedMatcher() {
     return matcher;
+  }
+
+  @Override
+  protected String getMessage(Name name) {
+    return String.format("Return value of '%s' must be used", name);
   }
 }

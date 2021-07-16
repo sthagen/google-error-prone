@@ -16,7 +16,11 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static org.junit.Assume.assumeTrue;
+
+import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,6 +31,9 @@ public class ReturnValueIgnoredTest {
 
   private final CompilationTestHelper compilationHelper =
       CompilationTestHelper.newInstance(ReturnValueIgnored.class, getClass());
+
+  private final BugCheckerRefactoringTestHelper refactoringHelper =
+      BugCheckerRefactoringTestHelper.newInstance(ReturnValueIgnored.class, getClass());
 
   @Test
   public void testPositiveCases() {
@@ -46,7 +53,7 @@ public class ReturnValueIgnoredTest {
             "import java.util.function.Function;",
             "class Test {",
             "  void f(Function<Integer, Integer> f) {",
-            "    // BUG: Diagnostic contains:",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
             "    f.apply(0);",
             "  }",
             "}")
@@ -106,7 +113,7 @@ public class ReturnValueIgnoredTest {
             "Test.java",
             "class Test {",
             "  void f() {",
-            "    // BUG: Diagnostic contains:",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
             "    \"\".codePoints().count();",
             "    \"\".codePoints().forEach(i -> {});",
             "  }",
@@ -169,9 +176,73 @@ public class ReturnValueIgnoredTest {
             "  void optional() {",
             "    Optional<Integer> optional = Optional.of(42);",
             "    // BUG: Diagnostic contains: ReturnValueIgnored",
-            "    optional.isPresent();",
             "    optional.filter(v -> v > 40);",
-            "    optional.map(v -> Integer.toString(v));",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.flatMap(v -> Optional.of(v + 1));",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.get();",
+            "    optional.ifPresent(v -> {});",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.isPresent();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.map(v -> v + 1);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.orElse(40);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.orElseGet(() -> 40);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.orElseThrow(() -> new RuntimeException());",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void optionalInstanceMethods_jdk9() {
+    assumeTrue(RuntimeVersion.isAtLeast9());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  void optional() {",
+            "    Optional<Integer> optional = Optional.of(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.or(() -> Optional.empty());",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void optionalInstanceMethods_jdk10() {
+    assumeTrue(RuntimeVersion.isAtLeast10());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  void optional() {",
+            "    Optional<Integer> optional = Optional.of(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.orElseThrow();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void optionalInstanceMethods_jdk11() {
+    assumeTrue(RuntimeVersion.isAtLeast11());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  void optional() {",
+            "    Optional<Integer> optional = Optional.of(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    optional.isEmpty();",
             "  }",
             "}")
         .doTest();
@@ -237,7 +308,7 @@ public class ReturnValueIgnoredTest {
             "import java.nio.file.Path;",
             "abstract class Test {",
             "  void test(Path p) {",
-            "    // BUG: Diagnostic contains:",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
             "    E e = p::toRealPath;",
             "  }",
             "  abstract <T> void a(T t);",
@@ -255,12 +326,61 @@ public class ReturnValueIgnoredTest {
             "Test.java",
             "abstract class Test {",
             "  void test(java.util.List p) {",
-            "    // BUG: Diagnostic contains:",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
             "    p.contains(null);",
             "  }",
-            "  void test2(java.util.Map p) {",
-            "    // BUG: Diagnostic contains:",
-            "    p.containsKey(null);",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void mapMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Map;",
+            "public final class Test {",
+            "  void doTest(Map<Integer, Integer> map) {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.isEmpty();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.size();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.entrySet();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.keySet();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.values();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.containsKey(42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    map.containsValue(42);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void mapMethods_java11() {
+    assumeTrue(RuntimeVersion.isAtLeast11());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Map;",
+            "class Test {",
+            "  void doTest() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Map.of(42, 42);",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Map.entry(42, 42);",
+            "  }",
+            "  void doTest(Map<Integer, Integer> map) {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Map.copyOf(map);",
+            "  }",
+            "  void doTest(Map.Entry<Integer, Integer>... entries) {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    Map.ofEntries(entries);",
             "  }",
             "}")
         .doTest();
@@ -339,6 +459,113 @@ public class ReturnValueIgnoredTest {
             "    // BUG: Diagnostic contains: ReturnValueIgnored",
             "    Duration.newBuilder().setSeconds(4).buildPartial();",
             "    Duration duration = Duration.newBuilder().setSeconds(4).buildPartial();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void refactoring() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "import java.util.stream.Stream;",
+            "final class Test {",
+            "  public void f() {",
+            "    Optional.of(42).orElseThrow(AssertionError::new);",
+            "    Stream.of(Optional.of(42)).forEach(o -> o.orElseThrow(AssertionError::new));",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "import java.util.stream.Stream;",
+            "final class Test {",
+            "  public void f() {",
+            "    Stream.of(Optional.of(42)).forEach(o -> o.orElseThrow(AssertionError::new));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testIterableHasNext() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Iterator;",
+            "final class Test {",
+            "  private static class CustomIterator implements Iterator<String> {",
+            "    @Override public boolean hasNext() { return true; }",
+            "    public boolean hasNext(boolean unused) { return true; }",
+            "    @Override public String next() { return \"hi\"; }",
+            "    public boolean nonInterfaceMethod() { return true; }",
+            "  }",
+            "  public void iteratorHasNext() {",
+            "    CustomIterator iterator = new CustomIterator();",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    iterator.hasNext();",
+            "    iterator.next();", // this is OK (some folks next their way through an Iterator)
+            "    iterator.hasNext(true);", // this is OK (it's an overload but not on the interface)
+            "    iterator.nonInterfaceMethod();", // this is OK (it's not an interface method)
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testCollectionToArray() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "final class Test {",
+            "  private static final ImmutableList<Long> LIST = ImmutableList.of(42L);",
+            "  public void collectionToArray() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    LIST.toArray();",
+            // Collection.toArray(T[]) is fine, since it _can_ dump the collection contents into the
+            // passed-in array *if* the array is large enough (in which case, you don't have to
+            // check the return value of the method call).
+            "    LIST.toArray(new Long[0]);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testCollectionToArray_java8() {
+    assumeTrue(RuntimeVersion.isAtLeast9());
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "final class Test {",
+            "  private static final ImmutableList<Long> LIST = ImmutableList.of(42L);",
+            "  public void collectionToArray() {",
+            "    // BUG: Diagnostic contains: ReturnValueIgnored",
+            "    LIST.toArray(Long[]::new);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void objectMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void test(Test t, Object o) {",
+            "    // BUG: Diagnostic contains:",
+            "    t.equals(o);",
+            "    // BUG: Diagnostic contains:",
+            "    o.equals(t);",
+            "    // BUG: Diagnostic contains:",
+            "    t.hashCode();",
+            "    // BUG: Diagnostic contains:",
+            "    t.getClass();",
             "  }",
             "}")
         .doTest();

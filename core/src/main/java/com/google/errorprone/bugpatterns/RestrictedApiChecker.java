@@ -56,6 +56,7 @@ import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
@@ -163,8 +164,7 @@ public class RestrictedApiChecker extends BugChecker
 
     return (MethodSymbol)
         getOnlyElement(
-            superclass
-                .members()
+            ASTHelpers.scope(superclass.members())
                 .getSymbols(
                     member ->
                         member.isConstructor()
@@ -222,8 +222,16 @@ public class RestrictedApiChecker extends BugChecker
     if (!restriction.allowedOnPath().isEmpty()) {
       JCCompilationUnit compilationUnit = (JCCompilationUnit) state.getPath().getCompilationUnit();
       String path = compilationUnit.getSourceFile().toUri().toString();
-      if (Pattern.matches(restriction.allowedOnPath(), path)) {
-        return NO_MATCH;
+      try {
+        if (Pattern.matches(restriction.allowedOnPath(), path)) {
+          return NO_MATCH;
+        }
+
+      } catch (PatternSyntaxException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Invalid regex for RestrictedApi annotation of %s", state.getSourceForNode(where)),
+            e);
       }
     }
     boolean warn = Matchers.enclosingNode(shouldAllowWithWarning(attribute)).matches(where, state);

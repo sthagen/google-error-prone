@@ -32,6 +32,7 @@ import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.CompoundAssignmentTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.LambdaExpressionTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
@@ -67,6 +68,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
           "com.google.inject.testing.fieldbinder.Bind",
           "com.google.errorprone.annotations.Var",
           "com.google.common.annotations.NonFinalForGwt",
+          "com.google.testing.junit.testparameterinjector.TestParameter",
           "org.kohsuke.args4j.Argument",
           "org.kohsuke.args4j.Option",
           "org.mockito.Spy",
@@ -254,6 +256,12 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
     }
 
     @Override
+    public Void visitLambdaExpression(
+        LambdaExpressionTree lambdaExpressionTree, InitializationContext init) {
+      // reset the initialization context when entering lambda
+      return super.visitLambdaExpression(lambdaExpressionTree, InitializationContext.NONE);
+    }
+
     public Void visitBlock(BlockTree node, InitializationContext init) {
       if (getCurrentPath().getParentPath().getLeaf().getKind() == Kind.CLASS) {
         init = node.isStatic() ? InitializationContext.STATIC : InitializationContext.INSTANCE;

@@ -33,7 +33,6 @@ import com.google.errorprone.bugpatterns.ArraysAsListPrimitiveArray;
 import com.google.errorprone.bugpatterns.AssertFalse;
 import com.google.errorprone.bugpatterns.AssertThrowsMultipleStatements;
 import com.google.errorprone.bugpatterns.AssertionFailureIgnored;
-import com.google.errorprone.bugpatterns.AssignmentToMock;
 import com.google.errorprone.bugpatterns.AsyncCallableReturnsNull;
 import com.google.errorprone.bugpatterns.AsyncFunctionReturnsNull;
 import com.google.errorprone.bugpatterns.AutoValueFinalMethods;
@@ -109,6 +108,7 @@ import com.google.errorprone.bugpatterns.EqualsGetClass;
 import com.google.errorprone.bugpatterns.EqualsHashCode;
 import com.google.errorprone.bugpatterns.EqualsIncompatibleType;
 import com.google.errorprone.bugpatterns.EqualsNaN;
+import com.google.errorprone.bugpatterns.EqualsNull;
 import com.google.errorprone.bugpatterns.EqualsReference;
 import com.google.errorprone.bugpatterns.EqualsUnsafeCast;
 import com.google.errorprone.bugpatterns.EqualsUsingHashCode;
@@ -176,6 +176,7 @@ import com.google.errorprone.bugpatterns.JUnit4ClassUsedInJUnit3;
 import com.google.errorprone.bugpatterns.JUnit4SetUpNotRun;
 import com.google.errorprone.bugpatterns.JUnit4TearDownNotRun;
 import com.google.errorprone.bugpatterns.JUnit4TestNotRun;
+import com.google.errorprone.bugpatterns.JUnit4TestsNotRunWithinEnclosed;
 import com.google.errorprone.bugpatterns.JUnitAmbiguousTestClass;
 import com.google.errorprone.bugpatterns.JUnitAssertSameCheck;
 import com.google.errorprone.bugpatterns.JUnitParameterMethodNotFound;
@@ -197,6 +198,7 @@ import com.google.errorprone.bugpatterns.MathAbsoluteRandom;
 import com.google.errorprone.bugpatterns.MathRoundIntLong;
 import com.google.errorprone.bugpatterns.MemberName;
 import com.google.errorprone.bugpatterns.MethodCanBeStatic;
+import com.google.errorprone.bugpatterns.MissingBraces;
 import com.google.errorprone.bugpatterns.MissingCasesInEnumSwitch;
 import com.google.errorprone.bugpatterns.MissingDefault;
 import com.google.errorprone.bugpatterns.MissingFail;
@@ -237,6 +239,7 @@ import com.google.errorprone.bugpatterns.NullOptional;
 import com.google.errorprone.bugpatterns.NullTernary;
 import com.google.errorprone.bugpatterns.NullableConstructor;
 import com.google.errorprone.bugpatterns.NullablePrimitive;
+import com.google.errorprone.bugpatterns.NullablePrimitiveArray;
 import com.google.errorprone.bugpatterns.NullableVoid;
 import com.google.errorprone.bugpatterns.NumericEquality;
 import com.google.errorprone.bugpatterns.ObjectEqualsForPrimitives;
@@ -247,6 +250,7 @@ import com.google.errorprone.bugpatterns.OptionalEquality;
 import com.google.errorprone.bugpatterns.OptionalMapToOptional;
 import com.google.errorprone.bugpatterns.OptionalMapUnusedValue;
 import com.google.errorprone.bugpatterns.OptionalNotPresent;
+import com.google.errorprone.bugpatterns.OptionalOfRedundantMethod;
 import com.google.errorprone.bugpatterns.OrphanedFormatString;
 import com.google.errorprone.bugpatterns.OutlineNone;
 import com.google.errorprone.bugpatterns.OverrideThrowableToString;
@@ -311,6 +315,7 @@ import com.google.errorprone.bugpatterns.SymbolToString;
 import com.google.errorprone.bugpatterns.SystemExitOutsideMain;
 import com.google.errorprone.bugpatterns.SystemOut;
 import com.google.errorprone.bugpatterns.TestExceptionChecker;
+import com.google.errorprone.bugpatterns.TestParametersNotInitialized;
 import com.google.errorprone.bugpatterns.TheoryButNoTheories;
 import com.google.errorprone.bugpatterns.ThreadJoinLoop;
 import com.google.errorprone.bugpatterns.ThreadLocalUsage;
@@ -341,6 +346,7 @@ import com.google.errorprone.bugpatterns.UngroupedOverloads;
 import com.google.errorprone.bugpatterns.UnnecessarilyFullyQualified;
 import com.google.errorprone.bugpatterns.UnnecessarilyVisible;
 import com.google.errorprone.bugpatterns.UnnecessaryAnonymousClass;
+import com.google.errorprone.bugpatterns.UnnecessaryAssignment;
 import com.google.errorprone.bugpatterns.UnnecessaryBoxedAssignment;
 import com.google.errorprone.bugpatterns.UnnecessaryBoxedVariable;
 import com.google.errorprone.bugpatterns.UnnecessaryDefaultInEnumSwitch;
@@ -364,7 +370,6 @@ import com.google.errorprone.bugpatterns.UnusedNestedClass;
 import com.google.errorprone.bugpatterns.UnusedVariable;
 import com.google.errorprone.bugpatterns.UseCorrectAssertInTests;
 import com.google.errorprone.bugpatterns.UseEnumSwitch;
-import com.google.errorprone.bugpatterns.UseTimeInScope;
 import com.google.errorprone.bugpatterns.VarChecker;
 import com.google.errorprone.bugpatterns.VarTypeName;
 import com.google.errorprone.bugpatterns.VariableNameSameAsType;
@@ -442,6 +447,9 @@ import com.google.errorprone.bugpatterns.inject.guice.InjectOnFinalField;
 import com.google.errorprone.bugpatterns.inject.guice.OverridesGuiceInjectableMethod;
 import com.google.errorprone.bugpatterns.inject.guice.OverridesJavaxInjectableMethod;
 import com.google.errorprone.bugpatterns.inject.guice.ProvidesMethodOutsideOfModule;
+import com.google.errorprone.bugpatterns.inlineme.Inliner;
+import com.google.errorprone.bugpatterns.inlineme.Suggester;
+import com.google.errorprone.bugpatterns.inlineme.Validator;
 import com.google.errorprone.bugpatterns.javadoc.AlmostJavadoc;
 import com.google.errorprone.bugpatterns.javadoc.EmptyBlockTag;
 import com.google.errorprone.bugpatterns.javadoc.EscapedEntity;
@@ -455,6 +463,7 @@ import com.google.errorprone.bugpatterns.javadoc.InvalidThrowsLink;
 import com.google.errorprone.bugpatterns.javadoc.MissingSummary;
 import com.google.errorprone.bugpatterns.javadoc.ReturnFromVoid;
 import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
+import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
@@ -632,6 +641,7 @@ public class BuiltInCheckerSuppliers {
           JUnit4SetUpNotRun.class,
           JUnit4TearDownNotRun.class,
           JUnit4TestNotRun.class,
+          JUnit4TestsNotRunWithinEnclosed.class,
           JUnitAssertSameCheck.class,
           JUnitParameterMethodNotFound.class,
           JavaxInjectOnAbstractMethod.class,
@@ -659,6 +669,8 @@ public class BuiltInCheckerSuppliers {
           NonRuntimeAnnotation.class,
           NullTernary.class,
           OptionalEquality.class,
+          OptionalMapUnusedValue.class,
+          OptionalOfRedundantMethod.class,
           OverlappingQualifierAndScopeAnnotation.class,
           OverridesJavaxInjectableMethod.class,
           PackageInfo.class,
@@ -693,6 +705,7 @@ public class BuiltInCheckerSuppliers {
           SubstringOfZero.class,
           SuppressWarningsDeprecated.class,
           TemporalAccessorGetChronoField.class,
+          TestParametersNotInitialized.class,
           TheoryButNoTheories.class,
           ThrowIfUncheckedKnownChecked.class,
           ThrowNull.class,
@@ -704,6 +717,7 @@ public class BuiltInCheckerSuppliers {
           UnnecessaryTypeArgument.class,
           UnusedAnonymousClass.class,
           UnusedCollectionModifiedInPlace.class,
+          Validator.class,
           VarTypeName.class,
           WrongOneof.class,
           XorPower.class,
@@ -723,7 +737,6 @@ public class BuiltInCheckerSuppliers {
           AssertEqualsArgumentOrderChecker.class,
           AssertThrowsMultipleStatements.class,
           AssertionFailureIgnored.class,
-          AssignmentToMock.class,
           AssistedInjectAndInjectOnSameConstructor.class,
           AutoValueFinalMethods.class,
           AutoValueImmutableFields.class,
@@ -765,6 +778,7 @@ public class BuiltInCheckerSuppliers {
           EmptySetMultibindingContributions.class,
           EqualsGetClass.class,
           EqualsIncompatibleType.class,
+          EqualsNull.class,
           EqualsUnsafeCast.class,
           EqualsUsingHashCode.class,
           ErroneousThreadPoolConstructorChecker.class,
@@ -793,6 +807,7 @@ public class BuiltInCheckerSuppliers {
           InjectOnConstructorOfAbstractClass.class,
           InjectedConstructorAnnotations.class,
           InlineFormatString.class,
+          Inliner.class,
           InputStreamSlowMultibyteRead.class,
           InstanceOfAndCastMatchWrongType.class,
           IntLongMath.class,
@@ -854,13 +869,13 @@ public class BuiltInCheckerSuppliers {
           NullOptional.class,
           NullableConstructor.class,
           NullablePrimitive.class,
+          NullablePrimitiveArray.class,
           NullableVoid.class,
           ObjectEqualsForPrimitives.class,
           ObjectToString.class,
           ObjectsHashCodePrimitive.class,
           OperatorPrecedence.class,
           OptionalMapToOptional.class,
-          OptionalMapUnusedValue.class,
           OptionalNotPresent.class,
           OrphanedFormatString.class,
           OutlineNone.class,
@@ -889,6 +904,7 @@ public class BuiltInCheckerSuppliers {
           StreamResourceLeak.class,
           StreamToIterable.class,
           StringSplitter.class,
+          Suggester.class,
           SwigMemoryLeak.class,
           SynchronizeOnNonFinalField.class,
           ThreadJoinLoop.class,
@@ -908,10 +924,12 @@ public class BuiltInCheckerSuppliers {
           URLEqualsHashCode.class,
           UndefinedEquals.class,
           UnescapedEntity.class,
+          UnnecessaryAssignment.class,
           UnnecessaryLambda.class,
           UnnecessaryMethodInvocationMatcher.class,
           UnnecessaryMethodReference.class,
           UnnecessaryParentheses.class,
+          UnrecognisedJavadocTag.class,
           UnsafeFinalization.class,
           UnsafeReflectiveConstructionCast.class,
           UnsynchronizedOverridesSynchronized.class,
@@ -920,7 +938,6 @@ public class BuiltInCheckerSuppliers {
           UnusedVariable.class,
           UseBinds.class,
           UseCorrectAssertInTests.class,
-          UseTimeInScope.class,
           VariableNameSameAsType.class,
           WaitNotInLoop.class,
           WakelockReleasedDangerously.class,
@@ -990,6 +1007,7 @@ public class BuiltInCheckerSuppliers {
           LongLiteralLowerCaseSuffix.class,
           MemberName.class,
           MethodCanBeStatic.class,
+          MissingBraces.class,
           MissingDefault.class,
           MixedArrayDimensions.class,
           MoreThanOneQualifier.class,

@@ -16,9 +16,12 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static org.junit.Assume.assumeTrue;
+
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.ErrorProneFlags;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -248,6 +251,60 @@ public class FieldCanBeStaticTest {
             "  private static final int BAR_FIELD = 2;",
             "  int f() {",
             "    return FOO + BAR_FIELD;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void inner() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.time.Duration;",
+            "class Test {",
+            "  class I {",
+            "    private final Duration D = Duration.ofMillis(1);",
+            "    // BUG: Diagnostic contains: can be static",
+            "    private final int I = 42;",
+            "  }",
+            "  static class S {",
+            "    // BUG: Diagnostic contains: can be static",
+            "    private final Duration D = Duration.ofMillis(1);",
+            "    // BUG: Diagnostic contains: can be static",
+            "    private final int I = 42;",
+            "  }",
+            "  void f() {",
+            "    class L {",
+            "      private final Duration D = Duration.ofMillis(1);",
+            "      // BUG: Diagnostic contains: can be static",
+            "      private final int I = 42;",
+            "    }",
+            "    new Object() {",
+            "      private final Duration D = Duration.ofMillis(1);",
+            "      // BUG: Diagnostic contains: can be static",
+            "      private final int I = 42;",
+            "    };",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void record() {
+    assumeTrue(RuntimeVersion.isAtLeast16());
+    compilationHelper
+        .addSourceLines(
+            "ExampleClass.java",
+            "package example;",
+            "public final class ExampleClass {",
+            "  public record OtherRecord(String value) {}",
+            "  public record SomeRecord(OtherRecord value) {",
+            "    public static SomeRecord fromValue(final OtherRecord value) {",
+            "      return new SomeRecord(value);",
+            "    }",
+            "  }",
+            "  private ExampleClass() {",
             "  }",
             "}")
         .doTest();

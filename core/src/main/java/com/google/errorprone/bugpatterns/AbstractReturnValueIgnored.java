@@ -49,6 +49,7 @@ import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.ExpressionStatementTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.LambdaExpressionTree;
 import com.sun.source.tree.MemberReferenceTree;
@@ -77,6 +78,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import javax.lang.model.element.Name;
 import javax.lang.model.type.TypeKind;
 
 /**
@@ -86,6 +88,7 @@ import javax.lang.model.type.TypeKind;
  */
 public abstract class AbstractReturnValueIgnored extends BugChecker
     implements MethodInvocationTreeMatcher, MemberReferenceTreeMatcher, ReturnTreeMatcher {
+
   private final java.util.function.Supplier<Matcher<ExpressionTree>> methodInvocationMatcher =
       Suppliers.memoize(
           () ->
@@ -218,7 +221,7 @@ public abstract class AbstractReturnValueIgnored extends BugChecker
     Type returnType =
         ASTHelpers.getReturnType(((JCMethodInvocation) methodInvocationTree).getMethodSelect());
 
-    Fix fix;
+    Fix fix = SuggestedFix.emptyFix();
     Symbol symbol = getSymbol(identifierExpr);
     if (identifierExpr != null
         && symbol != null
@@ -232,9 +235,14 @@ public abstract class AbstractReturnValueIgnored extends BugChecker
     } else {
       // Unclear what the programmer intended.  Delete since we don't know what else to do.
       Tree parent = state.getPath().getParentPath().getLeaf();
-      fix = SuggestedFix.delete(parent);
+      if (parent instanceof ExpressionStatementTree) {
+        fix = SuggestedFix.delete(parent);
+      }
     }
-    return describeMatch(methodInvocationTree, fix);
+    return buildDescription(methodInvocationTree)
+        .addFix(fix)
+        .setMessage(getMessage(getSymbol(methodInvocationTree).getSimpleName()))
+        .build();
   }
 
   /**
@@ -243,7 +251,17 @@ public abstract class AbstractReturnValueIgnored extends BugChecker
    */
   protected Description describeReturnValueIgnored(
       MemberReferenceTree memberReferenceTree, VisitorState state) {
-    return describeMatch(memberReferenceTree);
+    return buildDescription(memberReferenceTree)
+        .setMessage(getMessage(memberReferenceTree.getName()))
+        .build();
+  }
+
+  /**
+   * Returns the diagnostic message. Can be overridden by subclasses to provide a customized
+   * diagnostic that includes the name of the invoked method.
+   */
+  protected String getMessage(Name name) {
+    return message();
   }
 
   private static final Matcher<ExpressionTree> FAIL_METHOD =

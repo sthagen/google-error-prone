@@ -101,6 +101,23 @@ public class AndroidJdkLibsCheckerTest extends Java7ApiCheckerTest {
   }
 
   @Test
+  public void stopwatchElapsed() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.base.Stopwatch;",
+            "import java.util.concurrent.TimeUnit;",
+            "public class Test {",
+            "  void o() {",
+            "    // BUG: Diagnostic contains:",
+            "    Stopwatch.createStarted().elapsed();",
+            "    Stopwatch.createStarted().elapsed(TimeUnit.MILLISECONDS);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void allowJava8Flag_packageAllowed() {
     allowJava8Helper
         .addSourceLines(

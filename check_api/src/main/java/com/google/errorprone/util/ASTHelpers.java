@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.Streams.stream;
 import static com.google.errorprone.matchers.JUnitMatchers.JUNIT4_RUN_WITH_ANNOTATION;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
 import static com.sun.tools.javac.code.Scope.LookupKind.NON_RECURSIVE;
@@ -31,12 +32,11 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
-import com.google.common.base.Predicate;
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Streams;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnalysis;
@@ -133,7 +133,6 @@ import com.sun.tools.javac.tree.JCTree.JCPackageDecl;
 import com.sun.tools.javac.tree.JCTree.JCTypeParameter;
 import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
 import com.sun.tools.javac.util.FatalError;
-import com.sun.tools.javac.util.Filter;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Log.DeferredDiagnosticHandler;
 import com.sun.tools.javac.util.Name;
@@ -153,6 +152,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -555,6 +555,35 @@ public class ASTHelpers {
   }
 
   /**
+   * Returns a {@link Stream} of {@link ExpressionTree}s resulting from calling {@link
+   * #getReceiver(ExpressionTree)} repeatedly until no receiver exists.
+   *
+   * <p>For example, give {@code foo().bar().baz()}, returns a stream of {@code [foo().bar(),
+   * foo()]}.
+   *
+   * <p>This can be more convenient than manually traversing up a tree, as it handles the
+   * termination condition automatically. Typical uses cases would include traversing fluent call
+   * chains.
+   */
+  public static Stream<ExpressionTree> streamReceivers(ExpressionTree tree) {
+    return stream(
+        new AbstractIterator<ExpressionTree>() {
+          private ExpressionTree current = tree;
+
+          @Override
+          protected ExpressionTree computeNext() {
+            if (current instanceof MethodInvocationTree
+                || current instanceof MemberSelectTree
+                || current instanceof MemberReferenceTree) {
+              current = getReceiver(current);
+              return current == null ? endOfData() : current;
+            }
+            return endOfData();
+          }
+        });
+  }
+
+  /**
    * Given a BinaryTree to match against and a list of two matchers, applies the matchers to the
    * operands in both orders. If both matchers match, returns a list with the operand that matched
    * each matcher in the corresponding position.
@@ -654,11 +683,8 @@ public class ASTHelpers {
    *     in an unspecified order.
    */
   public static Stream<MethodSymbol> matchingMethods(
-      Name name,
-      java.util.function.Predicate<MethodSymbol> predicate,
-      Type startClass,
-      Types types) {
-    Filter<Symbol> matchesMethodPredicate =
+      Name name, Predicate<MethodSymbol> predicate, Type startClass, Types types) {
+    Predicate<Symbol> matchesMethodPredicate =
         sym -> sym instanceof MethodSymbol && predicate.test((MethodSymbol) sym);
 
     // Iterate over all classes and interfaces that startClass inherits from.
@@ -671,9 +697,9 @@ public class ASTHelpers {
               if (superClassSymbols == null) { // Can be null if superClass is a type variable
                 return Stream.empty();
               }
-              return Streams.stream(
-                      superClassSymbols.getSymbolsByName(
-                          name, matchesMethodPredicate, NON_RECURSIVE))
+              return stream(
+                      scope(superClassSymbols)
+                          .getSymbolsByName(name, matchesMethodPredicate, NON_RECURSIVE))
                   // By definition of the filter, we know that the symbol is a MethodSymbol.
                   .map(symbol -> (MethodSymbol) symbol);
             });
@@ -1201,6 +1227,10 @@ public class ASTHelpers {
           && TestNgMatchers.hasTestNgAnnotation((MethodTree) ancestor, state)) {
         return true;
       }
+      if (ancestor instanceof ClassTree
+          && TestNgMatchers.hasTestNgAnnotation((ClassTree) ancestor)) {
+        return true;
+      }
     }
     return false;
   }
@@ -1372,7 +1402,7 @@ public class ASTHelpers {
    * cases of that happening, so it isn't supported here.
    */
   public static ImmutableSet<String> getGeneratedBy(VisitorState state) {
-    return Streams.stream(state.getPath())
+    return stream(state.getPath())
         .filter(ClassTree.class::isInstance)
         .flatMap(enclosing -> getGeneratedBy(getSymbol(enclosing), state).stream())
         .collect(toImmutableSet());
@@ -2173,6 +2203,11 @@ public class ASTHelpers {
     } catch (ReflectiveOperationException e) {
       throw new LinkageError(e.getMessage(), e);
     }
+  }
+
+  /** Returns a compatibility adapter around {@link Scope}. */
+  public static ErrorProneScope scope(Scope scope) {
+    return new ErrorProneScope(scope);
   }
 
   private ASTHelpers() {}

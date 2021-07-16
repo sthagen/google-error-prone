@@ -15,8 +15,11 @@
  */
 package com.google.errorprone.bugpatterns;
 
+import static org.junit.Assume.assumeTrue;
+
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -343,6 +346,20 @@ public final class PrivateConstructorForUtilityClassTest {
             "  static final String SOME_CONSTANT = \"\";",
             "}")
         .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void record() {
+    assumeTrue(RuntimeVersion.isAtLeast16());
+    CompilationTestHelper.newInstance(PrivateConstructorForUtilityClass.class, getClass())
+        .addSourceLines(
+            "ExampleUtilityClass.java",
+            "package example;",
+            "// BUG: Diagnostic contains:",
+            "public final class ExampleUtilityClass {",
+            "  public record SomeRecord(String value) {}",
+            "}")
         .doTest();
   }
 }

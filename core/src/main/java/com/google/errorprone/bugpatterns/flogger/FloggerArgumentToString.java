@@ -30,7 +30,6 @@ import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static java.util.Arrays.stream;
-import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
@@ -41,6 +40,7 @@ import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
@@ -101,27 +101,36 @@ public class FloggerArgumentToString extends BugChecker implements MethodInvocat
 
   static class Parameter {
 
-    final ExpressionTree expression;
+    final Supplier<String> source;
+    final Type type;
     @Nullable final Character placeholder;
 
-    private Parameter(ExpressionTree expression) {
-      this.expression = requireNonNull(expression);
-      this.placeholder = null;
+    private Parameter(ExpressionTree expression, char placeholder) {
+      this(s -> s.getSourceForNode(expression), getType(expression), placeholder);
     }
 
-    private Parameter(ExpressionTree expression, char placeholder) {
-      this.expression = requireNonNull(expression);
+    private Parameter(Supplier<String> source, Type type, char placeholder) {
+      this.source = source;
+      this.type = type;
       this.placeholder = placeholder;
+    }
+
+    private static Parameter receiver(MethodInvocationTree invocation, char placeholder) {
+      ExpressionTree receiver = getReceiver(invocation);
+      if (receiver != null) {
+        return new Parameter(getReceiver(invocation), placeholder);
+      }
+      return new Parameter(s -> "this", null, placeholder);
     }
   }
 
   private enum Unwrapper {
     // Unwrap any instance call to toString().
-    TO_STRING(instanceMethod().anyClass().named("toString").withParameters()) {
+    TO_STRING(instanceMethod().anyClass().named("toString").withNoParameters()) {
 
       @Override
       Parameter unwrap(MethodInvocationTree invocation, char placeholder) {
-        return new Parameter(getReceiver(invocation), placeholder);
+        return Parameter.receiver(invocation, placeholder);
       }
     },
     // Unwrap things like: String.valueOf(x) --> x
@@ -144,7 +153,7 @@ public class FloggerArgumentToString extends BugChecker implements MethodInvocat
 
       @Override
       Parameter unwrap(MethodInvocationTree invocation, char placeholder) {
-        return new Parameter(getOnlyArgument(invocation), placeholder);
+        return Parameter.receiver(invocation, placeholder);
       }
     },
     // Unwrap things like: Integer.toString(n) --> n
@@ -197,7 +206,7 @@ public class FloggerArgumentToString extends BugChecker implements MethodInvocat
     // Check that the output format safe to unwrap (it could be log("%b", x.toString()) which
     // cannot be unwrapped).
     STRING_TO_UPPER_CASE(
-        instanceMethod().onExactClass("java.lang.String").named("toUpperCase").withParameters()) {
+        instanceMethod().onExactClass("java.lang.String").named("toUpperCase").withNoParameters()) {
 
       @Override
       Parameter unwrap(MethodInvocationTree invocation, char placeholder) {
@@ -238,9 +247,9 @@ public class FloggerArgumentToString extends BugChecker implements MethodInvocat
             Ascii.isUpperCase(placeholder) ? UPPER_HEX_FORMAT : HEX_FORMAT);
       }
     },
-    ARRAYS_AS_LIST(
+    ARRAYS_AS_LIST_OR_TO_STRING(
         allOf(
-            staticMethod().onClass("java.util.Arrays").named("asList"),
+            staticMethod().onClass("java.util.Arrays").namedAnyOf("asList", "toString"),
             toType(
                 MethodInvocationTree.class,
                 FloggerArgumentToString::hasSingleVarargsCompatibleArgument))) {
@@ -321,10 +330,10 @@ public class FloggerArgumentToString extends BugChecker implements MethodInvocat
           char placeholder = term.charAt(1);
           Parameter unwrapped = unwrap(argument, placeholder, state);
           if (unwrapped != null) {
-            fix.replace(argument, state.getSourceForNode(unwrapped.expression));
+            fix.replace(argument, unwrapped.source.get(state));
             placeholder = firstNonNull(unwrapped.placeholder, 's');
             if (placeholder == STRING_FORMAT) {
-              placeholder = inferFormatSpecifier(unwrapped.expression, state);
+              placeholder = inferFormatSpecifier(unwrapped.type, state);
             }
             term = "%" + placeholder;
             fixed = true;

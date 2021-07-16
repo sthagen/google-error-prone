@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 The Error Prone Authors.
+ * Copyright 2021 The Error Prone Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,9 @@ package com.google.errorprone.bugpatterns.testdata;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.util.stream.Stream;
 
-public class MustBeClosedCheckerPositiveCases {
+class MustBeClosedCheckerPositiveCases {
 
   class DoesNotImplementAutoCloseable {
-
     @MustBeClosed
     // BUG: Diagnostic contains: MustBeClosed should only annotate constructors of AutoCloseables.
     DoesNotImplementAutoCloseable() {}
@@ -37,6 +36,10 @@ public class MustBeClosedCheckerPositiveCases {
 
     @Override
     public void close() {}
+
+    public int method() {
+      return 1;
+    }
   }
 
   class Foo {
@@ -87,7 +90,7 @@ public class MustBeClosedCheckerPositiveCases {
   }
 
   void positiveCase4() {
-    try (Closeable closeable = new Foo().mustBeClosedAnnotatedMethod()) {
+    try (Closeable c = new Foo().mustBeClosedAnnotatedMethod()) {
       // BUG: Diagnostic contains:
       new Foo().mustBeClosedAnnotatedMethod();
     }
@@ -124,6 +127,12 @@ public class MustBeClosedCheckerPositiveCases {
         return new MustBeClosedAnnotatedConstructor();
       }
     };
+  }
+
+  int expressionDeclaredVariable() {
+    // BUG: Diagnostic contains:
+    int result = new Foo().mustBeClosedAnnotatedMethod().method();
+    return result;
   }
 
   void tryWithResources_nonFinal() {
