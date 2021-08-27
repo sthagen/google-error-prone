@@ -20,8 +20,8 @@ import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
 
 import com.google.errorprone.BugPattern;
-import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
+import com.google.errorprone.annotations.DoNotCall;
 import com.google.errorprone.annotations.InlineMe;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
@@ -41,13 +41,6 @@ import javax.lang.model.element.Modifier;
     severity = WARNING)
 public final class Suggester extends BugChecker implements MethodTreeMatcher {
 
-  private final boolean checkForArgumentReuse;
-
-  public Suggester(ErrorProneFlags flags) {
-    checkForArgumentReuse =
-        flags.getBoolean(InlinabilityResult.DISALLOW_ARGUMENT_REUSE).orElse(true);
-  }
-
   @Override
   public Description matchMethod(MethodTree tree, VisitorState state) {
     // only suggest @InlineMe on @Deprecated APIs
@@ -60,9 +53,13 @@ public final class Suggester extends BugChecker implements MethodTreeMatcher {
       return Description.NO_MATCH;
     }
 
+    // if the API is already annotated with @DoNotCall, then return no match
+    if (hasAnnotation(tree, DoNotCall.class, state)) {
+      return Description.NO_MATCH;
+    }
+
     // if the body is not inlineable, then return no match
-    InlinabilityResult inlinabilityResult =
-        InlinabilityResult.forMethod(tree, state, checkForArgumentReuse);
+    InlinabilityResult inlinabilityResult = InlinabilityResult.forMethod(tree, state);
     if (!inlinabilityResult.isValidForSuggester()) {
       return Description.NO_MATCH;
     }

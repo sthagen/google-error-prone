@@ -24,7 +24,6 @@ import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.Streams;
-import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
@@ -47,27 +46,12 @@ import javax.lang.model.type.TypeKind;
  * <p>i.e.: It is possible that an object of one type could be equal to an object of the other type.
  */
 public final class TypeCompatibilityUtils {
-  private final boolean treatDifferentProtosAsIncomparable;
-
-  public static TypeCompatibilityUtils fromFlags(ErrorProneFlags flags) {
-    return new TypeCompatibilityUtils(
-        flags.getBoolean("TypeCompatibility:TreatDifferentProtosAsIncomparable").orElse(true));
-  }
-
-  public static TypeCompatibilityUtils allOn() {
-    return new TypeCompatibilityUtils(/* treatDifferentProtosAsIncomparable= */ true);
-  }
-
-  private TypeCompatibilityUtils(boolean treatDifferentProtosAsIncomparable) {
-    this.treatDifferentProtosAsIncomparable = treatDifferentProtosAsIncomparable;
-  }
-
-  public TypeCompatibilityReport compatibilityOfTypes(
+  public static TypeCompatibilityReport compatibilityOfTypes(
       Type receiverType, Type argumentType, VisitorState state) {
     return compatibilityOfTypes(receiverType, argumentType, typeSet(state), typeSet(state), state);
   }
 
-  private TypeCompatibilityReport compatibilityOfTypes(
+  private static TypeCompatibilityReport compatibilityOfTypes(
       Type leftType,
       Type rightType,
       Set<Type> previouslySeenComponentsOfLeftType,
@@ -82,7 +66,10 @@ public final class TypeCompatibilityUtils {
     }
 
     // If they're the exact same type, they are definitely compatible.
-    if (state.getTypes().isSameType(upperBound(leftType), upperBound(rightType))) {
+    Types types = state.getTypes();
+    Type leftUpperBound = getUpperBound(leftType, types);
+    Type rightUpperBound = getUpperBound(rightType, types);
+    if (types.isSameType(leftUpperBound, rightUpperBound)) {
       return TypeCompatibilityReport.compatible();
     }
 
@@ -103,7 +90,9 @@ public final class TypeCompatibilityUtils {
     // class Bar extends Super<String>
     // class Foo extends Super<Integer>
     // Bar and Foo would least-upper-bound to Super, and we compare String and Integer to each-other
-    Type commonSupertype = state.getTypes().lub(rightType, leftType);
+    Type erasedLeftType = types.erasure(leftType);
+    Type erasedRightType = types.erasure(rightType);
+    Type commonSupertype = types.lub(erasedRightType, erasedLeftType);
     // primitives, etc. can't have a common superclass.
     if (commonSupertype.getTag().equals(TypeTag.BOT)
         || commonSupertype.getTag().equals(TypeTag.ERROR)) {
@@ -130,7 +119,7 @@ public final class TypeCompatibilityUtils {
     // compatible, but due to the way that certain classes' equals methods are constructed, they
     // deceive the normal processing into thinking they're compatible, but they are not.
     return areTypesIncompatibleCollections(leftType, rightType, commonSupertype, state)
-            || areIncompatibleProtoTypes(leftType, rightType, commonSupertype, state)
+            || areIncompatibleProtoTypes(erasedLeftType, erasedRightType, commonSupertype, state)
         ? TypeCompatibilityReport.incompatible(leftType, rightType)
         : TypeCompatibilityReport.compatible();
   }
@@ -193,11 +182,8 @@ public final class TypeCompatibilityUtils {
         && !isSameType(rightType, collectionType, state);
   }
 
-  private boolean areIncompatibleProtoTypes(
+  private static boolean areIncompatibleProtoTypes(
       Type leftType, Type rightType, Type nearestCommonSupertype, VisitorState state) {
-    if (!treatDifferentProtosAsIncomparable) {
-      return false;
-    }
     // See discussion in b/152428396 - Proto equality is defined as having the "same message type",
     // with the same corresponding field values. However - there are 3 flavors of Java Proto API
     // that could represent the same message (proto1, mutable proto2, and immutable proto2 [as well
@@ -248,21 +234,17 @@ public final class TypeCompatibilityUtils {
     // consider them incompatible with each other.
     Type messageLite = state.getTypeFromString("com.google.protobuf.MessageLite");
     return isSubtype(nearestCommonSupertype, messageLite, state)
-        && isConcrete(leftType)
-        && isConcrete(rightType);
+        && isConcrete(leftType, state.getTypes())
+        && isConcrete(rightType, state.getTypes());
   }
 
-  private static boolean isConcrete(Type type) {
-    Type toEvaluate = upperBound(type);
+  private static boolean isConcrete(Type type, Types types) {
+    Type toEvaluate = getUpperBound(type, types);
     return (toEvaluate.tsym.flags() & (Flags.ABSTRACT | Flags.INTERFACE)) == 0;
   }
 
   private static boolean classesAreMutableAndImmutableOfSameType(String l, String r) {
     return l.startsWith("Mutable") && l.substring("Mutable".length()).equals(r);
-  }
-
-  private static Type upperBound(Type type) {
-    return type.getUpperBound() == null ? type : type.getUpperBound();
   }
 
   private static String classNamePart(Type type) {
@@ -282,7 +264,7 @@ public final class TypeCompatibilityUtils {
    * report showing that a specific generic type in the projection of {@code leftType} is
    * incompatible with the specific generic type in the projection of {@code rightType}.
    */
-  private TypeCompatibilityReport checkForGenericsMismatch(
+  private static TypeCompatibilityReport checkForGenericsMismatch(
       Type leftType,
       Type rightType,
       Type superType,

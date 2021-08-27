@@ -21,9 +21,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugCheckerInfo;
+import com.google.errorprone.bugpatterns.AlwaysThrows;
 import com.google.errorprone.bugpatterns.AmbiguousMethodReference;
 import com.google.errorprone.bugpatterns.AnnotateFormatMethod;
+import com.google.errorprone.bugpatterns.AnnotationMirrorToString;
 import com.google.errorprone.bugpatterns.AnnotationPosition;
+import com.google.errorprone.bugpatterns.AnnotationValueToString;
 import com.google.errorprone.bugpatterns.ArrayAsKeyOfSetOrMap;
 import com.google.errorprone.bugpatterns.ArrayEquals;
 import com.google.errorprone.bugpatterns.ArrayFillIncompatibleType;
@@ -90,6 +93,7 @@ import com.google.errorprone.bugpatterns.DeduplicateConstants;
 import com.google.errorprone.bugpatterns.DefaultCharset;
 import com.google.errorprone.bugpatterns.DefaultPackage;
 import com.google.errorprone.bugpatterns.DepAnn;
+import com.google.errorprone.bugpatterns.DeprecatedVariable;
 import com.google.errorprone.bugpatterns.DescribeMatch;
 import com.google.errorprone.bugpatterns.DifferentNameButSame;
 import com.google.errorprone.bugpatterns.DiscardedPostfixExpression;
@@ -193,10 +197,12 @@ import com.google.errorprone.bugpatterns.LogicalAssignment;
 import com.google.errorprone.bugpatterns.LongFloatConversion;
 import com.google.errorprone.bugpatterns.LongLiteralLowerCaseSuffix;
 import com.google.errorprone.bugpatterns.LoopConditionChecker;
+import com.google.errorprone.bugpatterns.LoopOverCharArray;
 import com.google.errorprone.bugpatterns.LossyPrimitiveCompare;
 import com.google.errorprone.bugpatterns.MathAbsoluteRandom;
 import com.google.errorprone.bugpatterns.MathRoundIntLong;
 import com.google.errorprone.bugpatterns.MemberName;
+import com.google.errorprone.bugpatterns.MemoizeConstantVisitorStateLookups;
 import com.google.errorprone.bugpatterns.MethodCanBeStatic;
 import com.google.errorprone.bugpatterns.MissingBraces;
 import com.google.errorprone.bugpatterns.MissingCasesInEnumSwitch;
@@ -274,6 +280,7 @@ import com.google.errorprone.bugpatterns.ProtoStringFieldReferenceEquality;
 import com.google.errorprone.bugpatterns.ProtoTruthMixedDescriptors;
 import com.google.errorprone.bugpatterns.ProtocolBufferOrdinal;
 import com.google.errorprone.bugpatterns.ProtosAsKeyOfSetOrMap;
+import com.google.errorprone.bugpatterns.PublicApiNamedStreamShouldReturnStream;
 import com.google.errorprone.bugpatterns.PublicConstructorForAbstractClass;
 import com.google.errorprone.bugpatterns.RandomCast;
 import com.google.errorprone.bugpatterns.RandomModInteger;
@@ -466,7 +473,11 @@ import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
 import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
+import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.FieldMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
+import com.google.errorprone.bugpatterns.nullness.VoidMissingNullable;
 import com.google.errorprone.bugpatterns.overloading.InconsistentOverloads;
 import com.google.errorprone.bugpatterns.threadsafety.DoubleCheckedLocking;
 import com.google.errorprone.bugpatterns.threadsafety.GuardedByChecker;
@@ -561,6 +572,7 @@ public class BuiltInCheckerSuppliers {
   public static final ImmutableSet<BugCheckerInfo> ENABLED_ERRORS =
       getSuppliers(
           // keep-sorted start
+          AlwaysThrows.class,
           AndroidInjectionBeforeSuper.class,
           ArrayEquals.class,
           ArrayFillIncompatibleType.class,
@@ -768,6 +780,7 @@ public class BuiltInCheckerSuppliers {
           DateFormatConstant.class,
           DefaultCharset.class,
           DefaultPackage.class,
+          DeprecatedVariable.class,
           DoNotCallSuggester.class,
           DoNotClaimAnnotations.class,
           DoNotMockAutoValue.class,
@@ -848,7 +861,9 @@ public class BuiltInCheckerSuppliers {
           LockOnBoxedPrimitive.class,
           LogicalAssignment.class,
           LongFloatConversion.class,
+          LoopOverCharArray.class,
           MathAbsoluteRandom.class,
+          MemoizeConstantVisitorStateLookups.class,
           MissingCasesInEnumSwitch.class,
           MissingFail.class,
           MissingOverride.class,
@@ -950,7 +965,9 @@ public class BuiltInCheckerSuppliers {
       getSuppliers(
           // keep-sorted start
           AndroidJdkLibsChecker.class,
+          AnnotationMirrorToString.class,
           AnnotationPosition.class,
+          AnnotationValueToString.class,
           AssertFalse.class,
           AssistedInjectAndInjectOnConstructors.class,
           AutoFactoryAtInject.class,
@@ -973,11 +990,13 @@ public class BuiltInCheckerSuppliers {
           EmptyIfStatement.class,
           EmptyTopLevelDeclaration.class,
           EqualsBrokenForNull.class,
+          EqualsMissingNullable.class,
           ExpectedExceptionChecker.class,
           ExtendsAutoValue.class,
           FieldCanBeFinal.class,
           FieldCanBeLocal.class,
           FieldCanBeStatic.class,
+          FieldMissingNullable.class,
           FloggerLogWithCause.class,
           FloggerMessageFormat.class,
           FloggerPassedAround.class,
@@ -1025,6 +1044,7 @@ public class BuiltInCheckerSuppliers {
           PrivateConstructorForNoninstantiableModule.class,
           PrivateConstructorForUtilityClass.class,
           ProtosAsKeyOfSetOrMap.class,
+          PublicApiNamedStreamShouldReturnStream.class,
           PublicConstructorForAbstractClass.class,
           QualifierWithTypeUse.class,
           RedundantCondition.class,
@@ -1032,6 +1052,7 @@ public class BuiltInCheckerSuppliers {
           RedundantThrows.class,
           RefersToDaggerCodegen.class,
           RemoveUnusedImports.class,
+          ReturnMissingNullable.class,
           ReturnsNullCollection.class,
           ScopeOnModule.class,
           ScopeOrQualifierAnnotationRetention.class,
@@ -1068,6 +1089,7 @@ public class BuiltInCheckerSuppliers {
           UrlInSee.class,
           UseEnumSwitch.class,
           VarChecker.class,
+          VoidMissingNullable.class,
           WildcardImport.class
           // keep-sorted end
           );
