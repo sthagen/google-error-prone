@@ -296,6 +296,109 @@ public class ReturnMissingNullableTest {
   }
 
   @Test
+  public void testReturnXIfXIsNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    // BUG: Diagnostic contains: @Nullable",
+            "    return (o == null ? o : \"\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnXUnlessXIsXNotNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    // BUG: Diagnostic contains: @Nullable",
+            "    return (o != null ? \"\" : o);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnXInsideIfNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    if (o == null) {",
+            "      // BUG: Diagnostic contains: @Nullable",
+            "      return o;",
+            "    }",
+            "    return \"\";",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnXInsideElseOfNotNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    if (o != null) {",
+            "      return \"\";",
+            "    } else {",
+            "      // BUG: Diagnostic contains: @Nullable",
+            "      return o;",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnFieldInsideIfNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object o;",
+            "  Object foo() {",
+            "    if (o == null) {",
+            "      // BUG: Diagnostic contains: @Nullable",
+            "      return o;",
+            "    }",
+            "    return \"\";",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testOtherVerify() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import static com.google.common.base.Verify.verify;",
+            "class LiteralNullReturnTest {",
+            "  public String getMessage(boolean b) {",
+            "    verify(b);",
+            "    // BUG: Diagnostic contains: @Nullable",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void testLimitation_staticFinalFieldInitializedLater() {
     createCompilationTestHelper()
         .addSourceLines(
@@ -342,6 +445,24 @@ public class ReturnMissingNullableTest {
             "    final Object nullObject;",
             "    nullObject = null;",
             "    return nullObject;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testLimitationReturnThisXInsideIfNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object o;",
+            "  Object foo() {",
+            "    if (this.o == null) {",
+            "      return this.o;",
+            "    }",
+            "    return \"\";",
             "  }",
             "}")
         .doTest();
@@ -767,6 +888,86 @@ public class ReturnMissingNullableTest {
   }
 
   @Test
+  public void testNegativeCases_unreachableExit() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "class LiteralNullReturnTest {",
+            "  public String getMessage() {",
+            "    System.exit(1);",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_unreachableFail() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import static org.junit.Assert.fail;",
+            "class LiteralNullReturnTest {",
+            "  public String getMessage() {",
+            "    fail();",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_unreachableThrowExceptionMethod() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import static org.junit.Assert.fail;",
+            "class LiteralNullReturnTest {",
+            "  void throwRuntimeException() {}",
+            "  public String getMessage() {",
+            "    throwRuntimeException();",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_unreachableCheckFalse() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import static com.google.common.base.Preconditions.checkState;",
+            "class LiteralNullReturnTest {",
+            "  public String getMessage() {",
+            "    checkState(false);",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_unreachableVerifyFalse() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import static com.google.common.base.Verify.verify;",
+            "class LiteralNullReturnTest {",
+            "  public String getMessage() {",
+            "    verify(false);",
+            "    return null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void testNegativeCases_staticFinalNonNullField() {
     createCompilationTestHelper()
         .addSourceLines(
@@ -776,6 +977,120 @@ public class ReturnMissingNullableTest {
             "  static final Object SOMETHING = 1;",
             "  Object get() {",
             "    return SOMETHING;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXIfXIsNotNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    return (o != null ? o : \"\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXIfSameSymbolDifferentObjectIsNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object o;",
+            "  Object foo(LiteralNullReturnTest other) {",
+            "    return (o == null ? other.o : \"\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXUnlessXIsXNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    return (o == null ? \"\" : o);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXInsideIfNotNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    if (o != null) {",
+            "      return o;",
+            "    }",
+            "    return \"\";",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXInsideIfNullElse() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    if (o == null) {",
+            "      return \"\";",
+            "    } else {",
+            "      return o;",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_returnXInsideIfNullButAfterOtherStatement() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object foo(Object o) {",
+            "    if (o == null) {",
+            "      o = \"\";",
+            "      return o;",
+            "    }",
+            "    return \"\";",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnSameSymbolDifferentObjectInsideIfNull() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "abstract class LiteralNullReturnTest {",
+            "  Object o;",
+            "  Object foo(LiteralNullReturnTest other) {",
+            "    if (o == null) {",
+            "      return other.o;",
+            "    }",
+            "    return \"\";",
             "  }",
             "}")
         .doTest();
@@ -917,8 +1232,7 @@ public class ReturnMissingNullableTest {
   }
 
   private CompilationTestHelper createAggressiveCompilationTestHelper() {
-    return createCompilationTestHelper()
-        .setArgs("-XepOpt:ReturnMissingNullable:Conservative=false");
+    return createCompilationTestHelper().setArgs("-XepOpt:Nullness:Conservative=false");
   }
 
   private BugCheckerRefactoringTestHelper createRefactoringTestHelper() {

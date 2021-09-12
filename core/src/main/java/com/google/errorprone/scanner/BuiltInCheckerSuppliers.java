@@ -304,6 +304,7 @@ import com.google.errorprone.bugpatterns.SelfEquals;
 import com.google.errorprone.bugpatterns.ShortCircuitBoolean;
 import com.google.errorprone.bugpatterns.ShouldHaveEvenArgs;
 import com.google.errorprone.bugpatterns.SizeGreaterThanOrEqualsZero;
+import com.google.errorprone.bugpatterns.StackTraceElementGetClass;
 import com.google.errorprone.bugpatterns.StaticAssignmentInConstructor;
 import com.google.errorprone.bugpatterns.StaticMockMember;
 import com.google.errorprone.bugpatterns.StaticQualifiedUsingExpression;
@@ -340,6 +341,7 @@ import com.google.errorprone.bugpatterns.TruthGetOrDefault;
 import com.google.errorprone.bugpatterns.TruthSelfEquals;
 import com.google.errorprone.bugpatterns.TryFailRefactoring;
 import com.google.errorprone.bugpatterns.TryFailThrowable;
+import com.google.errorprone.bugpatterns.TryWithResourcesVariable;
 import com.google.errorprone.bugpatterns.TypeEqualsChecker;
 import com.google.errorprone.bugpatterns.TypeNameShadowing;
 import com.google.errorprone.bugpatterns.TypeParameterNaming;
@@ -475,6 +477,7 @@ import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.FieldMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.ParameterMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
 import com.google.errorprone.bugpatterns.nullness.VoidMissingNullable;
@@ -712,6 +715,7 @@ public class BuiltInCheckerSuppliers {
           SelfEquals.class,
           ShouldHaveEvenArgs.class,
           SizeGreaterThanOrEqualsZero.class,
+          StackTraceElementGetClass.class,
           StreamToString.class,
           StringBuilderInitWithChar.class,
           SubstringOfZero.class,
@@ -1039,6 +1043,7 @@ public class BuiltInCheckerSuppliers {
           NumericEquality.class,
           PackageLocation.class,
           ParameterComment.class,
+          ParameterMissingNullable.class,
           PreferJavaTimeOverload.class,
           PrimitiveArrayPassedToVarargsMethod.class,
           PrivateConstructorForNoninstantiableModule.class,
@@ -1071,6 +1076,7 @@ public class BuiltInCheckerSuppliers {
           TimeUnitMismatch.class,
           TransientMisuse.class,
           TryFailRefactoring.class,
+          TryWithResourcesVariable.class,
           TypeParameterNaming.class,
           TypeToString.class,
           UngroupedOverloads.class,

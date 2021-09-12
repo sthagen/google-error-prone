@@ -17,12 +17,13 @@
 package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
-import static com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable.hasDefinitelyNullBranch;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.findDeclaration;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotation;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.getNullCheck;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.hasDefinitelyNullBranch;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.varsProvenNullByParentIf;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
-import static com.sun.source.tree.Tree.Kind.EQUAL_TO;
-import static com.sun.source.tree.Tree.Kind.NOT_EQUAL_TO;
-import static com.sun.source.tree.Tree.Kind.NULL_LITERAL;
 import static javax.lang.model.element.ElementKind.FIELD;
 
 import com.google.common.collect.ImmutableSet;
@@ -32,6 +33,7 @@ import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.AssignmentTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
+import com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullCheck;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnnotations;
 import com.google.errorprone.matchers.Description;
@@ -39,17 +41,14 @@ import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.VariableTree;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.processing.JavacProcessingEnvironment;
-import javax.annotation.Nullable;
+import javax.lang.model.element.Name;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
     name = "FieldMissingNullable",
     summary =
-        "Fields is assigned (or compared against) a definitely null value but is not annotated"
+        "Field is assigned (or compared against) a definitely null value but is not annotated"
             + " @Nullable",
     severity = SUGGESTION)
 public class FieldMissingNullable extends BugChecker
@@ -62,15 +61,17 @@ public class FieldMissingNullable extends BugChecker
 
   @Override
   public Description matchBinary(BinaryTree tree, VisitorState state) {
-    if (tree.getKind() != EQUAL_TO && tree.getKind() != NOT_EQUAL_TO) {
-      return NO_MATCH;
-    }
-    if (tree.getRightOperand().getKind() != NULL_LITERAL) {
+    NullCheck nullCheck = getNullCheck(tree);
+    if (nullCheck == null) {
       return NO_MATCH;
     }
     // TODO(cpovirk): Consider not adding @Nullable in cases like `checkState(foo != null)`.
     return matchIfLocallyDeclaredReferenceFieldWithoutNullable(
-        getSymbol(tree.getLeftOperand()), tree, state);
+        /*
+         * We do want the Symbol here: We conclude that a field may be null if there is code that
+         * compares *any* access of the field (foo, this.foo, other.foo) to null.
+         */
+        nullCheck.varSymbolButUsuallyPreferBareIdentifier(), tree, state);
   }
 
   @Override
@@ -88,10 +89,18 @@ public class FieldMissingNullable extends BugChecker
       return NO_MATCH;
     }
 
+    ImmutableSet<Name> varsProvenNullByParentIf =
+        varsProvenNullByParentIf(
+            /*
+             * Start at the AssignmentTree/VariableTree, not its expression. This matches what we do
+             * for ReturnMissingNullable, where we start at the ReturnTree and not its expression.
+             */
+            state.getPath().getParentPath());
     if (!hasDefinitelyNullBranch(
         expression,
         // TODO(cpovirk): Precompute a set of definitelyNullVars instead of passing an empty set.
         ImmutableSet.of(),
+        varsProvenNullByParentIf,
         state)) {
       return NO_MATCH;
     }
@@ -114,19 +123,6 @@ public class FieldMissingNullable extends BugChecker
       return NO_MATCH;
     }
 
-    return describeMatch(treeToReportOn, NullnessFixes.makeFix(state, fieldDecl));
-  }
-
-  @Nullable
-  private static VariableTree findDeclaration(VisitorState state, Symbol field) {
-    JavacProcessingEnvironment javacEnv = JavacProcessingEnvironment.instance(state.context);
-    TreePath fieldDeclPath = Trees.instance(javacEnv).getPath(field);
-    // Skip fields declared in other compilation units since we can't make a fix for them here.
-    if (fieldDeclPath != null
-        && fieldDeclPath.getCompilationUnit() == state.getPath().getCompilationUnit()
-        && (fieldDeclPath.getLeaf() instanceof VariableTree)) {
-      return (VariableTree) fieldDeclPath.getLeaf();
-    }
-    return null;
+    return describeMatch(treeToReportOn, fixByAddingNullableAnnotation(state, fieldDecl));
   }
 }

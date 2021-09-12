@@ -17,9 +17,10 @@
 package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
-import static com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable.isVoid;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotation;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.hasNoExplicitType;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.isVoid;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
-import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static javax.lang.model.element.ElementKind.LOCAL_VARIABLE;
@@ -63,9 +64,6 @@ public class VoidMissingNullable extends BugChecker
    * type-use annotations). Thus, we'd need to look not just for AnnotatedTypeTree but for
    * MethodTree and VariableTree, as well. That might still pay off if we start caring about cases
    * like Void[], but those cases may be rare enough that we don't need to care.
-   *
-   * (Looking for IdentifierTree and MemberSelectTree may also help us skip the cases in which
-   * "Void" does not appear in the source code, as in lambda parameters and `var`.)
    */
 
   @Override
@@ -91,25 +89,12 @@ public class VoidMissingNullable extends BugChecker
 
   @Override
   public Description matchVariable(VariableTree tree, VisitorState state) {
-    if (getStartPosition(tree.getType()) == -1 || state.getEndPosition(tree.getType()) == -1) {
+    if (hasNoExplicitType(tree, state)) {
       /*
-       * Don't add @Nullable: This is probably a `var` or a lambda parameter with no explicit type.
-       *
-       * (We detect the absence of an explicit type by looking for an absent start position for the
-       * type tree. But under javac8, the nonexistent type tree still has a start position. So, if
-       * we see a start position, we then also look for an end position, which *is* absent for
-       * lambda parameters, even under javac8. Possibly we could get by looking *only* for the end
-       * position, but I'm keeping both checks now that I have something that appears to work.)
-       *
-       * (In the case of `var`, a declaration-annotation @Nullable would be valid. But a type-use
+       * In the case of `var`, a declaration-annotation @Nullable would be valid. But a type-use
        * @Nullable would not be. But more importantly, we expect that tools will infer the
        * "top-level" nullness of all local variables, `var` and otherwise, without ever requiring a
-       * @Nullable annotation on them.)
-       *
-       * TODO(cpovirk): Would it make more sense to move this logic to NullnessFixes.makeFix, which
-       * would presumably then return an Optional<SuggestedFix>? That would let other checks take
-       * advantage of the logic. But it also seems conceptually wrong: It's not merely that we can't
-       * generate a fix for such code; it's that such code isn't wrong.
+       * @Nullable annotation on them.
        */
       return NO_MATCH;
     }
@@ -150,6 +135,6 @@ public class VoidMissingNullable extends BugChecker
      * Or run this refactoring as part of a suite that migrates from existing annotations to
      * type-use annotations? For now, we rely on users to patch things up.
      */
-    return describeMatch(treeToAnnotate, NullnessFixes.makeFix(state, treeToAnnotate));
+    return describeMatch(treeToAnnotate, fixByAddingNullableAnnotation(state, treeToAnnotate));
   }
 }
