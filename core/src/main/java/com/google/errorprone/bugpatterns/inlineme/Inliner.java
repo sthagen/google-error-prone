@@ -22,7 +22,7 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
-import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
+import static com.google.errorprone.util.ASTHelpers.hasDirectAnnotationWithSimpleName;
 import static com.google.errorprone.util.MoreAnnotations.asStringValue;
 import static com.google.errorprone.util.MoreAnnotations.getValue;
 import static com.google.errorprone.util.SideEffectAnalysis.hasSideEffect;
@@ -52,7 +52,12 @@ import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
+import com.sun.tools.javac.parser.JavaTokenizer;
+import com.sun.tools.javac.parser.ScannerFactory;
+import com.sun.tools.javac.parser.Tokens.Token;
+import com.sun.tools.javac.parser.Tokens.TokenKind;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
+import java.nio.CharBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -73,32 +78,31 @@ public final class Inliner extends BugChecker
 
   public static final String FINDING_TAG = "JavaInlineMe";
 
+  static final String PREFIX_FLAG = "InlineMe:Prefix";
+  static final String SKIP_COMMENTS_FLAG = "InlineMe:SkipInliningsWithComments";
+
   private static final Splitter PACKAGE_SPLITTER = Splitter.on('.');
 
-  static final String PREFIX_FLAG = "InlineMe:Prefix";
+  private static final String CHECK_FIX_COMPILES = "InlineMe:CheckFixCompiles";
 
-  static final String ALLOW_BREAKING_CHANGES_FLAG = "InlineMe:AllowBreakingChanges";
-
-  private static final String INLINE_ME = "com.google.errorprone.annotations.InlineMe";
-
-  private static final String VALIDATION_DISABLED =
-      "com.google.errorprone.annotations.InlineMeValidationDisabled";
+  private static final String INLINE_ME = "InlineMe";
+  private static final String VALIDATION_DISABLED = "InlineMeValidationDisabled";
 
   private final ImmutableSet<String> apiPrefixes;
-  private final boolean allowBreakingChanges;
+  private final boolean skipCallsitesWithComments;
+  private final boolean checkFixCompiles;
 
   public Inliner(ErrorProneFlags flags) {
     this.apiPrefixes =
         ImmutableSet.copyOf(flags.getSet(PREFIX_FLAG).orElse(ImmutableSet.<String>of()));
-    this.allowBreakingChanges = flags.getBoolean(ALLOW_BREAKING_CHANGES_FLAG).orElse(false);
+    this.skipCallsitesWithComments = flags.getBoolean(SKIP_COMMENTS_FLAG).orElse(true);
+    this.checkFixCompiles = flags.getBoolean(CHECK_FIX_COMPILES).orElse(false);
   }
-
-  // TODO(b/163596864): Add support for inlining fields
 
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
     MethodSymbol symbol = getSymbol(tree);
-    if (!hasAnnotation(symbol, INLINE_ME, state)) {
+    if (!hasDirectAnnotationWithSimpleName(symbol, INLINE_ME)) {
       return Description.NO_MATCH;
     }
     ImmutableList<String> callingVars =
@@ -112,7 +116,7 @@ public final class Inliner extends BugChecker
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
     MethodSymbol symbol = getSymbol(tree);
-    if (!hasAnnotation(symbol, INLINE_ME, state)) {
+    if (!hasDirectAnnotationWithSimpleName(symbol, INLINE_ME)) {
       return Description.NO_MATCH;
     }
     ImmutableList<String> callingVars =
@@ -147,16 +151,20 @@ public final class Inliner extends BugChecker
       String receiverString,
       ExpressionTree receiver,
       VisitorState state) {
-    checkState(hasAnnotation(symbol, INLINE_ME, state));
+    checkState(hasDirectAnnotationWithSimpleName(symbol, INLINE_ME));
 
     Api api = Api.create(symbol, state);
     if (!matchesApiPrefixes(api)) {
       return Description.NO_MATCH;
     }
 
+    if (skipCallsitesWithComments && stringContainsComments(state.getSourceForNode(tree), state)) {
+      return Description.NO_MATCH;
+    }
+
     Attribute.Compound inlineMe =
         symbol.getRawAttributes().stream()
-            .filter(a -> a.type.tsym.getQualifiedName().contentEquals(INLINE_ME))
+            .filter(a -> a.type.tsym.getSimpleName().contentEquals(INLINE_ME))
             .collect(onlyElement());
 
     SuggestedFix.Builder builder = SuggestedFix.builder();
@@ -251,15 +259,29 @@ public final class Inliner extends BugChecker
 
     SuggestedFix fix = builder.build();
 
-    // If there are no imports to add, then there's no new dependencies, so we can verify that it
-    // compilesWithFix(); if there are new imports to add, then we can't validate that it compiles.
-    if (fix.getImportsToAdd().isEmpty() && !allowBreakingChanges) {
+    if (checkFixCompiles && fix.getImportsToAdd().isEmpty()) {
+      // If there are no new imports being added (then there are no new dependencies). Therefore, we
+      // can verify that the fix compiles (if CHECK_FIX_COMPILES is enabled).
       return SuggestedFixes.compilesWithFix(fix, state)
           ? describe(tree, fix, api)
           : Description.NO_MATCH;
     }
 
     return describe(tree, fix, api);
+  }
+
+  // Implementation borrowed from Refaster's comment-checking code.
+  private static boolean stringContainsComments(String source, VisitorState state) {
+    JavaTokenizer tokenizer =
+        new JavaTokenizer(ScannerFactory.instance(state.context), CharBuffer.wrap(source)) {};
+    for (Token token = tokenizer.readToken();
+        token.kind != TokenKind.EOF;
+        token = tokenizer.readToken()) {
+      if (token.comments != null && !token.comments.isEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static ImmutableList<String> getStrings(Attribute.Compound attribute, String name) {
@@ -279,10 +301,10 @@ public final class Inliner extends BugChecker
 
     static Api create(MethodSymbol method, VisitorState state) {
       String extraMessage = "";
-      if (hasAnnotation(method, VALIDATION_DISABLED, state)) {
+      if (hasDirectAnnotationWithSimpleName(method, VALIDATION_DISABLED)) {
         Attribute.Compound inlineMeValidationDisabled =
             method.getRawAttributes().stream()
-                .filter(a -> a.type.tsym.getQualifiedName().contentEquals(VALIDATION_DISABLED))
+                .filter(a -> a.type.tsym.getSimpleName().contentEquals(VALIDATION_DISABLED))
                 .collect(onlyElement());
         String reason = Iterables.getOnlyElement(getStrings(inlineMeValidationDisabled, "value"));
         extraMessage = " NOTE: this is an unvalidated inlining! Reasoning: " + reason;

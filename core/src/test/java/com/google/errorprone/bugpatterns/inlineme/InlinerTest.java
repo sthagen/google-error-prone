@@ -450,9 +450,7 @@ public class InlinerTest {
             "  protected final void before(int value) {",
             "    after(Duration.ofMillis(value));",
             "  }",
-            // TODO(b/187169365): Validator currently doesn't like inlining non-public members.
-            //   Consider allowing protected members if the method being inlined is also protected?
-            "  public void after(Duration value) {",
+            "  protected void after(Duration value) {",
             "  }",
             "}")
         .expectUnchanged()
@@ -492,9 +490,7 @@ public class InlinerTest {
             "  protected Parent(int value) {",
             "    this(Duration.ofMillis(value));",
             "  }",
-            // TODO(b/187169365): Validator currently doesn't like inlining non-public members.
-            //   Consider allowing protected members if the method being inlined is also protected?
-            "  public Parent(Duration value) {",
+            "  protected Parent(Duration value) {",
             "  }",
             "}")
         .expectUnchanged()
@@ -889,7 +885,7 @@ public class InlinerTest {
 
   @Test
   public void testReplaceWithJustParameter() {
-    refactoringTestHelper
+    bugCheckerWithCheckFixCompiles()
         .allowBreakingChanges()
         .addInputLines(
             "Client.java",
@@ -926,7 +922,7 @@ public class InlinerTest {
 
   @Test
   public void testOrderOfOperations() {
-    refactoringTestHelper
+    bugCheckerWithCheckFixCompiles()
         .allowBreakingChanges()
         .addInputLines(
             "Client.java",
@@ -961,7 +957,7 @@ public class InlinerTest {
 
   @Test
   public void testOrderOfOperationsWithParamAddition() {
-    refactoringTestHelper
+    bugCheckerWithCheckFixCompiles()
         .allowBreakingChanges()
         .addInputLines(
             "Client.java",
@@ -996,7 +992,7 @@ public class InlinerTest {
 
   @Test
   public void testOrderOfOperationsWithTrailingOperand() {
-    refactoringTestHelper
+    bugCheckerWithCheckFixCompiles()
         .allowBreakingChanges()
         .addInputLines(
             "Client.java",
@@ -1099,8 +1095,59 @@ public class InlinerTest {
         .doTest();
   }
 
-  private BugCheckerRefactoringTestHelper buildBugCheckerWithPrefixFlag(String prefix) {
+  @Test
+  public void testCustomInlineMe() {
+    refactoringTestHelper
+        .addInputLines(
+            "InlineMe.java", //
+            "package bespoke;",
+            "public @interface InlineMe {",
+            "  String replacement();",
+            "  String[] imports() default {};",
+            "  String[] staticImports() default {};",
+            "}")
+        .expectUnchanged()
+        .addInputLines(
+            "Client.java",
+            "import bespoke.InlineMe;",
+            "public final class Client {",
+            "  @Deprecated",
+            "  @InlineMe(replacement = \"this.foo2(value)\")",
+            "  public void foo1(String value) {",
+            "    foo2(value);",
+            "  }",
+            "  public void foo2(String value) {",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .addInputLines(
+            "Caller.java",
+            "public final class Caller {",
+            "  public void doTest() {",
+            "    Client client = new Client();",
+            "    client.foo1(\"frobber!\");",
+            "    client.foo1(\"don't change this!\");",
+            "  }",
+            "}")
+        .addOutputLines(
+            "out/Caller.java",
+            "public final class Caller {",
+            "  public void doTest() {",
+            "    Client client = new Client();",
+            "    client.foo2(\"frobber!\");",
+            "    client.foo2(\"don't change this!\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  private BugCheckerRefactoringTestHelper bugCheckerWithPrefixFlag(String prefix) {
     return BugCheckerRefactoringTestHelper.newInstance(Inliner.class, getClass())
         .setArgs("-XepOpt:" + PREFIX_FLAG + "=" + prefix);
+  }
+
+  private BugCheckerRefactoringTestHelper bugCheckerWithCheckFixCompiles() {
+    return BugCheckerRefactoringTestHelper.newInstance(Inliner.class, getClass())
+        .setArgs("-XepOpt:InlineMe:CheckFixCompiles=true");
   }
 }

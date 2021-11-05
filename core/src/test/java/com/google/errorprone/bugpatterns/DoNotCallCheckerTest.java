@@ -62,6 +62,107 @@ public class DoNotCallCheckerTest {
   }
 
   @Test
+  public void positiveWhereDeclaredTypeIsSuper() {
+    testHelperWithImmutableList()
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "class Test {",
+            "  void foo() {",
+            "    List<Integer> xs = ImmutableList.of();",
+            "    // BUG: Diagnostic contains:",
+            "    xs.add(1);",
+            "    xs.get(1);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void positiveWhereDeclaredTypeIsSuper_butAssignedMultipleTimes() {
+    testHelperWithImmutableList()
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "class Test {",
+            "  void foo() {",
+            "    List<Integer> xs;",
+            "    if (hashCode() == 0) {",
+            "      xs = ImmutableList.of();",
+            "    } else {",
+            "      xs = ImmutableList.of();",
+            "    }",
+            "    // BUG: Diagnostic contains:",
+            "    xs.add(1);",
+            "    xs.get(1);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  private CompilationTestHelper testHelperWithImmutableList() {
+    // Stub out an ImmutableList with the annotations we need for testing.
+    return testHelper
+        .addSourceLines(
+            "ImmutableCollection.java",
+            "import com.google.errorprone.annotations.DoNotCall;",
+            "import java.util.List;",
+            "abstract class ImmutableCollection<T> implements java.util.Collection<T> {",
+            "  @DoNotCall @Override public final boolean add(T t) { throw new"
+                + " UnsupportedOperationException(); }",
+            "}")
+        .addSourceLines(
+            "ImmutableList.java",
+            "import com.google.errorprone.annotations.DoNotCall;",
+            "import java.util.List;",
+            "abstract class ImmutableList<T> extends ImmutableCollection<T> implements List<T> {",
+            "  public static <T> ImmutableList<T> of() {",
+            "    return null;",
+            "  }",
+            "}");
+  }
+
+  @Test
+  public void positiveWhereDeclaredTypeIsSuper_flaggedOff() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import java.util.List;",
+            "class Test {",
+            "  void foo() {",
+            "    List<Integer> xs = ImmutableList.of();",
+            "    xs.add(1);",
+            "    xs.get(1);",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:DoNotCallChecker:CheckAssignedTypes=false")
+        .doTest();
+  }
+
+  @Test
+  public void positiveWhereDeclaredTypeIsSuper_butNotAssignedOnce() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import com.google.common.collect.ImmutableList;",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "class Test {",
+            "  void foo() {",
+            "    List<Integer> xs;",
+            "    if (true) {",
+            "      xs = ImmutableList.of();",
+            "    } else {",
+            "      xs = new ArrayList<>();",
+            "      xs.add(2);",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void concreteFinal() {
     testHelper
         .addSourceLines(
@@ -423,6 +524,23 @@ public class DoNotCallCheckerTest {
   }
 
   @Test
+  public void memberReferencesOnThirdPartyMethods() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.concurrent.ThreadLocalRandom;",
+            "import java.util.Optional;",
+            "public class Test {",
+            "  public void foo(Optional<Long> x) {",
+            "    ThreadLocalRandom random = ThreadLocalRandom.current();",
+            "    // BUG: Diagnostic contains: DoNotCall",
+            "    x.ifPresent(random::setSeed);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void thread_stop() {
     // Thread.stop(Throwable) was removed in JDK11:
     //   https://bugs.openjdk.java.net/browse/JDK-8204243
@@ -434,6 +552,21 @@ public class DoNotCallCheckerTest {
             "  public void foo() {",
             "    // BUG: Diagnostic contains: DoNotCall",
             "    Thread.currentThread().stop(new Throwable());",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void typeArgs_dontCrash() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.List;",
+            "class Test<T extends java.util.Collection<Object>> {",
+            "  @Override public boolean equals(Object o) {",
+            "    T foo = (T) o;",
+            "    return foo.equals(1);",
             "  }",
             "}")
         .doTest();

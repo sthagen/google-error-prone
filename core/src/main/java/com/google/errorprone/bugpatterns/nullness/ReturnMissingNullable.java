@@ -18,7 +18,7 @@ package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotation;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotationToReturnType;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.hasDefinitelyNullBranch;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.isVoid;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.varsProvenNullByParentIf;
@@ -44,6 +44,7 @@ import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnnotations;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.sun.source.tree.BlockTree;
@@ -207,13 +208,6 @@ public class ReturnMissingNullable extends BugChecker implements CompilationUnit
           // Buggy code, but adding @Nullable just makes it worse.
           return;
         }
-        if (beingConservative && state.getTypes().isArray(returnType)) {
-          /*
-           * Type-annotation syntax on arrays can be confusing, and this refactoring doesn't get it
-           * right yet.
-           */
-          return;
-        }
         if (beingConservative && returnType.getKind() == TYPEVAR) {
           /*
            * Consider AbstractFuture.getDoneValue: It returns a literal `null`, but it shouldn't be
@@ -238,10 +232,12 @@ public class ReturnMissingNullable extends BugChecker implements CompilationUnit
             definitelyNullVars,
             varsProvenNullByParentIf,
             stateForCompilationUnit)) {
-          state.reportMatch(
-              describeMatch(
-                  returnTree,
-                  fixByAddingNullableAnnotation(state.withPath(getCurrentPath()), methodTree)));
+          SuggestedFix fix =
+              fixByAddingNullableAnnotationToReturnType(
+                  state.withPath(getCurrentPath()), methodTree);
+          if (!fix.isEmpty()) {
+            state.reportMatch(describeMatch(returnTree, fix));
+          }
         }
       }
     }.scan(tree, null);

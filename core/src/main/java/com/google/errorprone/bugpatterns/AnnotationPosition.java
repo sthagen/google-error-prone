@@ -63,7 +63,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 
@@ -86,10 +85,14 @@ public final class AnnotationPosition extends BugChecker
       Arrays.stream(TokenKind.values()).collect(toImmutableMap(tk -> tk.name(), tk -> tk));
 
   private static final ImmutableSet<TokenKind> MODIFIERS =
-      Arrays.stream(Modifier.values())
-          .map(m -> TOKEN_KIND_BY_NAME.get(m.name()))
-          // TODO(b/168625474): sealed doesn't have a token kind in Java 15
-          .filter(m -> m != null)
+      Streams.concat(
+              Arrays.stream(Modifier.values())
+                  .map(m -> TOKEN_KIND_BY_NAME.get(m.name()))
+                  // TODO(b/168625474): sealed doesn't have a token kind in Java 15
+                  .filter(Objects::nonNull),
+              // Pretend that "<" and ">" are modifiers, so that type arguments wind up grouped with
+              // modifiers.
+              Stream.of(TokenKind.LT, TokenKind.GT, TokenKind.GTGT))
           .collect(toImmutableSet());
 
   @Override
@@ -104,10 +107,6 @@ public final class AnnotationPosition extends BugChecker
 
   @Override
   public Description matchVariable(VariableTree tree, VisitorState state) {
-    Symbol symbol = getSymbol(tree);
-    if (symbol.getKind() != ElementKind.FIELD) {
-      return NO_MATCH;
-    }
     return handle(tree, tree.getName(), tree.getModifiers(), state);
   }
 
@@ -123,6 +122,7 @@ public final class AnnotationPosition extends BugChecker
 
     ImmutableList<ErrorProneToken> modifierTokens =
         tokens.stream().filter(t -> MODIFIERS.contains(t.kind())).collect(toImmutableList());
+
     int firstModifierPos =
         modifierTokens.stream().findFirst().map(x -> x.pos()).orElse(Integer.MAX_VALUE);
     int lastModifierPos = Streams.findLast(modifierTokens.stream()).map(x -> x.endPos()).orElse(0);
@@ -157,12 +157,14 @@ public final class AnnotationPosition extends BugChecker
     int endPos;
     if (tree instanceof JCMethodDecl) {
       JCMethodDecl methodTree = (JCMethodDecl) tree;
-      if (!methodTree.getParameters().isEmpty()) {
-        endPos = methodTree.getParameters().get(0).getStartPosition();
-      } else if (methodTree.getBody() == null) {
-        endPos = state.getEndPosition(methodTree);
+      if (methodTree.getReturnType() != null) {
+        endPos = getStartPosition(methodTree.getReturnType());
+      } else if (!methodTree.getParameters().isEmpty()) {
+        endPos = getStartPosition(methodTree.getParameters().get(0));
+      } else if (methodTree.getBody() != null && !methodTree.getBody().getStatements().isEmpty()) {
+        endPos = getStartPosition(methodTree.getBody().getStatements().get(0));
       } else {
-        endPos = methodTree.getBody().getStartPosition();
+        endPos = state.getEndPosition(methodTree);
       }
     } else if (tree instanceof JCVariableDecl) {
       endPos = ((JCVariableDecl) tree).getType().getStartPosition();
@@ -232,7 +234,7 @@ public final class AnnotationPosition extends BugChecker
           .replace(
               lastModifierPos,
               lastModifierPos,
-              String.format("%s ", joinSource(state, shouldBeAfter)));
+              String.format(" %s ", joinSource(state, shouldBeAfter)));
     }
     Stream.Builder<String> messages = Stream.builder();
     if (!shouldBeBefore.isEmpty()) {

@@ -846,4 +846,84 @@ public class SuggesterTest {
         .expectUnchanged()
         .doTest();
   }
+
+  @Test
+  public void testCustom() {
+    refactoringTestHelper
+        .addInputLines(
+            "InlineMe.java", //
+            "package bespoke;",
+            "public @interface InlineMe {",
+            "  String replacement();",
+            "  String[] imports() default {};",
+            "  String[] staticImports() default {};",
+            "}")
+        .expectUnchanged()
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import java.time.Duration;",
+            "import java.util.Optional;",
+            "public final class Client {",
+            "  @Deprecated",
+            "  public Optional<Duration> silly(Optional<Long> input) {",
+            "    return input.map(Duration::ofMillis);",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import bespoke.InlineMe;",
+            "import java.time.Duration;",
+            "import java.util.Optional;",
+            "public final class Client {",
+            "  @InlineMe(replacement = \"input.map(Duration::ofMillis)\", ",
+            "      imports = \"java.time.Duration\")",
+            "  @Deprecated",
+            "  public Optional<Duration> silly(Optional<Long> input) {",
+            "    return input.map(Duration::ofMillis);",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:InlineMe:annotation=bespoke.InlineMe")
+        .doTest();
+  }
+
+  @Test
+  public void implementationUsingPublicStaticField() {
+    refactoringTestHelper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import java.util.function.Supplier;",
+            "public class Client {",
+            "  public static final Supplier<Integer> MAGIC = () -> 42;",
+            "  @Deprecated",
+            "  public static int before() {",
+            "    return after(MAGIC.get());",
+            "  }",
+            "  public static int after(int value) {",
+            "    return value;",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import com.google.errorprone.annotations.InlineMe;",
+            "import java.util.function.Supplier;",
+            "public class Client {",
+            "  public static final Supplier<Integer> MAGIC = () -> 42;",
+            "  @InlineMe("
+                // TODO(b/202145711): MAGIC.get() should be Client.MAGIC.get()
+                + "replacement = \"Client.after(MAGIC.get())\", "
+                + "imports = \"com.google.frobber.Client\")",
+            "  @Deprecated",
+            "  public static int before() {",
+            "    return after(MAGIC.get());",
+            "  }",
+            "  public static int after(int value) {",
+            "    return value;",
+            "  }",
+            "}")
+        .doTest();
+  }
 }
