@@ -16,6 +16,8 @@
 
 package com.google.errorprone.bugpatterns.nullness;
 
+import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
+
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
@@ -128,7 +130,7 @@ public class FieldMissingNullableTest {
 
   @Test
   public void testComparisonToNull() {
-    createCompilationTestHelper()
+    createAggressiveCompilationTestHelper()
         .addSourceLines(
             "com/google/errorprone/bugpatterns/nullness/FieldMissingNullTest.java",
             "package com.google.errorprone.bugpatterns.nullness;",
@@ -145,7 +147,7 @@ public class FieldMissingNullableTest {
 
   @Test
   public void testComparisonToNullOnOtherInstance() {
-    createCompilationTestHelper()
+    createAggressiveCompilationTestHelper()
         .addSourceLines(
             "com/google/errorprone/bugpatterns/nullness/FieldMissingNullTest.java",
             "package com.google.errorprone.bugpatterns.nullness;",
@@ -154,6 +156,22 @@ public class FieldMissingNullableTest {
             "  public void reset(FieldMissingNullTest other) {",
             "    // BUG: Diagnostic contains: @Nullable",
             "    if (other.message != null) {",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_comparisonToNullConservative() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/FieldMissingNullTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "public class FieldMissingNullTest {",
+            "  private String message;",
+            "  public void reset() {",
+            "    if (message != null) {",
             "    }",
             "  }",
             "}")
@@ -192,6 +210,40 @@ public class FieldMissingNullableTest {
             "import com.google.anno.my.Nullable;",
             "public class FieldMissingNullTest {",
             "  @Nullable String message;",
+            "  public void reset() {",
+            "    this.message = null;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_alreadyAnnotatedMonotonic() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/FieldMissingNullTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import org.checkerframework.checker.nullness.qual.MonotonicNonNull;",
+            "public class FieldMissingNullTest {",
+            "  private @MonotonicNonNull String message;",
+            "  public void reset() {",
+            "    if (message != null) {",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testNegativeCases_alreadyTypeAnnotatedInnerClass() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/FieldMissingNullTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "import org.checkerframework.checker.nullness.qual.Nullable;",
+            "public class FieldMissingNullTest {",
+            "  class Inner {}",
+            "  @Nullable Inner message;",
             "  public void reset() {",
             "    this.message = null;",
             "  }",
@@ -370,7 +422,25 @@ public class FieldMissingNullableTest {
             "  @Nullable private final Object obj2 = null;",
             "  @interface Nullable {}",
             "}")
-        .doTest();
+        .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void testAnnotationInsertedAfterModifiers() {
+    createRefactoringTestHelper()
+        .addInputLines(
+            "in/Test.java",
+            "import org.checkerframework.checker.nullness.qual.Nullable;",
+            "class T {",
+            "  private final Object obj1 = null;",
+            "}")
+        .addOutputLines(
+            "out/Test.java",
+            "import org.checkerframework.checker.nullness.qual.Nullable;",
+            "class T {",
+            "  private final @Nullable Object obj1 = null;",
+            "}")
+        .doTest(TEXT_MATCH);
   }
 
   @Test
@@ -393,6 +463,10 @@ public class FieldMissingNullableTest {
 
   private CompilationTestHelper createCompilationTestHelper() {
     return CompilationTestHelper.newInstance(FieldMissingNullable.class, getClass());
+  }
+
+  private CompilationTestHelper createAggressiveCompilationTestHelper() {
+    return createCompilationTestHelper().setArgs("-XepOpt:Nullness:Conservative=false");
   }
 
   private BugCheckerRefactoringTestHelper createRefactoringTestHelper() {

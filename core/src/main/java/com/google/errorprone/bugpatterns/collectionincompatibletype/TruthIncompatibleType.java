@@ -269,6 +269,10 @@ public class TruthIncompatibleType extends BugChecker implements MethodInvocatio
             getOnlyElement(getSymbol((MethodInvocationTree) receiver).getParameters()).type,
             ignoringCasts(getOnlyElement(((MethodInvocationTree) receiver).getArguments())),
             state);
+    if (targetType == null) {
+      // The target collection may be raw.
+      return Stream.empty();
+    }
     ExpressionTree argument = getOnlyElement(tree.getArguments());
     Type sourceType = getCorrespondenceTypeArg(argument, state);
     // This is different to the others: we're checking for castability, not possible equality.
@@ -465,7 +469,9 @@ public class TruthIncompatibleType extends BugChecker implements MethodInvocatio
   }
 
   private static boolean isNumericType(Type parameter, VisitorState state) {
-    return parameter.isNumeric()
-        || isSubtype(parameter, state.getTypeFromString("java.lang.Number"), state);
+    return parameter.isNumeric() || isSubtype(parameter, JAVA_LANG_NUMBER.get(state), state);
   }
+
+  private static final Supplier<Type> JAVA_LANG_NUMBER =
+      VisitorState.memoize(state -> state.getTypeFromString("java.lang.Number"));
 }

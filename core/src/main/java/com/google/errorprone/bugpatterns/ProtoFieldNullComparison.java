@@ -30,7 +30,9 @@ import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
@@ -40,6 +42,7 @@ import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.ClassTree;
@@ -59,7 +62,6 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -68,10 +70,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /** Matches comparison of proto fields to {@code null}. */
-@BugPattern(
-    name = "ProtoFieldNullComparison",
-    summary = "Protobuf fields cannot be null.",
-    severity = ERROR)
+@BugPattern(summary = "Protobuf fields cannot be null.", severity = ERROR)
 public class ProtoFieldNullComparison extends BugChecker implements CompilationUnitTreeMatcher {
 
   // TODO(b/111109484): Try to consolidate these with NullnessPropagationTransfer.
@@ -98,8 +97,8 @@ public class ProtoFieldNullComparison extends BugChecker implements CompilationU
 
   private static final Matcher<Tree> RETURNS_LIST = Matchers.isSubtypeOf("java.util.List");
 
-  private static final Set<Kind> COMPARISON_OPERATORS =
-      EnumSet.of(Kind.EQUAL_TO, Kind.NOT_EQUAL_TO);
+  private static final ImmutableSet<Kind> COMPARISON_OPERATORS =
+      Sets.immutableEnumSet(Kind.EQUAL_TO, Kind.NOT_EQUAL_TO);
 
   private static final Matcher<ExpressionTree> EXTENSION_METHODS_WITH_FIX =
       instanceMethod()
@@ -402,7 +401,7 @@ public class ProtoFieldNullComparison extends BugChecker implements CompilationU
           MethodInvocationTree methodInvocation = (MethodInvocationTree) tree;
           Type argumentType =
               ASTHelpers.getType(Iterables.getOnlyElement(methodInvocation.getArguments()));
-          Symbol extension = state.getSymbolFromString("com.google.protobuf.ExtensionLite");
+          Symbol extension = COM_GOOGLE_PROTOBUF_EXTENSIONLITE.get(state);
           Type genericsArgument = state.getTypes().asSuper(argumentType, extension);
 
           // If there are not two arguments then it is a raw type
@@ -523,4 +522,7 @@ public class ProtoFieldNullComparison extends BugChecker implements CompilationU
 
     abstract SuggestedFix fix(Fixer fixer, ExpressionTree tree, VisitorState state);
   }
+
+  private static final Supplier<Symbol> COM_GOOGLE_PROTOBUF_EXTENSIONLITE =
+      VisitorState.memoize(state -> state.getSymbolFromString("com.google.protobuf.ExtensionLite"));
 }

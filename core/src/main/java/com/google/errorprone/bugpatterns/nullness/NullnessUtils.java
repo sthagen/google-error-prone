@@ -22,8 +22,8 @@ import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullCheck
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullableAnnotationToUse.annotationToBeImported;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullableAnnotationToUse.annotationWithoutImporting;
 import static com.google.errorprone.fixes.SuggestedFix.emptyFix;
+import static com.google.errorprone.matchers.Matchers.instanceMethod;
 import static com.google.errorprone.suppliers.Suppliers.JAVA_LANG_VOID_TYPE;
-import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
@@ -38,6 +38,8 @@ import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullCheck.Polarity;
 import com.google.errorprone.fixes.SuggestedFix;
+import com.google.errorprone.fixes.SuggestedFixes;
+import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.FindIdentifiers;
 import com.sun.source.tree.AnnotatedTypeTree;
 import com.sun.source.tree.ArrayTypeTree;
@@ -48,6 +50,7 @@ import com.sun.source.tree.ConditionalExpressionTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.IfTree;
+import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.ParenthesizedTree;
@@ -76,67 +79,102 @@ import javax.lang.model.element.Name;
 class NullnessUtils {
   private NullnessUtils() {}
 
+  private static final Matcher<ExpressionTree> OPTIONAL_OR_NULL =
+      instanceMethod().onDescendantOf("com.google.common.base.Optional").named("orNull");
+  private static final Matcher<ExpressionTree> OPTIONAL_OR_ELSE =
+      instanceMethod().onDescendantOf("java.util.Optional").named("orElse");
+
   /**
    * Returns a {@link SuggestedFix} to add a {@code Nullable} annotation to the given method's
    * return type.
    */
   static SuggestedFix fixByAddingNullableAnnotationToReturnType(
       VisitorState state, MethodTree method) {
+    return fixByAddingNullableAnnotationToElementOrType(
+        state, method, method.getReturnType(), "nullness:return");
+  }
+
+  /**
+   * Returns a {@link SuggestedFix} to add a {@code Nullable} annotation to the given variable's
+   * type.
+   */
+  static SuggestedFix fixByAddingNullableAnnotationToType(
+      VisitorState state, VariableTree variable) {
+    return fixByAddingNullableAnnotationToElementOrType(
+        state, variable, variable.getType(), /* suppressionToRemove= */ null);
+  }
+
+  private static SuggestedFix fixByAddingNullableAnnotationToElementOrType(
+      VisitorState state, Tree elementTree, Tree typeTree, @Nullable String suppressionToRemove) {
     NullableAnnotationToUse nullableAnnotationToUse = pickNullableAnnotation(state);
     if (!nullableAnnotationToUse.isAlreadyInScope() && applyOnlyIfAlreadyInScope(state)) {
       return emptyFix();
     }
 
     if (!nullableAnnotationToUse.isTypeUse()) {
-      return nullableAnnotationToUse.fixPrefixingOnto(method);
+      return nullableAnnotationToUse.fixPrefixingOnto(elementTree, state, suppressionToRemove);
     }
 
-    Tree returnType = method.getReturnType();
-    if (returnType.getKind() == PARAMETERIZED_TYPE) {
-      returnType = ((ParameterizedTypeTree) returnType).getType();
+    return fixByAddingKnownTypeUseNullableAnnotation(
+        state, typeTree, nullableAnnotationToUse, suppressionToRemove);
+  }
+
+  /**
+   * Returns a {@link SuggestedFix} to add a <b>type-use</b> {@code Nullable} annotation to the
+   * given tree. The tree should be a "type-use-only" location, like a type argument or a bounds of
+   * a type parameter or wildcard. Prefer to use {@link #fixByAddingNullableAnnotationToReturnType}
+   * and {@link #fixByAddingNullableAnnotationToType} instead of this method when applicable.
+   */
+  static SuggestedFix fixByAnnotatingTypeUseOnlyLocationWithNullableAnnotation(
+      VisitorState state, Tree typeTree) {
+    NullableAnnotationToUse nullableAnnotationToUse = pickNullableAnnotation(state);
+    if (!nullableAnnotationToUse.isTypeUse()) {
+      return emptyFix();
     }
-    switch (returnType.getKind()) {
+
+    return fixByAddingKnownTypeUseNullableAnnotation(
+        state, typeTree, nullableAnnotationToUse, /* suppressionToRemove= */ null);
+  }
+
+  private static SuggestedFix fixByAddingKnownTypeUseNullableAnnotation(
+      VisitorState state,
+      Tree typeTree,
+      NullableAnnotationToUse nullableAnnotationToUse,
+      @Nullable String suppressionToRemove) {
+    if (typeTree.getKind() == PARAMETERIZED_TYPE) {
+      typeTree = ((ParameterizedTypeTree) typeTree).getType();
+    }
+    switch (typeTree.getKind()) {
       case ARRAY_TYPE:
         Tree beforeBrackets;
-        for (beforeBrackets = returnType;
+        for (beforeBrackets = typeTree;
             beforeBrackets.getKind() == ARRAY_TYPE;
             beforeBrackets = ((ArrayTypeTree) beforeBrackets).getType()) {}
         // For an explanation of "int @Foo [][] f," etc., see JLS 4.11.
-        return nullableAnnotationToUse.fixPostfixingOnto(beforeBrackets);
+        return nullableAnnotationToUse.fixPostfixingOnto(
+            beforeBrackets, state, suppressionToRemove);
 
       case MEMBER_SELECT:
         int lastDot =
-            reverse(state.getOffsetTokensForNode(returnType)).stream()
+            reverse(state.getOffsetTokensForNode(typeTree)).stream()
                 .filter(t -> t.kind() == DOT)
                 .findFirst()
                 .get()
                 .pos();
-        return nullableAnnotationToUse.fixPostfixingOnto(lastDot);
+        return nullableAnnotationToUse.fixPostfixingOnto(lastDot, state, suppressionToRemove);
 
       case ANNOTATED_TYPE:
         return nullableAnnotationToUse.fixPrefixingOnto(
-            ((AnnotatedTypeTree) returnType).getAnnotations().get(0));
+            ((AnnotatedTypeTree) typeTree).getAnnotations().get(0), state, suppressionToRemove);
 
       case IDENTIFIER:
-        return nullableAnnotationToUse.fixPrefixingOnto(returnType);
+        return nullableAnnotationToUse.fixPrefixingOnto(typeTree, state, suppressionToRemove);
 
       default:
         throw new AssertionError(
-            "unexpected tree kind for getReturnType: "
-                + returnType.getKind()
-                + " for "
-                + returnType);
+            "unexpected kind for type tree: " + typeTree.getKind() + " for " + typeTree);
     }
     // TODO(cpovirk): Remove any @NonNull, etc. annotation that is present?
-  }
-
-  /** Returns a {@link SuggestedFix} to add a {@code Nullable} annotation before the given tree. */
-  /*
-   * TODO(cpovirk): Evaluate callers to see if they need special cases like the *ToReturnType method
-   * above.
-   */
-  static SuggestedFix fixByPrefixingWithNullableAnnotation(VisitorState state, Tree tree) {
-    return pickNullableAnnotation(state).fixPrefixingOnto(tree);
   }
 
   @com.google.auto.value.AutoValue // fully qualified to work around JDK-7177813(?) in JDK8 build
@@ -158,20 +196,27 @@ class NullnessUtils {
     /**
      * Returns a {@link SuggestedFix} to add a {@code Nullable} annotation after the given position.
      */
-    final SuggestedFix fixPostfixingOnto(int position) {
-      return fixBuilderWithImport().replace(position + 1, position + 1, " @" + use() + " ").build();
+    final SuggestedFix fixPostfixingOnto(
+        int position, VisitorState state, @Nullable String suppressionToRemove) {
+      return prepareBuilder(state, suppressionToRemove)
+          .replace(position + 1, position + 1, " @" + use() + " ")
+          .build();
     }
 
     /** Returns a {@link SuggestedFix} to add a {@code Nullable} annotation after the given tree. */
-    final SuggestedFix fixPostfixingOnto(Tree tree) {
-      return fixBuilderWithImport().postfixWith(tree, " @" + use() + " ").build();
+    final SuggestedFix fixPostfixingOnto(
+        Tree tree, VisitorState state, @Nullable String suppressionToRemove) {
+      return prepareBuilder(state, suppressionToRemove)
+          .postfixWith(tree, " @" + use() + " ")
+          .build();
     }
 
     /**
      * Returns a {@link SuggestedFix} to add a {@code Nullable} annotation before the given tree.
      */
-    final SuggestedFix fixPrefixingOnto(Tree tree) {
-      return fixBuilderWithImport().prefixWith(tree, "@" + use() + " ").build();
+    final SuggestedFix fixPrefixingOnto(
+        Tree tree, VisitorState state, @Nullable String suppressionToRemove) {
+      return prepareBuilder(state, suppressionToRemove).prefixWith(tree, "@" + use() + " ").build();
     }
 
     @Nullable
@@ -183,10 +228,14 @@ class NullnessUtils {
 
     abstract boolean isAlreadyInScope();
 
-    private SuggestedFix.Builder fixBuilderWithImport() {
+    private SuggestedFix.Builder prepareBuilder(
+        VisitorState state, @Nullable String suppressionToRemove) {
       SuggestedFix.Builder builder = SuggestedFix.builder();
       if (importToAdd() != null) {
         builder.addImport(importToAdd());
+      }
+      if (applyRemoveSuppressWarnings(state)) {
+        SuggestedFixes.removeSuppressWarnings(builder, state, suppressionToRemove);
       }
       return builder;
     }
@@ -209,7 +258,8 @@ class NullnessUtils {
      *
      * - When we suggest a jsr305 annotation, might we want to suggest @CheckForNull over @Nullable?
      *   It's more verbose, but it's more obviously a declaration annotation, and it's the
-     *   annotation that is *technically* defined to produce the behaviors that users want.
+     *   annotation that is *technically* defined to produce the behaviors that users want. (But do
+     *   tools like Dagger recognize it?)
      */
     Symbol sym = FindIdentifiers.findIdent("Nullable", state, KindSelector.VAL_TYP);
     ErrorProneFlags flags = state.errorProneOptions().getFlags();
@@ -243,6 +293,7 @@ class NullnessUtils {
      */
     switch (className) {
       case "libcore.util.Nullable":
+      case "org.checkerframework.checker.nullness.compatqual.NullableType":
       case "org.checkerframework.checker.nullness.qual.Nullable":
       case "org.jspecify.nullness.Nullable":
         return true;
@@ -379,6 +430,11 @@ class NullnessUtils {
       }
 
       @Override
+      public Boolean visitMethodInvocation(MethodInvocationTree tree, Void unused) {
+        return super.visitMethodInvocation(tree, unused) || isOptionalOrNull(tree);
+      }
+
+      @Override
       public Boolean visitParenthesized(ParenthesizedTree tree, Void unused) {
         return visit(tree.getExpression(), unused);
       }
@@ -400,6 +456,16 @@ class NullnessUtils {
          */
         return isVoid(getType(tree), stateForCompilationUnit)
             || definitelyNullVars.contains(getSymbol(tree));
+      }
+
+      boolean isOptionalOrNull(MethodInvocationTree tree) {
+        return OPTIONAL_OR_NULL.matches(tree, stateForCompilationUnit)
+            || (OPTIONAL_OR_ELSE.matches(tree, stateForCompilationUnit)
+                && tree.getArguments().get(0).getKind() == NULL_LITERAL);
+        /*
+         * TODO(cpovirk): Instead of checking only for NULL_LITERAL, call hasDefinitelyNullBranch?
+         * But consider whether that would interfere with the TODO at the top of that method.
+         */
       }
     }.visit(tree, null);
   }
@@ -445,18 +511,6 @@ class NullnessUtils {
     return ImmutableSet.of(nullCheck.bareIdentifier());
   }
 
-  /** Returns {@code true} if this is a `var` or a lambda parameter that has no explicit type. */
-  static boolean hasNoExplicitType(VariableTree tree, VisitorState state) {
-    /*
-     * We detect the absence of an explicit type by looking for an absent start position for the
-     * type tree. But under javac8, the nonexistent type tree still has a start position. So, if
-     * we see a start position, we then also look for an end position, which *is* absent for
-     * lambda parameters, even under javac8. Possibly we could get by looking *only* for the end
-     * position, but I'm keeping both checks now that I have something that appears to work.
-     */
-    return getStartPosition(tree.getType()) == -1 || state.getEndPosition(tree.getType()) == -1;
-  }
-
   @Nullable
   static VariableTree findDeclaration(VisitorState state, Symbol sym) {
     JavacProcessingEnvironment javacEnv = JavacProcessingEnvironment.instance(state.context);
@@ -475,6 +529,14 @@ class NullnessUtils {
         .errorProneOptions()
         .getFlags()
         .getBoolean("Nullness:OnlyIfAnnotationAlreadyInScope")
+        .orElse(false);
+  }
+
+  private static boolean applyRemoveSuppressWarnings(VisitorState state) {
+    return state
+        .errorProneOptions()
+        .getFlags()
+        .getBoolean("Nullness:RemoveSuppressWarnings")
         .orElse(false);
   }
 }

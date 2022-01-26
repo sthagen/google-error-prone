@@ -16,11 +16,8 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static org.junit.Assume.assumeTrue;
-
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
-import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -199,7 +196,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void optionalInstanceMethods_jdk9() {
-    assumeTrue(RuntimeVersion.isAtLeast9());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -216,7 +212,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void optionalInstanceMethods_jdk10() {
-    assumeTrue(RuntimeVersion.isAtLeast10());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -233,7 +228,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void optionalInstanceMethods_jdk11() {
-    assumeTrue(RuntimeVersion.isAtLeast11());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -369,7 +363,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void mapMethods_java11() {
-    assumeTrue(RuntimeVersion.isAtLeast11());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -428,6 +421,22 @@ public class ReturnValueIgnoredTest {
             "    Integer.parseUnsignedInt(\"1985\", 10);",
             "    Integer.valueOf(\"1985\");",
             "    Integer.valueOf(\"1985\", 10);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void constructors() {
+    compilationHelper
+        .setArgs("-XepOpt:CheckConstructorReturnValue=true")
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  void f() throws Exception {",
+            // TODO: we haven't yet enabled constructor checking for basic types yet,
+            //   just making sure it doesn't crash
+            "    new String(\"Hello\");",
             "  }",
             "}")
         .doTest();
@@ -543,7 +552,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void testCollectionToArray_java8() {
-    assumeTrue(RuntimeVersion.isAtLeast9());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -628,7 +636,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void enumMethodsOnSubtype() {
-    assumeTrue(RuntimeVersion.isAtLeast9());
     compilationHelper
         .addSourceLines(
             "Test.java",
@@ -670,7 +677,6 @@ public class ReturnValueIgnoredTest {
 
   @Test
   public void objectsMethods() {
-    assumeTrue(RuntimeVersion.isAtLeast9());
     compilationHelper
         .addSourceLines(
             "Test.java",

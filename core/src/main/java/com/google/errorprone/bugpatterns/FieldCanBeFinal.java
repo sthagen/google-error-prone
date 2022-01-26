@@ -17,8 +17,10 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
+import static com.google.errorprone.util.ASTHelpers.shouldKeep;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
@@ -45,6 +47,7 @@ import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,7 +57,6 @@ import javax.lang.model.element.TypeElement;
 
 /** @author Liam Miller-Cushon (cushon@google.com) */
 @BugPattern(
-    name = "FieldCanBeFinal",
     summary = "This field is only assigned during initialization; consider making it final",
     severity = SUGGESTION)
 public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMatcher {
@@ -88,14 +90,14 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       ImmutableSet.of("NonFinalForTesting", "NotFinalForTesting");
 
   /** Unary operator kinds that implicitly assign to their operand. */
-  private static final EnumSet<Kind> UNARY_ASSIGNMENT =
-      EnumSet.of(
+  private static final ImmutableSet<Kind> UNARY_ASSIGNMENT =
+      Sets.immutableEnumSet(
           Kind.PREFIX_DECREMENT,
           Kind.POSTFIX_DECREMENT,
           Kind.PREFIX_INCREMENT,
           Kind.POSTFIX_INCREMENT);
 
-  /** The initalization context where an assignment occurred. */
+  /** The initialization context where an assignment occurred. */
   private enum InitializationContext {
     /** A class (static) initializer. */
     STATIC,
@@ -111,7 +113,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
     private final Map<VarSymbol, VariableAssignments> assignments = new LinkedHashMap<>();
 
     /** Returns all {@link VariableAssignments} in the current compilation unit. */
-    private Iterable<VariableAssignments> getAssignments() {
+    private Collection<VariableAssignments> getAssignments() {
       return assignments.values();
     }
 
@@ -209,6 +211,9 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       if (!var.sym.isPrivate()) {
         continue;
       }
+      if (shouldKeep(var.declaration)) {
+        continue;
+      }
       for (String annotation : IMPLICIT_VAR_ANNOTATIONS) {
         if (ASTHelpers.hasAnnotation(var.sym, annotation, state)) {
           continue outer;
@@ -262,6 +267,7 @@ public class FieldCanBeFinal extends BugChecker implements CompilationUnitTreeMa
       return super.visitLambdaExpression(lambdaExpressionTree, InitializationContext.NONE);
     }
 
+    @Override
     public Void visitBlock(BlockTree node, InitializationContext init) {
       if (getCurrentPath().getParentPath().getLeaf().getKind() == Kind.CLASS) {
         init = node.isStatic() ? InitializationContext.STATIC : InitializationContext.INSTANCE;

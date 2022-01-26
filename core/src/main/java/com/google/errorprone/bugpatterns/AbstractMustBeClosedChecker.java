@@ -35,7 +35,7 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Strings;
 import com.google.common.base.Verify;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Streams;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.MustBeClosed;
@@ -338,7 +338,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     }
     return Optional.of(
         new TryBlock(
-            tree,
             stmt,
             fix.prefixWith(
                 stmt,
@@ -357,7 +356,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     SuggestedFix.Builder fix = SuggestedFix.builder();
     return Optional.of(
         new TryBlock(
-            tree,
             fix.prefixWith(
                     declaringStatement,
                     String.format(
@@ -378,7 +376,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     SuggestedFix.Builder fix = SuggestedFix.builder();
     return Optional.of(
         new TryBlock(
-            tree,
             var,
             fix.replace(
                     afterTypePos,
@@ -401,7 +398,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     }
     return Optional.of(
         new TryBlock(
-            decl,
             enclosingBlock,
             SuggestedFix.builder()
                 .prefixWith(
@@ -438,19 +434,16 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
    * all be inserted at once atomically.
    */
   private static class TryBlock {
-    final Tree location;
     final Optional<Tree> closeBraceAfter;
     final SuggestedFix.Builder otherChanges;
 
     /** For changes that don't need to insert a close brace. */
-    TryBlock(Tree location, SuggestedFix.Builder changes) {
-      this.location = location;
+    TryBlock(SuggestedFix.Builder changes) {
       this.closeBraceAfter = Optional.empty();
       this.otherChanges = changes;
     }
 
-    TryBlock(Tree location, Tree closeBraceAfter, SuggestedFix.Builder otherChanges) {
-      this.location = location;
+    TryBlock(Tree closeBraceAfter, SuggestedFix.Builder otherChanges) {
       this.closeBraceAfter = Optional.of(closeBraceAfter);
       this.otherChanges = otherChanges;
     }
@@ -475,7 +468,7 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
   private static final class FindingPerMethod implements FixAggregator {
     private FindingPerMethod() {}
 
-    private final Multimap<Optional<Tree>, TryBlock> reports = ArrayListMultimap.create();
+    private final ListMultimap<Optional<Tree>, TryBlock> reports = ArrayListMultimap.create();
 
     @Override
     public Optional<SuggestedFix> report(TryBlock fix) {

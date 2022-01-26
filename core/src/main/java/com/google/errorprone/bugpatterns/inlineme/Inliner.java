@@ -16,19 +16,19 @@
 
 package com.google.errorprone.bugpatterns.inlineme;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.enclosingPackage;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
+import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
 import static com.google.errorprone.util.ASTHelpers.hasDirectAnnotationWithSimpleName;
-import static com.google.errorprone.util.MoreAnnotations.asStringValue;
+import static com.google.errorprone.util.ASTHelpers.stringContainsComments;
 import static com.google.errorprone.util.MoreAnnotations.getValue;
 import static com.google.errorprone.util.SideEffectAnalysis.hasSideEffect;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.base.CharMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
@@ -52,14 +52,10 @@ import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import com.sun.tools.javac.parser.JavaTokenizer;
-import com.sun.tools.javac.parser.ScannerFactory;
-import com.sun.tools.javac.parser.Tokens.Token;
-import com.sun.tools.javac.parser.Tokens.TokenKind;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
-import java.nio.CharBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -151,31 +147,30 @@ public final class Inliner extends BugChecker
       String receiverString,
       ExpressionTree receiver,
       VisitorState state) {
-    checkState(hasDirectAnnotationWithSimpleName(symbol, INLINE_ME));
+    Optional<InlineMeData> inlineMe = InlineMeData.createFromSymbol(symbol);
+    if (inlineMe.isEmpty()) {
+      return Description.NO_MATCH;
+    }
 
     Api api = Api.create(symbol, state);
     if (!matchesApiPrefixes(api)) {
       return Description.NO_MATCH;
     }
 
-    if (skipCallsitesWithComments && stringContainsComments(state.getSourceForNode(tree), state)) {
+    if (skipCallsitesWithComments
+        && stringContainsComments(state.getSourceForNode(tree), state.context)) {
       return Description.NO_MATCH;
     }
-
-    Attribute.Compound inlineMe =
-        symbol.getRawAttributes().stream()
-            .filter(a -> a.type.tsym.getSimpleName().contentEquals(INLINE_ME))
-            .collect(onlyElement());
 
     SuggestedFix.Builder builder = SuggestedFix.builder();
 
     Map<String, String> typeNames = new HashMap<>();
-    for (String newImport : getStrings(inlineMe, "imports")) {
+    for (String newImport : inlineMe.get().imports()) {
       String typeName = Iterables.getLast(PACKAGE_SPLITTER.split(newImport));
       String qualifiedTypeName = SuggestedFixes.qualifyType(state, builder, newImport);
       typeNames.put(typeName, qualifiedTypeName);
     }
-    for (String newStaticImport : getStrings(inlineMe, "staticImports")) {
+    for (String newStaticImport : inlineMe.get().staticImports()) {
       builder.addStaticImport(newStaticImport);
     }
 
@@ -202,8 +197,7 @@ public final class Inliner extends BugChecker
       }
     }
 
-    String replacement =
-        trimTrailingSemicolons(asStringValue(getValue(inlineMe, "replacement").get()).get());
+    String replacement = inlineMe.get().replacement();
     int replacementStart = ((DiagnosticPosition) tree).getStartPosition();
     int replacementEnd = state.getEndPosition(tree);
 
@@ -270,20 +264,6 @@ public final class Inliner extends BugChecker
     return describe(tree, fix, api);
   }
 
-  // Implementation borrowed from Refaster's comment-checking code.
-  private static boolean stringContainsComments(String source, VisitorState state) {
-    JavaTokenizer tokenizer =
-        new JavaTokenizer(ScannerFactory.instance(state.context), CharBuffer.wrap(source)) {};
-    for (Token token = tokenizer.readToken();
-        token.kind != TokenKind.EOF;
-        token = tokenizer.readToken()) {
-      if (token.comments != null && !token.comments.isEmpty()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private static ImmutableList<String> getStrings(Attribute.Compound attribute, String name) {
     return getValue(attribute, name)
         .map(MoreAnnotations::asStrings)
@@ -312,7 +292,9 @@ public final class Inliner extends BugChecker
       return new AutoValue_Inliner_Api(
           method.owner.getQualifiedName().toString(),
           method.getSimpleName().toString(),
+          enclosingPackage(method).toString(),
           method.isConstructor(),
+          hasAnnotation(method, "java.lang.Deprecated", state),
           extraMessage);
     }
 
@@ -320,12 +302,20 @@ public final class Inliner extends BugChecker
 
     abstract String methodName();
 
+    abstract String packageName();
+
     abstract boolean isConstructor();
+
+    abstract boolean isDeprecated();
 
     abstract String extraMessage();
 
     final String message() {
-      return shortName() + " should be inlined" + extraMessage();
+      return "Migrate (via inlining) from "
+          + (isDeprecated() ? "deprecated " : "")
+          + shortName()
+          + " to its replacement"
+          + extraMessage();
     }
 
     /** Returns {@code FullyQualifiedClassName#methodName}. */
@@ -338,7 +328,8 @@ public final class Inliner extends BugChecker
      * `ClassName.methodName()`}).
      */
     final String shortName() {
-      return String.format("`%s.%s()`", simpleClassName(), methodName());
+      String humanReadableClassName = className().replaceFirst(packageName() + ".", "");
+      return String.format("`%s.%s()`", humanReadableClassName, methodName());
     }
 
     /** Returns the simple class name (e.g., {@code ClassName}). */
@@ -357,11 +348,5 @@ public final class Inliner extends BugChecker
       }
     }
     return false;
-  }
-
-  private static final CharMatcher SEMICOLON = CharMatcher.is(';');
-
-  private static String trimTrailingSemicolons(String s) {
-    return SEMICOLON.trimTrailingFrom(s);
   }
 }

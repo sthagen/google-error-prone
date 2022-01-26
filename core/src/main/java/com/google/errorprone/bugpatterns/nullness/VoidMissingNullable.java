@@ -16,15 +16,19 @@
 
 package com.google.errorprone.bugpatterns.nullness;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByPrefixingWithNullableAnnotation;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.hasNoExplicitType;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotationToReturnType;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotationToType;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAnnotatingTypeUseOnlyLocationWithNullableAnnotation;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.isVoid;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.google.errorprone.util.ASTHelpers.hasNoExplicitType;
 import static javax.lang.model.element.ElementKind.LOCAL_VARIABLE;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
@@ -33,7 +37,10 @@ import com.google.errorprone.bugpatterns.BugChecker.ParameterizedTypeTreeMatcher
 import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnnotations;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
+import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.AnnotatedTypeTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.Tree;
@@ -73,7 +80,7 @@ public class VoidMissingNullable extends BugChecker
       if (tree instanceof WildcardTree) {
         tree = ((WildcardTree) tree).getBound();
       }
-      checkType(getType(tree), tree, state);
+      checkTree(tree, state);
     }
     return NO_MATCH; // Any reports were made through state.reportMatch.
   }
@@ -84,7 +91,10 @@ public class VoidMissingNullable extends BugChecker
     if (sym == null) {
       return NO_MATCH;
     }
-    return matchType(sym.getReturnType(), sym, tree, state);
+    if (!typeMatches(sym.getReturnType(), sym, state)) {
+      return NO_MATCH;
+    }
+    return describeMatch(tree, fixByAddingNullableAnnotationToReturnType(state, tree));
   }
 
   @Override
@@ -105,37 +115,59 @@ public class VoidMissingNullable extends BugChecker
     if (sym.getKind() == LOCAL_VARIABLE) {
       return NO_MATCH; // Local variables are discussed in the comment about `var`, etc. above.
     }
-    return matchType(sym.type, sym, tree, state);
-  }
-
-  private void checkType(Type type, Tree treeToAnnotate, VisitorState state) {
-    if (!isVoid(type, state)) {
-      return;
-    }
-    if (NullnessAnnotations.fromAnnotationsOn(type).orElse(null) == Nullness.NULLABLE) {
-      return;
-    }
-    state.reportMatch(describeMatch(treeToAnnotate, state));
-  }
-
-  private Description matchType(Type type, Symbol sym, Tree treeToAnnotate, VisitorState state) {
-    if (!isVoid(type, state)) {
+    if (!typeMatches(sym.type, sym, state)) {
       return NO_MATCH;
     }
-    if (NullnessAnnotations.fromAnnotationsOn(sym).orElse(null) == Nullness.NULLABLE) {
+    SuggestedFix fix = fixByAddingNullableAnnotationToType(state, tree);
+    if (fix.isEmpty()) {
       return NO_MATCH;
     }
-    return describeMatch(treeToAnnotate, state);
+    return describeMatch(tree, fix);
   }
 
-  private Description describeMatch(Tree treeToAnnotate, VisitorState state) {
+  private void checkTree(Tree tree, VisitorState state) {
+    if (!typeMatches(getType(tree), state)) {
+      return;
+    }
     /*
-     * TODO(cpovirk): For the case of type arguments, this fix makes sense only if we use a
-     * @Nullable that is a type-use annotation. If non-type-use annotations, don't suggest a change?
-     * Or run this refactoring as part of a suite that migrates from existing annotations to
-     * type-use annotations? For now, we rely on users to patch things up.
+     * Redundant-looking check required for anonymous classes because JCTree.type doesn't show the
+     * annotations in that case -- presumably a bug?
+     *
+     * TODO(cpovirk): Provide this pair of checks as NullnessAnnotations.fromAnnotationsOn(Tree),
+     * which might also be useful for a hypothetical future TypeArgumentMissingNullable?
      */
-    return describeMatch(
-        treeToAnnotate, fixByPrefixingWithNullableAnnotation(state, treeToAnnotate));
+    if (NullnessAnnotations.fromAnnotations(annotationsIfAnnotatedTypeTree(tree)).orElse(null)
+        == Nullness.NULLABLE) {
+      return;
+    }
+    SuggestedFix fix = fixByAnnotatingTypeUseOnlyLocationWithNullableAnnotation(state, tree);
+    if (fix.isEmpty()) {
+      return;
+    }
+    state.reportMatch(describeMatch(tree, fix));
+  }
+
+  private boolean typeMatches(Type type, Symbol sym, VisitorState state) {
+    return isVoid(type, state)
+        && NullnessAnnotations.fromAnnotationsOn(sym).orElse(null) != Nullness.NULLABLE;
+  }
+
+  /**
+   * Like the other overload but without looking for annotations on the Symbol (like declaration
+   * annotations on a method or variable).
+   */
+  private boolean typeMatches(Type type, VisitorState state) {
+    return isVoid(type, state)
+        && NullnessAnnotations.fromAnnotationsOn(type).orElse(null) != Nullness.NULLABLE;
+  }
+
+  private static ImmutableList<String> annotationsIfAnnotatedTypeTree(Tree tree) {
+    if (tree instanceof AnnotatedTypeTree) {
+      AnnotatedTypeTree annotated = ((AnnotatedTypeTree) tree);
+      return annotated.getAnnotations().stream()
+          .map(ASTHelpers::getAnnotationName)
+          .collect(toImmutableList());
+    }
+    return ImmutableList.of();
   }
 }

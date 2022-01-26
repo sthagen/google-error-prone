@@ -28,6 +28,7 @@ public enum TypesWithUndefinedEquality {
       "LongSparseArray",
       "android.util.LongSparseArray",
       "android.support.v4.util.LongSparseArrayCompat",
+      "androidx.core.util.LongSparseArrayCompat",
       "androidx.collection.LongSparseArrayCompat"),
   SPARSE_ARRAY(
       "SparseArray",
@@ -57,9 +58,5 @@ public enum TypesWithUndefinedEquality {
 
   public String shortName() {
     return shortName;
-  }
-
-  public ImmutableSet<String> typeNames() {
-    return typeNames;
   }
 }

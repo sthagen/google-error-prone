@@ -17,11 +17,9 @@
 package com.google.errorprone.bugpatterns;
 
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.annotations.DoNotCall;
-import com.google.errorprone.util.RuntimeVersion;
 import java.sql.Date;
 import java.sql.Time;
 import java.util.concurrent.ThreadLocalRandom;
@@ -541,23 +539,6 @@ public class DoNotCallCheckerTest {
   }
 
   @Test
-  public void thread_stop() {
-    // Thread.stop(Throwable) was removed in JDK11:
-    //   https://bugs.openjdk.java.net/browse/JDK-8204243
-    assumeTrue(RuntimeVersion.isAtMost10());
-    testHelper
-        .addSourceLines(
-            "Test.java",
-            "public class Test {",
-            "  public void foo() {",
-            "    // BUG: Diagnostic contains: DoNotCall",
-            "    Thread.currentThread().stop(new Throwable());",
-            "  }",
-            "}")
-        .doTest();
-  }
-
-  @Test
   public void typeArgs_dontCrash() {
     testHelper
         .addSourceLines(
@@ -568,6 +549,24 @@ public class DoNotCallCheckerTest {
             "    T foo = (T) o;",
             "    return foo.equals(1);",
             "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void positive_getSimpleName_refactoredToGetClassName() {
+    testHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test{",
+            " void f() {",
+            "   try {",
+            "     throw new Exception();",
+            "   } catch (Exception ex) {",
+            "     // BUG: Diagnostic contains: getClassName",
+            "     ex.getStackTrace()[0].getClass().getSimpleName();",
+            "   }",
+            " }",
             "}")
         .doTest();
   }

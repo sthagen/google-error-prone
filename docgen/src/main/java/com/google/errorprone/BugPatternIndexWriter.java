@@ -99,11 +99,11 @@ public class BugPatternIndexWriter {
     templateData.put("bugpatterns", bugpatternData);
 
     if (target == Target.EXTERNAL) {
-      Map<String, String> frontmatterData =
+      ImmutableMap<String, String> frontmatterData =
           ImmutableMap.<String, String>builder()
               .put("title", "Bug Patterns")
               .put("layout", "bugpatterns")
-              .build();
+              .buildOrThrow();
       DumperOptions options = new DumperOptions();
       options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
       Yaml yaml = new Yaml(options);

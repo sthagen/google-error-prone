@@ -25,8 +25,8 @@ import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.FormatMethod;
@@ -49,9 +49,9 @@ import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
-import com.sun.tools.javac.util.List;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.lang.model.element.ElementKind;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -82,8 +82,8 @@ public class InlineFormatString extends BugChecker implements CompilationUnitTre
         && isSubtype(methodSymbol.getParameters().get(1).type, state.getSymtab().stringType, state);
   }
 
-  @Nullable
-  private static ExpressionTree formatString(MethodInvocationTree tree, VisitorState state) {
+  private static @Nullable ExpressionTree formatString(
+      MethodInvocationTree tree, VisitorState state) {
     ImmutableList<ExpressionTree> args = FormatStringUtils.formatMethodArguments(tree, state);
     if (!args.isEmpty()) {
       return args.get(0);
@@ -94,8 +94,7 @@ public class InlineFormatString extends BugChecker implements CompilationUnitTre
     return formatMethodAnnotationArguments(tree, state);
   }
 
-  @Nullable
-  private static ExpressionTree formatMethodAnnotationArguments(
+  private static @Nullable ExpressionTree formatMethodAnnotationArguments(
       MethodInvocationTree tree, VisitorState state) {
     MethodSymbol sym = getSymbol(tree);
     if (sym == null) {
@@ -121,7 +120,7 @@ public class InlineFormatString extends BugChecker implements CompilationUnitTre
 
   @Override
   public Description matchCompilationUnit(CompilationUnitTree tree, VisitorState state) {
-    Multimap<Symbol, Tree> uses = MultimapBuilder.linkedHashKeys().linkedHashSetValues().build();
+    SetMultimap<Symbol, Tree> uses = MultimapBuilder.linkedHashKeys().linkedHashSetValues().build();
     Map<Symbol, VariableTree> declarations = new LinkedHashMap<>();
     // find calls to String.format and similar where the format string is a private compile-time
     // constant field

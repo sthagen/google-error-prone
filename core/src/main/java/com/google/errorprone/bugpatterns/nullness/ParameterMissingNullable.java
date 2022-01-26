@@ -18,11 +18,11 @@ package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.findDeclaration;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByPrefixingWithNullableAnnotation;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotationToType;
 import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.getNullCheck;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.hasNoExplicitType;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.google.errorprone.util.ASTHelpers.hasNoExplicitType;
 import static javax.lang.model.element.ElementKind.PARAMETER;
 
 import com.google.errorprone.BugPattern;
@@ -32,6 +32,7 @@ import com.google.errorprone.bugpatterns.BugChecker.BinaryTreeMatcher;
 import com.google.errorprone.bugpatterns.nullness.NullnessUtils.NullCheck;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnnotations;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.sun.source.tree.AssertTree;
 import com.sun.source.tree.BinaryTree;
@@ -120,7 +121,11 @@ public class ParameterMissingNullable extends BugChecker implements BinaryTreeMa
     if (hasNoExplicitType(param, state)) {
       return NO_MATCH;
     }
-    return describeMatch(tree, fixByPrefixingWithNullableAnnotation(state, param));
+    SuggestedFix fix = fixByAddingNullableAnnotationToType(state, param);
+    if (fix.isEmpty()) {
+      return NO_MATCH;
+    }
+    return describeMatch(tree, fix);
   }
 
   private static boolean isLoopCondition(TreePath path) {

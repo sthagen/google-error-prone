@@ -55,7 +55,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "CanonicalDuration",
     summary = "Duration can be expressed more clearly with different units",
     severity = WARNING)
 public class CanonicalDuration extends BugChecker implements MethodInvocationTreeMatcher {
@@ -93,7 +92,7 @@ public class CanonicalDuration extends BugChecker implements MethodInvocationTre
           .put(Api.JODA, ChronoUnit.HOURS, "standardHours")
           .put(Api.JODA, ChronoUnit.MINUTES, "standardMinutes")
           .put(Api.JODA, ChronoUnit.SECONDS, "standardSeconds")
-          .build();
+          .buildOrThrow();
 
   private static final ImmutableMap<String, TemporalUnit> METHOD_NAME_TO_UNIT =
       FACTORIES.rowMap().values().stream()
@@ -108,7 +107,7 @@ public class CanonicalDuration extends BugChecker implements MethodInvocationTre
           .put(ChronoUnit.SECONDS, Converter.from(Duration::getSeconds, Duration::ofSeconds))
           .put(ChronoUnit.MILLIS, Converter.from(Duration::toMillis, Duration::ofMillis))
           .put(ChronoUnit.NANOS, Converter.from(Duration::toNanos, Duration::ofNanos))
-          .build();
+          .buildOrThrow();
 
   // Represent a single day/hour/minute as hours/minutes/seconds is sometimes used to allow a block
   // of durations to have consistent units.

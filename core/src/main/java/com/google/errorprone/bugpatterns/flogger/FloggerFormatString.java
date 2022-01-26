@@ -37,7 +37,7 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.tree.JCTree;
-import edu.umd.cs.findbugs.formatStringChecker.ExtraFormatArgumentsException;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /** @author cushon@google.com (Liam Miller-Cushon) */
@@ -59,7 +59,10 @@ public class FloggerFormatString extends BugChecker implements MethodInvocationT
     if (!FORMAT_METHOD.matches(tree, state)) {
       return NO_MATCH;
     }
-    if (tree.getArguments().isEmpty()) {
+    List<? extends ExpressionTree> args = tree.getArguments();
+    if (args.size() <= 1) {
+      // log(String)'s argument isn't a format string, see FloggerLogString
+      // we also warn on mistakes like `log("hello %s")` in OrphanedFormatString
       return NO_MATCH;
     }
     MethodSymbol sym = ASTHelpers.getSymbol(tree);
@@ -86,11 +89,7 @@ public class FloggerFormatString extends BugChecker implements MethodInvocationT
   @Nullable
   private Fix withCauseFix(
       ValidationResult result, MethodInvocationTree tree, final VisitorState state) {
-    if (!(result.exception() instanceof ExtraFormatArgumentsException)) {
-      return null;
-    }
-    ExtraFormatArgumentsException exception = (ExtraFormatArgumentsException) result.exception();
-    if (exception.used >= exception.provided) {
+    if (!result.message().startsWith("extra format arguments")) {
       return null;
     }
     ExpressionTree last = getLast(tree.getArguments());

@@ -58,13 +58,12 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
-import java.util.Map.Entry;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.lang.model.element.Modifier;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
-// TODO(cushon): this should subsume LocalizableWrongToString
 @BugPattern(name = "DoNotCall", summary = "This method should not be called.", severity = ERROR)
 public class DoNotCallChecker extends BugChecker
     implements MethodTreeMatcher, CompilationUnitTreeMatcher {
@@ -130,17 +129,19 @@ public class DoNotCallChecker extends BugChecker
                   .onExactClass("java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock")
                   .named("newCondition"),
               "ReadLocks do not support conditions.")
-          .build();
+          .put(
+              instanceMethod().onExactClass("java.lang.StackTraceElement").named("getClass"),
+              "Calling getClass on StackTraceElement returns the Class object for"
+                  + " StackTraceElement, you probably meant to retrieve the class containing the"
+                  + " execution point represented by this stack trace element using getClassName")
+          .buildOrThrow();
 
   static final String DO_NOT_CALL = "com.google.errorprone.annotations.DoNotCall";
 
   private final boolean checkAssignedTypes;
-  private final boolean checkMemberReferencesToThirdPartyTypes;
 
   public DoNotCallChecker(ErrorProneFlags flags) {
     this.checkAssignedTypes = flags.getBoolean("DoNotCallChecker:CheckAssignedTypes").orElse(true);
-    this.checkMemberReferencesToThirdPartyTypes =
-        flags.getBoolean("DoNotCallChecker:CheckMemberReferencesToThirdPartyTypes").orElse(true);
   }
 
   @Override
@@ -197,28 +198,24 @@ public class DoNotCallChecker extends BugChecker
     new SuppressibleTreePathScanner<Void, Void>() {
       @Override
       public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
-        for (Entry<Matcher<ExpressionTree>, String> matcher : THIRD_PARTY_METHODS.entrySet()) {
-          if (matcher.getKey().matches(tree, state)) {
-            state.reportMatch(buildDescription(tree).setMessage(matcher.getValue()).build());
-            return super.visitMethodInvocation(tree, null);
-          }
-        }
-        checkTree(tree, getSymbol(tree), state);
+        handleTree(tree, getSymbol(tree));
         return super.visitMethodInvocation(tree, null);
       }
 
       @Override
       public Void visitMemberReference(MemberReferenceTree tree, Void unused) {
-        if (checkMemberReferencesToThirdPartyTypes) {
-          for (Entry<Matcher<ExpressionTree>, String> matcher : THIRD_PARTY_METHODS.entrySet()) {
-            if (matcher.getKey().matches(tree, state)) {
-              state.reportMatch(buildDescription(tree).setMessage(matcher.getValue()).build());
-              return super.visitMemberReference(tree, null);
-            }
+        handleTree(tree, getSymbol(tree));
+        return super.visitMemberReference(tree, null);
+      }
+
+      private void handleTree(ExpressionTree tree, MethodSymbol symbol) {
+        for (Map.Entry<Matcher<ExpressionTree>, String> matcher : THIRD_PARTY_METHODS.entrySet()) {
+          if (matcher.getKey().matches(tree, state)) {
+            state.reportMatch(buildDescription(tree).setMessage(matcher.getValue()).build());
+            return;
           }
         }
-        checkTree(tree, getSymbol(tree), state);
-        return super.visitMemberReference(tree, null);
+        checkTree(tree, symbol, state);
       }
 
       private void checkTree(ExpressionTree tree, MethodSymbol sym, VisitorState state) {
@@ -267,12 +264,12 @@ public class DoNotCallChecker extends BugChecker
                             symbol ->
                                 !sym.isStatic()
                                     && (sym.flags() & Flags.SYNTHETIC) == 0
+                                    && hasAnnotation(symbol, DO_NOT_CALL, state)
                                     && symbol.overrides(
                                         sym,
                                         types.erasure(typeSeen).tsym,
                                         types,
-                                        /* checkResult= */ true)
-                                    && hasAnnotation(symbol, DO_NOT_CALL, state)))
+                                        /* checkResult= */ true)))
             .findFirst();
       }
     }.scan(state.getPath(), null);

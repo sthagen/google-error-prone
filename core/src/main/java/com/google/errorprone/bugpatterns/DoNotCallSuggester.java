@@ -49,7 +49,6 @@ import javax.lang.model.element.Modifier;
  * calls at compile-time instead failing at runtime.
  */
 @BugPattern(
-    name = "DoNotCallSuggester",
     summary =
         "Consider annotating methods that always throw with @DoNotCall. "
             + "Read more at https://errorprone.info/bugpattern/DoNotCall",
@@ -188,7 +187,7 @@ public class DoNotCallSuggester extends BugChecker implements MethodTreeMatcher 
         .build();
   }
 
-  // this code is stolen from MissingOverride.java
+  // TODO(b/216306810): copied from MissingOverride.java
   private static boolean isEffectivelyOverride(Symbol sym, Types types) {
     // static methods can't be overrides
     if (sym.isStatic()) {

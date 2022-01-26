@@ -18,7 +18,7 @@ package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.SUGGESTION;
-import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByPrefixingWithNullableAnnotation;
+import static com.google.errorprone.bugpatterns.nullness.NullnessUtils.fixByAddingNullableAnnotationToType;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.equalsMethodDeclaration;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
@@ -29,6 +29,7 @@ import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnnotations;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
@@ -52,6 +53,10 @@ public class EqualsMissingNullable extends BugChecker implements MethodTreeMatch
       return NO_MATCH;
     }
 
-    return describeMatch(parameterTree, fixByPrefixingWithNullableAnnotation(state, parameterTree));
+    SuggestedFix fix = fixByAddingNullableAnnotationToType(state, parameterTree);
+    if (fix.isEmpty()) {
+      return NO_MATCH;
+    }
+    return describeMatch(parameterTree, fix);
   }
 }

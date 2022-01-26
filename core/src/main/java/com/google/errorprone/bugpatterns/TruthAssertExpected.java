@@ -52,7 +52,6 @@ import javax.annotation.Nullable;
  * @author ghm@google.com (Graeme Morgan)
  */
 @BugPattern(
-    name = "TruthAssertExpected",
     summary =
         "The actual and expected values appear to be swapped, which results in poor assertion "
             + "failure messages. The actual value should come first.",
@@ -90,7 +89,9 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
       return false;
     }
     Type throwable = Suppliers.typeFromClass(Throwable.class).get(state);
-    return Ascii.toLowerCase(identifier.getName().toString()).contains("expected")
+    String identifierName = Ascii.toLowerCase(identifier.getName().toString());
+    return identifierName.contains("expected")
+        && !identifierName.contains("actual")
         && !ASTHelpers.isSubtype(ASTHelpers.getType(identifier), throwable, state);
   }
 
@@ -122,7 +123,7 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
    * Matches expressions that look like they should be considered constant, i.e. {@code
    * ImmutableList.of(1, 2)}, {@code Long.valueOf(10L)}.
    */
-  static boolean isConstantCreator(ExpressionTree tree, VisitorState state) {
+  private static boolean isConstantCreator(ExpressionTree tree) {
     List<? extends ExpressionTree> arguments =
         tree.accept(
             new SimpleTreeVisitor<List<? extends ExpressionTree>, Void>() {
@@ -169,7 +170,7 @@ public final class TruthAssertExpected extends BugChecker implements MethodInvoc
     // compile-time constant.
     if (ASTHelpers.constValue(terminatingArgument) != null
         || Matchers.staticFieldAccess().matches(terminatingArgument, state)
-        || isConstantCreator(terminatingArgument, state)) {
+        || isConstantCreator(terminatingArgument)) {
       return Description.NO_MATCH;
     }
     SuggestedFix fix = SuggestedFix.swap(assertedArgument, terminatingArgument);

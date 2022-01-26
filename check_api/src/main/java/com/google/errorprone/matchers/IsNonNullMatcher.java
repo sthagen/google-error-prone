@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 The Error Prone Authors.
+ * Copyright 2021 The Error Prone Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,18 @@
 
 package com.google.errorprone.matchers;
 
+import static com.google.errorprone.matchers.Matchers.isNonNullUsingDataflow;
+
 import com.google.errorprone.VisitorState;
 import com.sun.source.tree.ExpressionTree;
-import com.sun.source.tree.MethodInvocationTree;
 
 /**
- * Adapts a matcher on MethodInvocationTree to match the MethodSelect of the MethodInvocation.
- *
- * @author alexeagle@google.com (Alex Eagle)
+ * Matches expressions that can be statically determined to be non-null. The matcher should have few
+ * if any false positives but has many, many false negatives.
  */
-public class MethodInvocationMethodSelect implements Matcher<MethodInvocationTree> {
-  private final Matcher<ExpressionTree> methodSelectMatcher;
-
-  public MethodInvocationMethodSelect(Matcher<ExpressionTree> methodSelectMatcher) {
-    this.methodSelectMatcher = methodSelectMatcher;
-  }
-
+public final class IsNonNullMatcher implements Matcher<ExpressionTree> {
   @Override
-  public boolean matches(MethodInvocationTree item, VisitorState state) {
-    return methodSelectMatcher.matches(item.getMethodSelect(), state);
+  public boolean matches(ExpressionTree tree, VisitorState state) {
+    return isNonNullUsingDataflow().matches(tree, state);
   }
 }

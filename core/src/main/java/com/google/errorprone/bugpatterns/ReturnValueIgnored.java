@@ -20,12 +20,12 @@ import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.matchers.Matchers.allOf;
 import static com.google.errorprone.matchers.Matchers.anyMethod;
 import static com.google.errorprone.matchers.Matchers.anyOf;
+import static com.google.errorprone.matchers.Matchers.kindIs;
 import static com.google.errorprone.matchers.Matchers.not;
 import static com.google.errorprone.matchers.Matchers.nothing;
 import static com.google.errorprone.matchers.Matchers.packageStartsWith;
 import static com.google.errorprone.matchers.method.MethodMatchers.instanceMethod;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
-import static com.google.errorprone.predicates.TypePredicates.isDescendantOf;
 import static com.google.errorprone.predicates.TypePredicates.isExactTypeAny;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 
@@ -36,15 +36,16 @@ import com.google.errorprone.VisitorState;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.Tree.Kind;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
+import com.sun.tools.javac.code.Type;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 
 /** @author alexeagle@google.com (Alex Eagle) */
 @BugPattern(
-    name = "ReturnValueIgnored",
     altNames = {"ResultOfMethodCallIgnored", "CheckReturnValue"},
     summary = "Return value of this method must be used",
     severity = ERROR)
@@ -66,8 +67,12 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
    */
   private static final Matcher<ExpressionTree> RETURNS_SAME_TYPE =
       allOf(
-          (t, s) -> TYPES_TO_CHECK.contains(ASTHelpers.getReceiverType(t).toString()),
-          (t, s) -> isSameType(ASTHelpers.getReceiverType(t), ASTHelpers.getReturnType(t), s));
+          not(kindIs(Kind.NEW_CLASS)), // Constructor calls don't have a "receiver"
+          (tree, state) -> {
+            Type receiverType = ASTHelpers.getReceiverType(tree);
+            return TYPES_TO_CHECK.contains(receiverType.toString())
+                && isSameType(receiverType, ASTHelpers.getReturnType(tree), state);
+          });
 
   /**
    * This matcher allows the following methods in {@code java.time}:
@@ -307,7 +312,7 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
    */
   private static final Matcher<ExpressionTree> PROTO_METHODS =
       anyOf(
-          staticMethod().onClass(isDescendantOf(PROTO_MESSAGE)).named("newBuilder"),
+          staticMethod().onDescendantOf(PROTO_MESSAGE).named("newBuilder"),
           instanceMethod()
               .onDescendantOf(PROTO_MESSAGE + ".Builder")
               .namedAnyOf("build", "buildPartial"));
@@ -356,37 +361,41 @@ public class ReturnValueIgnored extends AbstractReturnValueIgnored {
 
   private static final Matcher<? super ExpressionTree> SPECIALIZED_MATCHER =
       anyOf(
-          RETURNS_SAME_TYPE,
-          ReturnValueIgnored::functionalMethod,
-          STREAM_METHODS,
-          STRING_METHODS,
-          PROTO_METHODS,
-          PRIMITIVE_METHODS,
+          // keep-sorted start
           ARRAYS_METHODS,
-          OPTIONAL_METHODS,
-          TIME_UNIT_METHODS,
-          ReturnValueIgnored::javaTimeTypes,
+          CHAR_SEQUENCE_METHODS,
           COLLECTION_METHODS,
-          MAP_METHODS,
-          MAP_ENTRY_METHODS,
+          COLLECTOR_METHODS,
+          ENUM_METHODS,
           ITERABLE_METHODS,
           ITERATOR_METHODS,
-          JODA_TIME_METHODS);
+          JODA_TIME_METHODS,
+          MAP_ENTRY_METHODS,
+          MAP_METHODS,
+          OBJECTS_METHODS,
+          OPTIONAL_METHODS,
+          PRIMITIVE_METHODS,
+          PROTO_METHODS,
+          RETURNS_SAME_TYPE,
+          ReturnValueIgnored::functionalMethod,
+          ReturnValueIgnored::javaTimeTypes,
+          STREAM_METHODS,
+          STRING_METHODS,
+          THROWABLE_METHODS,
+          TIME_UNIT_METHODS
+          // keep-sorted end
+          );
 
   private final Matcher<? super ExpressionTree> matcher;
 
   public ReturnValueIgnored(ErrorProneFlags flags) {
+    super(flags);
     this.matcher =
         anyOf(
             SPECIALIZED_MATCHER,
             getMatcher(flags, "ReturnValueIgnored:MoreOptional", MORE_OPTIONAL_METHODS),
             getMatcher(flags, "ReturnValueIgnored:ClassMethods", CLASS_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:ObjectMethods", OBJECT_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:ObjectsMethods", OBJECTS_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:CharSequenceMethods", CHAR_SEQUENCE_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:EnumMethods", ENUM_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:ThrowableMethods", THROWABLE_METHODS),
-            getMatcher(flags, "ReturnValueIgnored:CollectorMethods", COLLECTOR_METHODS));
+            getMatcher(flags, "ReturnValueIgnored:ObjectMethods", OBJECT_METHODS));
   }
 
   private static Matcher<? super ExpressionTree> getMatcher(

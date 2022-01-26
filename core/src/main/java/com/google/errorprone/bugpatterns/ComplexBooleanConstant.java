@@ -32,7 +32,6 @@ import java.util.Objects;
 
 /** @author Sumit Bhagwani (bhagwani@google.com) */
 @BugPattern(
-    name = "ComplexBooleanConstant",
     summary = "Non-trivial compile time constant boolean expressions shouldn't be used.",
     severity = WARNING)
 public class ComplexBooleanConstant extends BugChecker implements BinaryTreeMatcher {
@@ -47,7 +46,7 @@ public class ComplexBooleanConstant extends BugChecker implements BinaryTreeMatc
         .addFix(SuggestedFix.replace(tree, constValue.toString()))
         .setMessage(
             String.format(
-                "This expression always evalutes to `%s`, prefer a boolean literal for clarity.",
+                "This expression always evaluates to `%s`, prefer a boolean literal for clarity.",
                 constValue))
         .build();
   }

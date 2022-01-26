@@ -73,10 +73,6 @@ import java.util.regex.Pattern;
 public final class InvalidInlineTag extends BugChecker
     implements ClassTreeMatcher, MethodTreeMatcher, VariableTreeMatcher {
 
-  private static final String INVALID_TAG_IS_PARAMETER_NAME =
-      "@%1$s is not a valid tag, but is a parameter name. "
-          + "Use {@code %1$s} to refer to parameter names inline.";
-
   private static final Pattern PARAM_MATCHER = Pattern.compile("\\{?@param ([a-zA-Z0-9]+)}?");
 
   private static final Pattern ANCHORED_PARAM_MATCHER =
@@ -89,9 +85,19 @@ public final class InvalidInlineTag extends BugChecker
     DocTreePath path = Utils.getDocTreePath(state);
     if (path != null) {
       ImmutableSet<String> parameters = ImmutableSet.of();
-      new InvalidTagChecker(state, JavadocTag.VALID_CLASS_TAGS, parameters).scan(path, null);
+      scanTags(state, JavadocTag.VALID_CLASS_TAGS, parameters, path);
     }
     return Description.NO_MATCH;
+  }
+
+  private void scanTags(
+      VisitorState state,
+      ImmutableSet<JavadocTag> tags,
+      ImmutableSet<String> parameters,
+      DocTreePath path) {
+    try (InvalidTagChecker checker = new InvalidTagChecker(state, tags, parameters)) {
+      checker.scan(path, null);
+    }
   }
 
   @Override
@@ -102,7 +108,7 @@ public final class InvalidInlineTag extends BugChecker
           methodTree.getParameters().stream()
               .map(v -> v.getName().toString())
               .collect(toImmutableSet());
-      new InvalidTagChecker(state, JavadocTag.VALID_METHOD_TAGS, parameters).scan(path, null);
+      scanTags(state, JavadocTag.VALID_METHOD_TAGS, parameters, path);
     }
     return Description.NO_MATCH;
   }
@@ -111,18 +117,19 @@ public final class InvalidInlineTag extends BugChecker
   public Description matchVariable(VariableTree variableTree, VisitorState state) {
     DocTreePath path = Utils.getDocTreePath(state);
     if (path != null) {
-      new InvalidTagChecker(
-              state, JavadocTag.VALID_VARIABLE_TAGS, /* parameters= */ ImmutableSet.of())
-          .scan(path, null);
+      scanTags(state, JavadocTag.VALID_VARIABLE_TAGS, /* parameters= */ ImmutableSet.of(), path);
     }
     return Description.NO_MATCH;
   }
 
   static String getMessageForInvalidTag(String paramName) {
-    return String.format(INVALID_TAG_IS_PARAMETER_NAME, paramName);
+    return String.format(
+        "@%1$s is not a valid tag, but is a parameter name. "
+            + "Use {@code %1$s} to refer to parameter names inline.",
+        paramName);
   }
 
-  final class InvalidTagChecker extends DocTreePathScanner<Void, Void> {
+  final class InvalidTagChecker extends DocTreePathScanner<Void, Void> implements AutoCloseable {
     private final VisitorState state;
 
     private final ImmutableSet<JavadocTag> validTags;
@@ -382,5 +389,8 @@ public final class InvalidInlineTag extends BugChecker
               .build());
       return null;
     }
+
+    @Override
+    public void close() {}
   }
 }

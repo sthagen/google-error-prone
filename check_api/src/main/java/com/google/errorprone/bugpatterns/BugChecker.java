@@ -16,16 +16,18 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.errorprone.util.ASTHelpers.getModifiers;
+import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 
+import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Range;
 import com.google.errorprone.BugCheckerInfo;
 import com.google.errorprone.BugPattern.SeverityLevel;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.fixes.Fix;
-import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Suppressible;
 import com.google.errorprone.suppliers.Supplier;
@@ -83,6 +85,7 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.WhileLoopTree;
 import com.sun.source.tree.WildcardTree;
 import com.sun.source.util.TreePathScanner;
+import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
@@ -91,9 +94,7 @@ import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiPredicate;
 
@@ -143,48 +144,38 @@ public abstract class BugChecker implements Suppressible, Serializable {
 
   /** Helper to create a Description for the common case where there is a fix. */
   @CheckReturnValue
-  protected Description describeMatch(Tree node, Fix fix) {
+  public Description describeMatch(Tree node, Fix fix) {
     return buildDescription(node).addFix(fix).build();
   }
 
   /** Helper to create a Description for the common case where there is a fix. */
   @CheckReturnValue
-  protected Description describeMatch(JCTree node, Fix fix) {
+  public Description describeMatch(JCTree node, Fix fix) {
     return describeMatch((Tree) node, fix);
   }
 
   /** Helper to create a Description for the common case where there is a fix. */
   @CheckReturnValue
-  protected Description describeMatch(DiagnosticPosition position, Fix fix) {
+  public Description describeMatch(DiagnosticPosition position, Fix fix) {
     return buildDescription(position).addFix(fix).build();
   }
 
   /** Helper to create a Description for the common case where there is no fix. */
   @CheckReturnValue
-  protected Description describeMatch(Tree node) {
+  public Description describeMatch(Tree node) {
     return buildDescription(node).build();
   }
 
-  /**
-   * Helper to create a Description for the common case where there is an {@link Optional} fix.
-   *
-   * @deprecated prefer referring to empty fixes using {@link SuggestedFix#emptyFix()}.
-   */
+  /** Helper to create a Description for the common case where there is no fix. */
   @CheckReturnValue
-  @Deprecated
-  protected Description describeMatch(Tree node, Optional<? extends Fix> fix) {
-    return describeMatch(node, fix.map(f -> (Fix) f).orElse(SuggestedFix.emptyFix()));
+  public Description describeMatch(JCTree node) {
+    return buildDescription(node).build();
   }
 
-  /**
-   * Helper to create a Description for the common case where there is an {@link Optional} fix.
-   *
-   * @deprecated prefer referring to empty fixes using {@link SuggestedFix#emptyFix()}.
-   */
+  /** Helper to create a Description for the common case where there is no fix. */
   @CheckReturnValue
-  @Deprecated
-  protected Description describeMatch(DiagnosticPosition position, Optional<? extends Fix> fix) {
-    return describeMatch(position, fix.map(f -> (Fix) f).orElse(SuggestedFix.emptyFix()));
+  public Description describeMatch(DiagnosticPosition position) {
+    return buildDescription(position).build();
   }
 
   /**
@@ -233,10 +224,6 @@ public abstract class BugChecker implements Suppressible, Serializable {
     return info.defaultSeverity();
   }
 
-  public SeverityLevel severity(Map<String, SeverityLevel> severities) {
-    return firstNonNull(severities.get(canonicalName()), defaultSeverity());
-  }
-
   public String linkUrl() {
     return info.linkUrl();
   }
@@ -279,6 +266,23 @@ public abstract class BugChecker implements Suppressible, Serializable {
   private boolean isSuppressed(SuppressWarnings suppression) {
     return suppression != null
         && !Collections.disjoint(Arrays.asList(suppression.value()), allNames());
+  }
+
+  /** Computes a RangeSet of code regions which are suppressed by this bug checker. */
+  public ImmutableRangeSet<Integer> suppressedRegions(VisitorState state) {
+    ImmutableRangeSet.Builder<Integer> suppressedRegions = ImmutableRangeSet.builder();
+    new TreeScanner<Void, Void>() {
+      @Override
+      public Void scan(Tree tree, Void unused) {
+        if (getModifiers(tree) != null && isSuppressed(tree)) {
+          suppressedRegions.add(Range.closed(getStartPosition(tree), state.getEndPosition(tree)));
+        } else {
+          super.scan(tree, null);
+        }
+        return null;
+      }
+    }.scan(state.getPath().getCompilationUnit(), null);
+    return suppressedRegions.build();
   }
 
   public interface AnnotationTreeMatcher extends Suppressible {
@@ -514,7 +518,7 @@ public abstract class BugChecker implements Suppressible, Serializable {
   /** A {@link TreePathScanner} which skips trees which are suppressed for this check. */
   protected class SuppressibleTreePathScanner<A, B> extends TreePathScanner<A, B> {
     @Override
-    public final A scan(Tree tree, B b) {
+    public A scan(Tree tree, B b) {
       boolean isSuppressible =
           tree instanceof ClassTree || tree instanceof MethodTree || tree instanceof VariableTree;
       return isSuppressible && isSuppressed(tree) ? null : super.scan(tree, b);

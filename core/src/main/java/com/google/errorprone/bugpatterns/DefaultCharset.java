@@ -39,9 +39,9 @@ import com.google.errorprone.fixes.Fix;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.suppliers.Suppliers;
 import com.google.errorprone.util.ASTHelpers;
-import com.google.errorprone.util.RuntimeVersion;
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.ImportTree;
@@ -73,7 +73,6 @@ import java.util.Scanner;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "DefaultCharset",
     summary =
         "Implicit use of the platform default charset, which can result in differing behaviour"
             + " between JVM executions or incorrect behavior if the encoding of the data source"
@@ -86,13 +85,13 @@ public class DefaultCharset extends BugChecker
   enum CharsetFix {
     UTF_8_FIX("UTF_8", "Specify UTF-8") {
       @Override
-      void addImport(SuggestedFix.Builder fix, VisitorState state) {
+      void addImport(SuggestedFix.Builder fix) {
         fix.addStaticImport("java.nio.charset.StandardCharsets.UTF_8");
       }
     },
     DEFAULT_CHARSET_FIX("Charset.defaultCharset()", "Specify default charset") {
       @Override
-      void addImport(SuggestedFix.Builder fix, VisitorState state) {
+      void addImport(SuggestedFix.Builder fix) {
         fix.addImport("java.nio.charset.Charset");
       }
     };
@@ -109,7 +108,7 @@ public class DefaultCharset extends BugChecker
       return replacement;
     }
 
-    abstract void addImport(SuggestedFix.Builder fix, VisitorState state);
+    abstract void addImport(SuggestedFix.Builder fix);
   }
 
   // ignore the constructor that takes FileDescriptor; it's rare and there's no automated fix
@@ -203,8 +202,7 @@ public class DefaultCharset extends BugChecker
 
   public DefaultCharset(ErrorProneFlags flags) {
     this.byteArrayOutputStreamToString =
-        RuntimeVersion.isAtLeast10()
-            && flags.getBoolean("DefaultCharset:ByteArrayOutputStreamToString").orElse(true);
+        flags.getBoolean("DefaultCharset:ByteArrayOutputStreamToString").orElse(true);
   }
 
   @Override
@@ -235,7 +233,7 @@ public class DefaultCharset extends BugChecker
     SuggestedFix.Builder builder =
         byteStringFix(
             tree, parent, state, "copyFrom(", ", " + CharsetFix.DEFAULT_CHARSET_FIX.replacement());
-    CharsetFix.DEFAULT_CHARSET_FIX.addImport(builder, state);
+    CharsetFix.DEFAULT_CHARSET_FIX.addImport(builder);
 
     return buildDescription(tree)
         .addFix(byteStringFix(tree, parent, state, "copyFromUtf8(", "").build())
@@ -282,18 +280,18 @@ public class DefaultCharset extends BugChecker
       return handleFileWriter(tree, state);
     }
     if (PRINT_WRITER.matches(tree, state)) {
-      return handlePrintWriter(tree, state);
+      return handlePrintWriter(tree);
     }
     if (PRINT_WRITER_OUTPUTSTREAM.matches(tree, state)) {
-      return handlePrintWriterOutputStream(tree, state);
+      return handlePrintWriterOutputStream(tree);
     }
     if (SCANNER_MATCHER.matches(tree, state)) {
-      return handleScanner(tree, state);
+      return handleScanner(tree);
     }
     return NO_MATCH;
   }
 
-  private Description handleScanner(NewClassTree tree, VisitorState state) {
+  private Description handleScanner(NewClassTree tree) {
     Description.Builder description = buildDescription(tree);
     for (CharsetFix charsetFix : CharsetFix.values()) {
       SuggestedFix.Builder fix =
@@ -301,7 +299,7 @@ public class DefaultCharset extends BugChecker
               .postfixWith(
                   getOnlyElement(tree.getArguments()),
                   String.format(", %s.name()", charsetFix.replacement()));
-      charsetFix.addImport(fix, state);
+      charsetFix.addImport(fix);
       description.addFix(fix.build());
     }
     return description.build();
@@ -348,7 +346,7 @@ public class DefaultCharset extends BugChecker
         String.format(
             "Files.newBufferedReader(%s, %s)", toPath(state, arg, fix), charset.replacement()));
     fix.addImport("java.nio.file.Files");
-    charset.addImport(fix, state);
+    charset.addImport(fix);
     variableTypeFix(fix, state, FileReader.class, Reader.class);
     return fix.build();
   }
@@ -361,7 +359,7 @@ public class DefaultCharset extends BugChecker
         String.format(
             "Files.newReader(%s, %s)", toFile(state, fileArg, fix), charset.replacement()));
     fix.addImport("com.google.common.io.Files");
-    charset.addImport(fix, state);
+    charset.addImport(fix);
     variableTypeFix(fix, state, FileReader.class, Reader.class);
     return fix.build();
   }
@@ -428,7 +426,7 @@ public class DefaultCharset extends BugChecker
         String.format(
             "Files.newWriter(%s, %s)", toFile(state, fileArg, fix), charset.replacement()));
     fix.addImport("com.google.common.io.Files");
-    charset.addImport(fix, state);
+    charset.addImport(fix);
     variableTypeFix(fix, state, FileWriter.class, Writer.class);
     return fix.build();
   }
@@ -451,7 +449,7 @@ public class DefaultCharset extends BugChecker
     sb.append(".newBufferedWriter(");
     sb.append(toPath(state, fileArg, fix));
     sb.append(", ").append(charset.replacement());
-    charset.addImport(fix, state);
+    charset.addImport(fix);
     if (appendTree != null) {
       sb.append(toAppendMode(fix, appendTree, state));
     }
@@ -489,7 +487,7 @@ public class DefaultCharset extends BugChecker
     if (ASTHelpers.isSubtype(type, state.getSymtab().stringType, state)) {
       fix.addImport("java.io.File");
       return String.format("new File(%s)", state.getSourceForNode(fileArg));
-    } else if (ASTHelpers.isSubtype(type, state.getTypeFromString("java.io.File"), state)) {
+    } else if (ASTHelpers.isSubtype(type, JAVA_IO_FILE.get(state), state)) {
       return state.getSourceForNode(fileArg);
     } else {
       throw new AssertionError("unexpected type: " + type);
@@ -502,7 +500,7 @@ public class DefaultCharset extends BugChecker
     if (ASTHelpers.isSubtype(type, state.getSymtab().stringType, state)) {
       fix.addImport("java.nio.file.Paths");
       return String.format("Paths.get(%s)", state.getSourceForNode(fileArg));
-    } else if (ASTHelpers.isSubtype(type, state.getTypeFromString("java.io.File"), state)) {
+    } else if (ASTHelpers.isSubtype(type, JAVA_IO_FILE.get(state), state)) {
       return String.format("%s.toPath()", state.getSourceForNode(fileArg));
     } else {
       throw new AssertionError("unexpected type: " + type);
@@ -532,12 +530,12 @@ public class DefaultCharset extends BugChecker
     } else {
       fix.postfixWith(Iterables.getLast(arguments), ", " + charset.replacement());
     }
-    charset.addImport(fix, state);
+    charset.addImport(fix);
     fix.setShortDescription(charset.title);
     return fix.build();
   }
 
-  private Description handlePrintWriter(NewClassTree tree, VisitorState state) {
+  private Description handlePrintWriter(NewClassTree tree) {
     Description.Builder description = buildDescription(tree);
     for (CharsetFix charsetFix : CharsetFix.values()) {
       SuggestedFix.Builder fix =
@@ -545,13 +543,13 @@ public class DefaultCharset extends BugChecker
               .postfixWith(
                   getOnlyElement(tree.getArguments()),
                   String.format(", %s.name()", charsetFix.replacement()));
-      charsetFix.addImport(fix, state);
+      charsetFix.addImport(fix);
       description.addFix(fix.build());
     }
     return description.build();
   }
 
-  private Description handlePrintWriterOutputStream(NewClassTree tree, VisitorState state) {
+  private Description handlePrintWriterOutputStream(NewClassTree tree) {
     Tree outputStream = tree.getArguments().get(0);
     Description.Builder description = buildDescription(tree);
     for (CharsetFix charsetFix : CharsetFix.values()) {
@@ -559,11 +557,14 @@ public class DefaultCharset extends BugChecker
           SuggestedFix.builder()
               .prefixWith(outputStream, "new BufferedWriter(new OutputStreamWriter(")
               .postfixWith(outputStream, String.format(", %s))", charsetFix.replacement()));
-      charsetFix.addImport(fix, state);
+      charsetFix.addImport(fix);
       fix.addImport("java.io.BufferedWriter");
       fix.addImport("java.io.OutputStreamWriter");
       description.addFix(fix.build());
     }
     return description.build();
   }
+
+  private static final Supplier<Type> JAVA_IO_FILE =
+      VisitorState.memoize(state -> state.getTypeFromString("java.io.File"));
 }

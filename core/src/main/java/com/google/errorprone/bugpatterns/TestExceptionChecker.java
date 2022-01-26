@@ -28,6 +28,7 @@ import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.JUnitMatchers;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.ExpressionStatementTree;
 import com.sun.source.tree.ExpressionTree;
@@ -47,7 +48,6 @@ import javax.annotation.Nullable;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "TestExceptionChecker",
     summary =
         "Using @Test(expected=...) is discouraged, since the test will pass if *any* statement in"
             + " the test method throws the expected exception",
@@ -121,7 +121,7 @@ public class TestExceptionChecker extends BugChecker implements MethodTreeMatche
   @Nullable
   private static JCExpression deleteExpectedException(
       SuggestedFix.Builder fix, List<JCAnnotation> annotations, VisitorState state) {
-    Type testAnnotation = state.getTypeFromString(JUnitMatchers.JUNIT4_TEST_ANNOTATION);
+    Type testAnnotation = ORG_JUNIT_TEST.get(state);
     for (JCAnnotation annotationTree : annotations) {
       if (!ASTHelpers.isSameType(testAnnotation, annotationTree.type, state)) {
         continue;
@@ -159,4 +159,7 @@ public class TestExceptionChecker extends BugChecker implements MethodTreeMatche
       fix.replace(getStartPosition(tree), getStartPosition(arguments.get(idx + 1)), "");
     }
   }
+
+  private static final Supplier<Type> ORG_JUNIT_TEST =
+      VisitorState.memoize(state -> state.getTypeFromString(JUnitMatchers.JUNIT4_TEST_ANNOTATION));
 }

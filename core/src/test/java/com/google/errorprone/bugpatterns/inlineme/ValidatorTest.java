@@ -295,6 +295,8 @@ public class ValidatorTest {
         .doTest();
   }
 
+  private static final Pattern FROM_ANNOTATION = Pattern.compile("FromAnnotation: \\[.*;]");
+
   @Test
   public void testConstructor() {
     helper
@@ -492,6 +494,9 @@ public class ValidatorTest {
         .doTest();
   }
 
+  private static final Pattern INFERRED_FROM_BODY =
+      Pattern.compile("InferredFromBody: .*\\.Builder]");
+
   @Test
   public void testAllowingNestedClassImport() {
     helper
@@ -518,8 +523,7 @@ public class ValidatorTest {
             "    }",
             "  }",
             "}")
-        .expectErrorMessage(
-            "BAR", Pattern.compile("InferredFromBody: .*\\.Builder]").asPredicate()::test)
+        .expectErrorMessage("BAR", INFERRED_FROM_BODY.asPredicate()::test)
         .doTest();
   }
 
@@ -696,6 +700,33 @@ public class ValidatorTest {
             "  @InlineMe(replacement = \"x * y\")",
             "  public final int multiply(int x, int y) {",
             "    return x * y;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testCustomInlineMe() {
+    helper
+        .addSourceLines(
+            "InlineMe.java", //
+            "package bespoke;",
+            "public @interface InlineMe {",
+            "  String replacement();",
+            "  String[] imports() default {};",
+            "  String[] staticImports() default {};",
+            "}")
+        .addSourceLines(
+            "Client.java",
+            "import bespoke.InlineMe;",
+            "public final class Client {",
+            "  @Deprecated",
+            "  @InlineMe(replacement = \"this.foo3(value)\")", // should be foo2(value)!!!
+            "  // BUG: Diagnostic contains: @InlineMe(replacement = \"this.foo2(value)\")",
+            "  public void foo1(String value) {",
+            "    foo2(value);",
+            "  }",
+            "  public void foo2(String value) {",
             "  }",
             "}")
         .doTest();

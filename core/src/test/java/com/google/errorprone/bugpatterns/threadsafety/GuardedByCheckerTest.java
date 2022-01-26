@@ -1775,4 +1775,130 @@ public class GuardedByCheckerTest {
         .setArgs("-XepOpt:GuardedByChecker:reportMissingGuards=true")
         .doTest();
   }
+
+  @Test
+  public void parameterGuard() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Work {",
+            "  final Object lock = new Object();",
+            "  Object getLock() {",
+            "    return lock;",
+            "  }",
+            "  @GuardedBy(\"getLock()\")",
+            "  void workStarted() {",
+            "  }",
+            "}",
+            "class Worker {",
+            "  @GuardedBy(\"work.getLock()\")",
+            "  void f(Work work) {",
+            "    work.workStarted(); // ok",
+            "  }",
+            "  // BUG: Diagnostic contains: could not resolve guard",
+            "  @GuardedBy(\"work2.getLock()\") void g() {}",
+            "  @GuardedBy(\"a.getLock()\")",
+            "  void g(Work a, Work b) {",
+            "    a.workStarted(); // ok",
+            "    // BUG: Diagnostic contains: should be guarded by 'b.getLock()'; instead found:"
+                + " 'a.getLock()'",
+            "    b.workStarted();",
+            "  }",
+            "}",
+            "abstract class Test {",
+            "  abstract Work getWork();",
+            "  void t(Worker worker, Work work) {",
+            "    synchronized(work.getLock()) {",
+            "      worker.f(work);",
+            "    }",
+            "    synchronized(getWork().getLock()) {",
+            "      // BUG: Diagnostic contains: guarded by 'work.getLock()'",
+            "      worker.f(getWork());",
+            "    }",
+            "    // BUG: Diagnostic contains: guarded by 'work.getLock()'",
+            "    worker.f(work);",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:GuardedByChecker:reportMissingGuards=true")
+        .doTest();
+  }
+
+  @Test
+  public void parameterGuardNegative() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Work {",
+            "  final Object lock = new Object();",
+            "  Object getLock() {",
+            "    return lock;",
+            "  }",
+            "}",
+            "class Worker {",
+            "  @GuardedBy(\"work.getLock()\")",
+            "  void f(Work work) {",
+            "  }",
+            "}",
+            "class Test {",
+            "  void t(Worker worker, Work work) {",
+            "    synchronized(work.getLock()) {",
+            "      worker.f(work);",
+            "    }",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:GuardedByChecker:reportMissingGuards=true")
+        .doTest();
+  }
+
+  @Test
+  public void parameterGuardNegativeSimpleName() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Work {",
+            "  final Object lock = new Object();",
+            "  Object getLock() {",
+            "    return lock;",
+            "  }",
+            "}",
+            "class Worker {",
+            "  @GuardedBy(\"work.getLock()\")",
+            "  void f(Work work) {",
+            "  }",
+            "  void g() {",
+            "    Work work = new Work();",
+            "    synchronized(work.getLock()) {",
+            "      f(work);",
+            "    }",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:GuardedByChecker:reportMissingGuards=true")
+        .doTest();
+  }
+
+  @Test
+  public void varargsArity() {
+    compilationHelper
+        .addSourceLines(
+            "threadsafety/Test.java",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  @GuardedBy(\"xs.toString()\")",
+            "  void f(int x, Object... xs) {",
+            "  }",
+            "  void g() {",
+            "    Object[] xs = null;",
+            "    synchronized(xs.toString()) {",
+            "      f(0, xs);",
+            "    }",
+            "    // BUG: Diagnostic contains:",
+            "    f(0);",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:GuardedByChecker:reportMissingGuards=true")
+        .doTest();
+  }
 }

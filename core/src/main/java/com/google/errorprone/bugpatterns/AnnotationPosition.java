@@ -72,7 +72,6 @@ import javax.lang.model.element.Name;
  * @author ghm@google.com (Graeme Morgan)
  */
 @BugPattern(
-    name = "AnnotationPosition",
     summary = "Annotations should be positioned after Javadocs, but before modifiers.",
     severity = WARNING,
     tags = STYLE,
@@ -167,7 +166,7 @@ public final class AnnotationPosition extends BugChecker
         endPos = state.getEndPosition(methodTree);
       }
     } else if (tree instanceof JCVariableDecl) {
-      endPos = ((JCVariableDecl) tree).getType().getStartPosition();
+      endPos = state.getEndPosition(((JCVariableDecl) tree).getModifiers());
     } else if (tree instanceof JCClassDecl) {
       JCClassDecl classTree = (JCClassDecl) tree;
       endPos =

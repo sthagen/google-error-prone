@@ -50,7 +50,8 @@ abstract class UPlaceholderStatement implements UStatement {
     for (int i = 0; i < placeholderParams.size(); i++) {
       builder.put(placeholderParams.get(i), argumentsList.get(i));
     }
-    return new AutoValue_UPlaceholderStatement(placeholder, builder.build(), implementationFlow);
+    return new AutoValue_UPlaceholderStatement(
+        placeholder, builder.buildOrThrow(), implementationFlow);
   }
 
   abstract PlaceholderMethod placeholder();
@@ -143,7 +144,7 @@ abstract class UPlaceholderStatement implements UStatement {
               .containsAll(placeholder().requiredParameters())) {
             Unifier resultUnifier = consumptionState.unifier().fork();
             int nConsumedStatements = consumptionState.result().consumedStatements();
-            java.util.List<? extends StatementTree> remainingStatements =
+            ImmutableList<? extends StatementTree> remainingStatements =
                 initState
                     .unconsumedStatements()
                     .subList(nConsumedStatements, initState.unconsumedStatements().size());

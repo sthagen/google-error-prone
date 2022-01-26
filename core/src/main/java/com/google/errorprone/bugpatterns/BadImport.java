@@ -30,6 +30,7 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.MultiMatcher;
+import com.google.errorprone.suppliers.Supplier;
 import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
@@ -40,6 +41,7 @@ import com.sun.source.tree.Tree.Kind;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.PackageSymbol;
+import com.sun.tools.javac.code.Type;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.util.Arrays;
@@ -49,7 +51,6 @@ import javax.lang.model.element.Name;
 
 /** @author awturner@google.com (Andy Turner) */
 @BugPattern(
-    name = "BadImport",
     summary =
         "Importing nested classes/static methods/static fields with commonly-used names can make "
             + "code harder to read, because it may not be clear from the context exactly which "
@@ -57,13 +58,6 @@ import javax.lang.model.element.Name;
             + "can make the code clearer.",
     severity = WARNING)
 public class BadImport extends BugChecker implements ImportTreeMatcher {
-
-  private static final String MESSAGE =
-      "Importing nested classes/static methods/static fields with commonly-used names can make "
-          + "code harder to read, because it may not be clear from the context exactly which "
-          + "type is being referred to. Qualifying the name with that of the containing class "
-          + "can make the code clearer. Here we recommend using qualified class: %s";
-
   static final ImmutableSet<String> BAD_NESTED_CLASSES =
       ImmutableSet.of(
           "Builder",
@@ -128,7 +122,7 @@ public class BadImport extends BugChecker implements ImportTreeMatcher {
       return Description.NO_MATCH;
     }
 
-    if (isSubtype(symbol.type, state.getTypeFromString(MESSAGE_LITE), state)) {
+    if (isSubtype(symbol.type, COM_GOOGLE_PROTOBUF_MESSAGELITE.get(state), state)) {
       return Description.NO_MATCH;
     }
 
@@ -234,7 +228,14 @@ public class BadImport extends BugChecker implements ImportTreeMatcher {
       return Description.NO_MATCH;
     }
     return buildDescription(firstFound)
-        .setMessage(String.format(MESSAGE, enclosingReplacement))
+        .setMessage(
+            String.format(
+                "Importing nested classes/static methods/static fields with commonly-used names can"
+                    + " make code harder to read, because it may not be clear from the context"
+                    + " exactly which type is being referred to. Qualifying the name with that of"
+                    + " the containing class can make the code clearer. Here we recommend using"
+                    + " qualified class: %s",
+                enclosingReplacement))
         .addFix(builder.build())
         .build();
   }
@@ -251,4 +252,7 @@ public class BadImport extends BugChecker implements ImportTreeMatcher {
     List<ElementType> value = Arrays.asList(target.value());
     return value.contains(ElementType.TYPE_USE) || value.contains(ElementType.TYPE_PARAMETER);
   }
+
+  private static final Supplier<Type> COM_GOOGLE_PROTOBUF_MESSAGELITE =
+      VisitorState.memoize(state -> state.getTypeFromString(MESSAGE_LITE));
 }

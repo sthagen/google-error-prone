@@ -56,7 +56,6 @@ import java.util.Set;
 
 /** Matches always-default expressions in oneof switches. */
 @BugPattern(
-    name = "WrongOneof",
     severity = ERROR,
     summary = "This field is guaranteed not to be set given it's within a switch over a one_of.")
 public final class WrongOneof extends BugChecker implements SwitchTreeMatcher {
@@ -119,8 +118,8 @@ public final class WrongOneof extends BugChecker implements SwitchTreeMatcher {
    * <p>Absent if the chain of calls is not a sequence of immutable proto getters ending in an
    * effectively final variable.
    *
-   * <p>For example {@code a.getFoo().getBar()} would return {@code MethodSymbol[getFoo],
-   * MethodSymbol[getBar], VarSymbol[a]}.
+   * <p>For example {@code a.getFoo().getBar()} would return {@code MethodSymbol[getBar],
+   * MethodSymbol[getFoo], VarSymbol[a]}.
    */
   private static Optional<ImmutableList<Symbol>> symbolizeImmutableExpression(
       ExpressionTree tree, VisitorState state) {

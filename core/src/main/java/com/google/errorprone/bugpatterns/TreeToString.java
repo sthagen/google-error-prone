@@ -30,6 +30,7 @@ import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.matchers.Matchers;
 import com.google.errorprone.predicates.TypePredicate;
 import com.google.errorprone.predicates.TypePredicates;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.google.errorprone.util.FindIdentifiers;
 import com.sun.source.tree.ClassTree;
@@ -46,7 +47,6 @@ import java.util.Optional;
  * @author bhagwani@google.com (Sumit Bhagwani)
  */
 @BugPattern(
-    name = "TreeToString",
     summary =
         "Tree#toString shouldn't be used for Trees deriving from the code being compiled, as it"
             + " discards whitespace and comments.",
@@ -102,10 +102,7 @@ public class TreeToString extends AbstractToString {
 
   private static Optional<Fix> fix(Tree target, Tree replace, VisitorState state) {
     return FindIdentifiers.findAllIdents(state).stream()
-        .filter(
-            s ->
-                isSubtype(
-                    s.type, state.getTypeFromString("com.google.errorprone.VisitorState"), state))
+        .filter(s -> isSubtype(s.type, COM_GOOGLE_ERRORPRONE_VISITORSTATE.get(state), state))
         .findFirst()
         .map(s -> SuggestedFix.replace(replace, createStringReplacement(state, s, target)));
   }
@@ -125,4 +122,7 @@ public class TreeToString extends AbstractToString {
     return String.format(
         "%s.getSourceForNode(%s)", visitorStateVariable, state.getSourceForNode(target));
   }
+
+  private static final Supplier<Type> COM_GOOGLE_ERRORPRONE_VISITORSTATE =
+      VisitorState.memoize(state -> state.getTypeFromString("com.google.errorprone.VisitorState"));
 }

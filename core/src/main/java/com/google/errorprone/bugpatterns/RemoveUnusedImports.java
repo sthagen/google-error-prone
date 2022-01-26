@@ -44,14 +44,12 @@ import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.tree.DCTree.DCReference;
 import java.util.LinkedHashSet;
 import javax.annotation.Nullable;
 
 /** @author gak@google.com (Gregory Kick) */
 @BugPattern(
-    name = "RemoveUnusedImports",
     summary = "Unused imports",
     severity = SUGGESTION,
     documentSuppression = false,
@@ -71,7 +69,7 @@ public final class RemoveUnusedImports extends BugChecker implements Compilation
     }
 
     final LinkedHashSet<ImportTree> unusedImports = new LinkedHashSet<>(importedSymbols.keySet());
-    new TreeSymbolScanner(JavacTrees.instance(state.context), state.getTypes())
+    new TreeSymbolScanner(JavacTrees.instance(state.context))
         .scan(
             compilationUnitTree,
             new SymbolSink() {
@@ -117,10 +115,8 @@ public final class RemoveUnusedImports extends BugChecker implements Compilation
   private static final class TreeSymbolScanner extends TreePathScanner<Void, SymbolSink> {
     final DocTreeSymbolScanner docTreeSymbolScanner;
     final JavacTrees trees;
-    final Types types;
 
-    private TreeSymbolScanner(JavacTrees trees, Types types) {
-      this.types = types;
+    private TreeSymbolScanner(JavacTrees trees) {
       this.docTreeSymbolScanner = new DocTreeSymbolScanner();
       this.trees = trees;
     }

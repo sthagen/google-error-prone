@@ -15,10 +15,7 @@
  */
 package com.google.errorprone.bugpatterns;
 
-import static org.junit.Assume.assumeTrue;
-
 import com.google.errorprone.CompilationTestHelper;
-import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -62,16 +59,32 @@ public class OptionalNotPresentTest {
   }
 
   @Test
-  public void isEmpty() {
-    assumeTrue(RuntimeVersion.isAtLeast11());
+  public void negation_butNotNegatingOptionalCheck() {
     compilationTestHelper
         .addSourceLines(
             "Test.java",
             "import java.util.Optional;",
             "class Test {",
             "  int g(Optional<Integer> o) {",
-            "    // BUG: Diagnostic contains:",
+            "    if (!equals(this) && o.isPresent()) {",
+            "      return o.orElseThrow();",
+            "    }",
+            "    return -1;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void isEmpty() {
+    compilationTestHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Optional;",
+            "class Test {",
+            "  int g(Optional<Integer> o) {",
             "    if (o.isEmpty()) {",
+            "      // BUG: Diagnostic contains:",
             "      return o.get();",
             "    }",
             "    return -1;",
@@ -82,15 +95,14 @@ public class OptionalNotPresentTest {
 
   @Test
   public void orElseThrow() {
-    assumeTrue(RuntimeVersion.isAtLeast11());
     compilationTestHelper
         .addSourceLines(
             "Test.java",
             "import java.util.Optional;",
             "class Test {",
             "  int g(Optional<Integer> o) {",
-            "    // BUG: Diagnostic contains:",
             "    if (o.isEmpty()) {",
+            "      // BUG: Diagnostic contains:",
             "      return o.orElseThrow();",
             "    }",
             "    return -1;",

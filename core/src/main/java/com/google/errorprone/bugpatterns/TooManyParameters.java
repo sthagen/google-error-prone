@@ -41,7 +41,6 @@ import javax.lang.model.element.Modifier;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "TooManyParameters",
     summary = "A large number of parameters on public APIs should be avoided.",
     severity = WARNING)
 public class TooManyParameters extends BugChecker implements MethodTreeMatcher {
@@ -50,7 +49,7 @@ public class TooManyParameters extends BugChecker implements MethodTreeMatcher {
   // https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46317.pdf
   // However, we have chosen a very conservative starting number, with hopes to decrease this in the
   // future.
-  private static final int DEFAULT_LIMIT = 10;
+  private static final int DEFAULT_LIMIT = 9;
 
   static final String TOO_MANY_PARAMETERS_FLAG_NAME = "TooManyParameters:ParameterLimit";
 
@@ -117,7 +116,7 @@ public class TooManyParameters extends BugChecker implements MethodTreeMatcher {
     return true;
   }
 
-  // Copied from MissingOverride.java
+  // TODO(b/216306810): copied from MissingOverride.java
   private static boolean isEffectivelyOverride(Symbol sym, Types types) {
     // static methods can't be overrides
     if (sym.isStatic()) {

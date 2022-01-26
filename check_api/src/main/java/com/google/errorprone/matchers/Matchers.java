@@ -91,6 +91,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import javax.lang.model.element.ElementKind;
@@ -331,12 +332,6 @@ public class Matchers {
   public static MultiMatcher<ClassTree, MethodTree> constructor(
       MatchType matchType, Matcher<MethodTree> constructorMatcher) {
     return new ConstructorOfClass(matchType, constructorMatcher);
-  }
-
-  // TODO(cushon): expunge
-  public static Matcher<MethodInvocationTree> methodSelect(
-      Matcher<ExpressionTree> methodSelectMatcher) {
-    return new MethodInvocationMethodSelect(methodSelectMatcher);
   }
 
   public static Matcher<MethodInvocationTree> argument(
@@ -1364,14 +1359,18 @@ public class Matchers {
     }
   }
 
+  private static <T extends Tree> Matcher<T> packageMatches(Predicate<String> predicate) {
+    return (tree, state) -> predicate.test(getPackageFullName(state));
+  }
+
   /** Matches an AST node whose compilation unit's package name matches the given pattern. */
   public static <T extends Tree> Matcher<T> packageMatches(Pattern pattern) {
-    return (tree, state) -> pattern.matcher(getPackageFullName(state)).matches();
+    return packageMatches(pattern.asPredicate());
   }
 
   /** Matches an AST node whose compilation unit starts with this prefix. */
   public static <T extends Tree> Matcher<T> packageStartsWith(String prefix) {
-    return (tree, state) -> getPackageFullName(state).startsWith(prefix);
+    return packageMatches(s -> s.startsWith(prefix));
   }
 
   private static String getPackageFullName(VisitorState state) {
@@ -1384,6 +1383,12 @@ public class Matchers {
           allOf(
               staticMethod()
                   .onClass("android.support.v4.util.ObjectsCompat")
+                  .named("equals")
+                  .withParameters("java.lang.Object", "java.lang.Object"),
+              Matchers::methodReturnsBoolean),
+          allOf(
+              staticMethod()
+                  .onClass("androidx.v4.util.ObjectsCompat")
                   .named("equals")
                   .withParameters("java.lang.Object", "java.lang.Object"),
               Matchers::methodReturnsBoolean),
@@ -1494,6 +1499,19 @@ public class Matchers {
   /** Matches {@code hashCode} method declaration. */
   public static Matcher<MethodTree> hashCodeMethodDeclaration() {
     return HASH_CODE_DECLARATION;
+  }
+
+  /** Matcher for the overriding method of 'int java.lang.Comparable.compareTo(T other)' */
+  private static final Matcher<MethodTree> COMPARABLE_METHOD_MATCHER =
+      allOf(
+          methodIsNamed("compareTo"),
+          methodHasVisibility(Visibility.PUBLIC),
+          methodReturns(INT_TYPE),
+          methodHasArity(1));
+
+  /** Matches {@code compareTo} method declaration. */
+  public static Matcher<MethodTree> compareToMethodDeclaration() {
+    return COMPARABLE_METHOD_MATCHER;
   }
 
   /** Method signature of serialization methods. */

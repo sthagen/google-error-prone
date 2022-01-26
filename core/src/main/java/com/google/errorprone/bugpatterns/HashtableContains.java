@@ -34,13 +34,12 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.List;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "HashtableContains",
     summary = "contains() is a legacy method that is equivalent to containsValue()",
     severity = ERROR)
 public class HashtableContains extends BugChecker implements MethodInvocationTreeMatcher {

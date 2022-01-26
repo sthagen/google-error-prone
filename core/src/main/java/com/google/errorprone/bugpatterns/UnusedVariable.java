@@ -111,7 +111,6 @@ import javax.lang.model.type.NullType;
 
 /** Bugpattern to detect unused declarations. */
 @BugPattern(
-    name = "UnusedVariable",
     altNames = {"unused", "UnusedParameters"},
     summary = "Unused.",
     severity = WARNING,
@@ -121,11 +120,14 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
 
   private static final ImmutableSet<String> EXEMPT_NAMES = ImmutableSet.of("ignored");
 
+  private static final String KEEP = "com.google.errorprone.annotations.Keep";
+
   /**
    * The set of annotation full names which exempt annotated element from being reported as unused.
    */
   private static final ImmutableSet<String> EXEMPTING_VARIABLE_ANNOTATIONS =
       ImmutableSet.of(
+          KEEP,
           "javax.persistence.Basic",
           "javax.persistence.Column",
           "javax.persistence.Id",
@@ -134,7 +136,9 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
           "org.junit.Rule",
           "org.openqa.selenium.support.FindAll",
           "org.openqa.selenium.support.FindBy",
-          "org.openqa.selenium.support.FindBys");
+          "org.openqa.selenium.support.FindBys",
+          "org.apache.beam.sdk.transforms.DoFn.TimerId",
+          "org.apache.beam.sdk.transforms.DoFn.StateId");
 
   private final ImmutableSet<String> methodAnnotationsExemptingParameters;
 
@@ -265,15 +269,24 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
             .filter(tp -> tp.getLeaf() instanceof VariableTree)
             .findFirst()
             .map(tp -> (VariableTree) tp.getLeaf());
+
+    // Find the first reassignment which wasn't only used by an ultimately unused assignment. If
+    // there is one, it should become a variable declaration.
     Optional<AssignmentTree> reassignment =
         specs.stream()
             .map(UnusedSpec::terminatingAssignment)
             .flatMap(Streams::stream)
-            .filter(a -> allUsageSites.stream().noneMatch(tp -> tp.getLeaf().equals(a)))
+            .filter(
+                a ->
+                    allUsageSites.stream()
+                        .noneMatch(
+                            tp ->
+                                tp.getLeaf() instanceof ExpressionStatementTree
+                                    && ((ExpressionStatementTree) tp.getLeaf())
+                                        .getExpression()
+                                        .equals(a)))
             .findFirst();
-    if (removedVariableTree.isPresent()
-        && reassignment.isPresent()
-        && !TOP_LEVEL_EXPRESSIONS.contains(reassignment.get().getExpression().getKind())) {
+    if (removedVariableTree.isPresent() && reassignment.isPresent()) {
       return SuggestedFix.prefixWith( // not needed if top-level statement
           reassignment.get(), state.getSourceForNode(removedVariableTree.get().getType()) + " ");
     }
@@ -525,6 +538,9 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
       }
       TypeSymbol tsym = annotationType.tsym;
       if (EXEMPTING_VARIABLE_ANNOTATIONS.contains(tsym.getQualifiedName().toString())) {
+        return true;
+      }
+      if (ASTHelpers.hasAnnotation(tsym, KEEP, state)) {
         return true;
       }
     }
@@ -940,7 +956,7 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
 
   @AutoValue
   abstract static class UnusedSpec {
-    /** {@link Symbol} of the unsued element. */
+    /** {@link Symbol} of the unused element. */
     abstract Symbol symbol();
 
     /** {@link VariableTree} or {@link AssignmentTree} for the original assignment site. */

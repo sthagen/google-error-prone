@@ -63,7 +63,6 @@ import javax.lang.model.element.Modifier;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "DoubleBraceInitialization",
     summary =
         "Prefer collection factory methods or builders to the double-brace initialization"
             + " pattern.",
@@ -118,7 +117,7 @@ public class DoubleBraceInitialization extends BugChecker implements NewClassTre
           .anyMatch(a -> a.getKind() == Kind.NULL_LITERAL)) {
         return Optional.empty();
       }
-      List<String> args =
+      ImmutableList<String> args =
           arguments.stream()
               .map(
                   arg ->
@@ -179,7 +178,7 @@ public class DoubleBraceInitialization extends BugChecker implements NewClassTre
                 + typeArguments
                 + "builder()"
                 + args.stream().map(a -> ".put(" + a + ")").collect(joining(""))
-                + ".build()";
+                + ".buildOrThrow()";
       } else {
         replacement = args.stream().collect(joining(", ", factoryMethod + "(", ")"));
       }

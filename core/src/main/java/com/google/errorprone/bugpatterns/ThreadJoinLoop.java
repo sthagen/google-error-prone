@@ -27,6 +27,7 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.BlockTree;
@@ -45,7 +46,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** @author mariasam@google.com (Maria Sam) */
 @BugPattern(
-    name = "ThreadJoinLoop",
     summary =
         "Thread.join needs to be immediately surrounded by a loop until it succeeds. "
             + "Consider using Uninterruptibles.joinUninterruptibly.",
@@ -124,7 +124,7 @@ public class ThreadJoinLoop extends BugChecker implements MethodInvocationTreeMa
   private static boolean hasOtherInvocationsOrAssignments(
       MethodInvocationTree methodInvocationTree, TryTree tryTree, VisitorState state) {
     AtomicInteger count = new AtomicInteger(0);
-    Type threadType = state.getTypeFromString("java.lang.Thread");
+    Type threadType = JAVA_LANG_THREAD.get(state);
     new TreeScanner<Void, Void>() {
       @Override
       public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
@@ -144,4 +144,7 @@ public class ThreadJoinLoop extends BugChecker implements MethodInvocationTreeMa
     }.scan(tryTree.getBlock(), null);
     return count.get() > 0;
   }
+
+  private static final Supplier<Type> JAVA_LANG_THREAD =
+      VisitorState.memoize(state -> state.getTypeFromString("java.lang.Thread"));
 }

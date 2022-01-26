@@ -199,13 +199,13 @@ public class ErrorProneScanner extends Scanner {
             });
   }
 
-  private static Map<String, BugPattern.SeverityLevel> defaultSeverities(
+  private static ImmutableMap<String, BugPattern.SeverityLevel> defaultSeverities(
       Iterable<BugChecker> checkers) {
     ImmutableMap.Builder<String, BugPattern.SeverityLevel> builder = ImmutableMap.builder();
     for (BugChecker check : checkers) {
       builder.put(check.canonicalName(), check.defaultSeverity());
     }
-    return builder.build();
+    return builder.buildOrThrow();
   }
 
   @Override

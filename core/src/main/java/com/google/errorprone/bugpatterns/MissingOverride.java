@@ -37,7 +37,6 @@ import javax.lang.model.element.Modifier;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
 @BugPattern(
-    name = "MissingOverride",
     summary = "method overrides method in supertype; expected @Override",
     severity = WARNING,
     tags = StandardTags.STYLE)
@@ -94,6 +93,7 @@ public class MissingOverride extends BugChecker implements MethodTreeMatcher {
    * Returns the {@link MethodSymbol} of the first method that sym overrides in its supertype
    * closure, or {@code null} if no such method exists.
    */
+  // TODO(b/216306810): consider adding a generalized version of this to ASTHelpers
   @Nullable
   private MethodSymbol getFirstOverride(Symbol sym, Types types) {
     ClassSymbol owner = sym.enclClass();

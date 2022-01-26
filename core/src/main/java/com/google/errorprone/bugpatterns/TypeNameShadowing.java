@@ -48,7 +48,6 @@ import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.JCTree.Tag;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -57,7 +56,6 @@ import java.util.stream.Collectors;
  * @author bennostein@google.com (Benno Stein)
  */
 @BugPattern(
-    name = "TypeNameShadowing",
     summary = "Type parameter declaration shadows another named type",
     severity = WARNING,
     tags = StandardTags.STYLE)
@@ -88,7 +86,7 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
     // Collect all visible type names declared in this source file by ascending lexical scopes,
     // collecting all members, filtering to keep type symbols and exclude TypeVariableSymbols
     // (otherwise, every type parameter spuriously shadows itself)
-    Iterable<Symbol> localSymbolsInScope =
+    ImmutableList<Symbol> localSymbolsInScope =
         Streams.stream(env)
             .map(
                 ctx ->
@@ -125,7 +123,7 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
 
     Iterable<Symbol> enclosingTypes = typesInEnclosingScope(env, javaLang);
 
-    List<Symbol> shadowedTypes =
+    ImmutableList<Symbol> shadowedTypes =
         typeParameters.stream()
             .map(
                 param ->
@@ -146,7 +144,7 @@ public class TypeNameShadowing extends BugChecker implements MethodTreeMatcher, 
 
     descBuilder.setMessage(buildMessage(shadowedTypes));
 
-    Set<String> visibleNames =
+    ImmutableSet<String> visibleNames =
         Streams.stream(Iterables.concat(env.info.getLocalElements(), enclosingTypes))
             .map(sym -> sym.getSimpleName().toString())
             .collect(ImmutableSet.toImmutableSet());
