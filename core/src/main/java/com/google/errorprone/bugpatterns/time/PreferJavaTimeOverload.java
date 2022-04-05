@@ -67,7 +67,6 @@ import javax.annotation.Nullable;
 
 /** This check suggests the use of {@code java.time}-based APIs, when available. */
 @BugPattern(
-    name = "PreferJavaTimeOverload",
     altNames = {"PreferDurationOverload"},
     summary =
         "Prefer using java.time-based APIs when available. Note that this checker does"
@@ -356,9 +355,6 @@ public final class PreferJavaTimeOverload extends BugChecker
   private static boolean hasJavaTimeOverload(
       MethodInvocationTree tree, VisitorState state, String typeName) {
     MethodSymbol calledMethod = getSymbol(tree);
-    if (calledMethod == null) {
-      return false;
-    }
     return hasJavaTimeOverload(state, typeName, calledMethod, calledMethod.name);
   }
 
@@ -389,9 +385,6 @@ public final class PreferJavaTimeOverload extends BugChecker
 
   private static boolean hasTimeSourceMethod(MethodInvocationTree tree, VisitorState state) {
     MethodSymbol calledMethod = getSymbol(tree);
-    if (calledMethod == null) {
-      return false;
-    }
     String timeSourceBasedName = calledMethod.name.toString().replace("Clock", "TimeSource");
     return hasJavaTimeOverload(
         state, TIME_SOURCE, calledMethod, state.getName(timeSourceBasedName));
@@ -399,7 +392,7 @@ public final class PreferJavaTimeOverload extends BugChecker
 
   // Adapted from ASTHelpers.findMatchingMethods(); but this short-circuits
   private static boolean hasMatchingMethods(
-      Name name, final Predicate<MethodSymbol> predicate, Type startClass, Types types) {
+      Name name, Predicate<MethodSymbol> predicate, Type startClass, Types types) {
     Predicate<Symbol> matchesMethodPredicate =
         sym -> sym instanceof MethodSymbol && predicate.apply((MethodSymbol) sym);
 

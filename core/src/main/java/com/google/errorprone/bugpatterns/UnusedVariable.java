@@ -24,10 +24,12 @@ import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Matchers.SERIALIZATION_METHODS;
+import static com.google.errorprone.util.ASTHelpers.canBeRemoved;
 import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
+import static com.google.errorprone.util.ASTHelpers.shouldKeep;
 import static com.google.errorprone.util.SideEffectAnalysis.hasSideEffect;
 import static com.sun.source.tree.Tree.Kind.POSTFIX_DECREMENT;
 import static com.sun.source.tree.Tree.Kind.POSTFIX_INCREMENT;
@@ -52,6 +54,7 @@ import com.google.errorprone.bugpatterns.BugChecker.CompilationUnitTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.fixes.SuggestedFixes;
 import com.google.errorprone.matchers.Description;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.suppliers.Suppliers;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.tree.AnnotationTree;
@@ -120,14 +123,11 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
 
   private static final ImmutableSet<String> EXEMPT_NAMES = ImmutableSet.of("ignored");
 
-  private static final String KEEP = "com.google.errorprone.annotations.Keep";
-
   /**
    * The set of annotation full names which exempt annotated element from being reported as unused.
    */
   private static final ImmutableSet<String> EXEMPTING_VARIABLE_ANNOTATIONS =
       ImmutableSet.of(
-          KEEP,
           "javax.persistence.Basic",
           "javax.persistence.Column",
           "javax.persistence.Id",
@@ -529,8 +529,7 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
    * Looks at the list of {@code annotations} and see if there is any annotation which exists {@code
    * exemptingAnnotations}.
    */
-  private static boolean exemptedByAnnotation(
-      List<? extends AnnotationTree> annotations, VisitorState state) {
+  private static boolean exemptedByAnnotation(List<? extends AnnotationTree> annotations) {
     for (AnnotationTree annotation : annotations) {
       Type annotationType = ASTHelpers.getType(annotation);
       if (annotationType == null) {
@@ -538,9 +537,6 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
       }
       TypeSymbol tsym = annotationType.tsym;
       if (EXEMPTING_VARIABLE_ANNOTATIONS.contains(tsym.getQualifiedName().toString())) {
-        return true;
-      }
-      if (ASTHelpers.hasAnnotation(tsym, KEEP, state)) {
         return true;
       }
     }
@@ -579,12 +575,18 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
         return null;
       }
       if (symbol.getKind() == ElementKind.FIELD
+          && symbol.getSimpleName().contentEquals("CREATOR")
+          && isSubtype(symbol.type, PARCELABLE_CREATOR.get(state), state)) {
+        return null;
+      }
+      if (symbol.getKind() == ElementKind.FIELD
           && exemptedFieldBySuperType(getType(variableTree), state)) {
         return null;
       }
       super.visitVariable(variableTree, null);
       // Return if the element is exempted by an annotation.
-      if (exemptedByAnnotation(variableTree.getModifiers().getAnnotations(), state)) {
+      if (exemptedByAnnotation(variableTree.getModifiers().getAnnotations())
+          || shouldKeep(variableTree)) {
         return null;
       }
       switch (symbol.getKind()) {
@@ -629,8 +631,7 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
       if ((symbol.flags() & RECORD_FLAG) == RECORD_FLAG) {
         return false;
       }
-      return variableTree.getModifiers().getFlags().contains(Modifier.PRIVATE)
-          && !SPECIAL_FIELDS.contains(symbol.getSimpleName().toString());
+      return canBeRemoved(symbol) && !SPECIAL_FIELDS.contains(symbol.getSimpleName().toString());
     }
 
     private static final long RECORD_FLAG = 1L << 61;
@@ -877,9 +878,7 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
     public Void visitMemberReference(MemberReferenceTree tree, Void unused) {
       super.visitMemberReference(tree, null);
       MethodSymbol symbol = getSymbol(tree);
-      if (symbol != null) {
-        symbol.getParameters().forEach(unusedElements::remove);
-      }
+      symbol.getParameters().forEach(unusedElements::remove);
       return null;
     }
 
@@ -986,4 +985,7 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
           Optional.ofNullable(assignmentTree));
     }
   }
+
+  private static final Supplier<Type> PARCELABLE_CREATOR =
+      VisitorState.memoize(state -> state.getTypeFromString("android.os.Parcelable.Creator"));
 }

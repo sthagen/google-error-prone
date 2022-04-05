@@ -31,7 +31,7 @@ public class CheckReturnValuePositiveCases {
 
   public void foo() {
     int i = 1;
-    // BUG: Diagnostic contains: remove this line
+    // BUG: Diagnostic contains:
     increment(i);
     System.out.println(i);
   }
@@ -70,7 +70,7 @@ public class CheckReturnValuePositiveCases {
   }
 
   public void testBeforeAndAfterRule() {
-    // BUG: Diagnostic contains: remove this line
+    // BUG: Diagnostic contains:
     new IntValue(1).increment();
     ExpectedException.none().expect(IllegalStateException.class);
     new IntValue(1).increment(); // No error here, last statement in block
@@ -88,7 +88,7 @@ public class CheckReturnValuePositiveCases {
      * on the constructed object. There, it would be nice if IteratorTester
      * could be annotated with @CheckReturnValue to mean "anyone who creates an
      * anonymous subclasses of this should still do something with that
-     * subclass." But perhaps that's an abuse of @CheckForNull.
+     * subclass." But perhaps that's an abuse of @CheckReturnValue.
      *
      * Anyway, these tests are here to ensure that subclasses don't don't crash
      * the compiler.
@@ -107,7 +107,7 @@ public class CheckReturnValuePositiveCases {
       }
     }
 
-    // TODO(cpovirk): This one probably ought to be treated as a bug:
+    // BUG: Diagnostic contains: Ignored return value
     new MyObject();
   }
 
@@ -124,12 +124,12 @@ public class CheckReturnValuePositiveCases {
     }
 
     public void increment2() {
-      // BUG: Diagnostic contains: remove this line
+      // BUG: Diagnostic contains:
       this.increment();
     }
 
     public void increment3() {
-      // BUG: Diagnostic contains: remove this line
+      // BUG: Diagnostic contains:
       increment();
     }
   }
@@ -149,7 +149,7 @@ public class CheckReturnValuePositiveCases {
     }
 
     public static <T> LB2<T> lb2() {
-      // BUG: Diagnostic contains: remove this line
+      // BUG: Diagnostic contains:
       lb1();
       return lb1();
     }
@@ -162,7 +162,7 @@ public class CheckReturnValuePositiveCases {
     }
 
     public static void ignoresCheck() {
-      // BUG: Diagnostic contains: remove this line
+      // BUG: Diagnostic contains:
       check();
     }
   }

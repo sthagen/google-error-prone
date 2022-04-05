@@ -21,7 +21,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** @author eaftan@google.com (Eddie Aftandilian) */
+/**
+ * @author eaftan@google.com (Eddie Aftandilian)
+ */
 @RunWith(JUnit4.class)
 public class CheckReturnValueTest {
 
@@ -656,24 +658,8 @@ public class CheckReturnValueTest {
   }
 
   @Test
-  public void constructor_flagOff() {
-    compilationHelper
-        .addSourceLines(
-            "Test.java",
-            "class Test {",
-            "  @com.google.errorprone.annotations.CheckReturnValue",
-            "  public Test() {",
-            "  }",
-            "  public static void foo() {",
-            "    new Test();",
-            "  }",
-            "}")
-        .doTest();
-  }
-
-  @Test
   public void constructor() {
-    compilationHelperLookingAtConstructors()
+    compilationHelper
         .addSourceLines(
             "Test.java",
             "class Test {",
@@ -689,7 +675,7 @@ public class CheckReturnValueTest {
 
   @Test
   public void constructor_telescoping() {
-    compilationHelperLookingAtConstructors()
+    compilationHelper
         .addSourceLines(
             "Test.java",
             "class Test {",
@@ -705,7 +691,7 @@ public class CheckReturnValueTest {
 
   @Test
   public void constructor_superCall() {
-    compilationHelperLookingAtConstructors()
+    compilationHelper
         .addSourceLines(
             "Test.java",
             "class Test {",
@@ -721,7 +707,7 @@ public class CheckReturnValueTest {
 
   @Test
   public void constructor_throwingContexts() {
-    compilationHelperLookingAtConstructors()
+    compilationHelper
         .addSourceLines(
             "Foo.java",
             "@com.google.errorprone.annotations.CheckReturnValue",
@@ -742,7 +728,7 @@ public class CheckReturnValueTest {
 
   @Test
   public void constructor_reference() {
-    compilationHelperLookingAtConstructors()
+    compilationHelper
         .addSourceLines(
             "Foo.java",
             "@com.google.errorprone.annotations.CheckReturnValue",
@@ -758,7 +744,53 @@ public class CheckReturnValueTest {
         .doTest();
   }
 
-  private CompilationTestHelper compilationHelperLookingAtConstructors() {
-    return compilationHelper.setArgs("-XepOpt:CheckConstructorReturnValue=true");
+  @Test
+  public void constructor_withoutCrvAnnotation() {
+    compilationHelperLookingAtAllConstructors()
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  public Test() {}",
+            "  public static void foo() {",
+            "    // BUG: Diagnostic contains: Ignored return value of 'Test', which wasn't"
+                + " annotated with @CanIgnoreReturnValue",
+            "    new Test();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void usingElementInTestExpected() {
+    compilationHelperLookingAtAllConstructors()
+        .addSourceLines(
+            "Foo.java",
+            "import org.junit.runner.RunWith;",
+            "import org.junit.runners.JUnit4;",
+            "import org.junit.Test;",
+            "@RunWith(JUnit4.class)",
+            "class Foo {",
+            "  @Test(expected = IllegalArgumentException.class) ",
+            "  public void foo() {",
+            "    new Foo();", // OK when it's the only statement
+            "  }",
+            "  @Test(expected = IllegalArgumentException.class) ",
+            "  public void fooWith2Statements() {",
+            "    Foo f = new Foo();",
+            "    // BUG: Diagnostic contains: Ignored return value of 'Foo'",
+            "    new Foo();", // Not OK if there is more than one statement in the block.
+            "  }",
+            "  @Test(expected = Test.None.class) ", // This is a weird way to spell the default
+            "  public void fooWithNone() {",
+            "    // BUG: Diagnostic contains: Ignored return value of 'Foo'",
+            "    new Foo();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  private CompilationTestHelper compilationHelperLookingAtAllConstructors() {
+    return compilationHelper.setArgs(
+        "-XepOpt:" + CheckReturnValue.CHECK_ALL_CONSTRUCTORS + "=true");
   }
 }

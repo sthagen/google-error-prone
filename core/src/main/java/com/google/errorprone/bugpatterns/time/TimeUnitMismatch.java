@@ -76,7 +76,6 @@ import javax.annotation.Nullable;
 
 /** Checker that detects likely time-unit mismatches by looking at identifier names. */
 @BugPattern(
-    name = "TimeUnitMismatch",
     summary =
         "An value that appears to be represented in one unit is used where another appears to be "
             + "required (e.g., seconds where nanos are needed)",
@@ -129,21 +128,17 @@ public final class TimeUnitMismatch extends BugChecker
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
     MethodSymbol symbol = getSymbol(tree);
-    if (symbol != null) {
-      checkAll(symbol.getParameters(), tree.getArguments(), state);
-    }
+    checkAll(symbol.getParameters(), tree.getArguments(), state);
     return ANY_MATCHES_WERE_ALREADY_REPORTED;
   }
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
     MethodSymbol symbol = getSymbol(tree);
-    if (symbol != null) {
-      checkTimeUnitToUnit(tree, symbol, state);
-      boolean setterMethodReported = checkSetterStyleMethod(tree, symbol, state);
-      if (!setterMethodReported) {
-        checkAll(symbol.getParameters(), tree.getArguments(), state);
-      }
+    checkTimeUnitToUnit(tree, symbol, state);
+    boolean setterMethodReported = checkSetterStyleMethod(tree, symbol, state);
+    if (!setterMethodReported) {
+      checkAll(symbol.getParameters(), tree.getArguments(), state);
     }
     return ANY_MATCHES_WERE_ALREADY_REPORTED;
   }

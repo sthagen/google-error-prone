@@ -27,9 +27,11 @@ import static com.google.errorprone.fixes.SuggestedFix.emptyFix;
 import static com.google.errorprone.fixes.SuggestedFixes.replaceIncludingComments;
 import static com.google.errorprone.matchers.Matchers.SERIALIZATION_METHODS;
 import static com.google.errorprone.suppliers.Suppliers.typeFromString;
+import static com.google.errorprone.util.ASTHelpers.canBeRemoved;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
+import static com.google.errorprone.util.ASTHelpers.scope;
 import static com.google.errorprone.util.ASTHelpers.shouldKeep;
 import static com.google.errorprone.util.MoreAnnotations.asStrings;
 import static com.google.errorprone.util.MoreAnnotations.getAnnotationValue;
@@ -48,9 +50,9 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.suppliers.Supplier;
 import com.sun.source.tree.AnnotationTree;
+import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MemberSelectTree;
@@ -213,7 +215,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
           }
         }
 
-        return tree.getModifiers().getFlags().contains(Modifier.PRIVATE);
+        return canBeRemoved(methodSymbol, state);
       }
 
       private boolean isExemptedConstructor(MethodSymbol methodSymbol, VisitorState state) {
@@ -243,28 +245,31 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
         super.visitMemberReference(tree, null);
         MethodSymbol symbol = getSymbol(tree);
         unusedMethods.remove(symbol);
-        if (symbol != null) {
-          symbol.getParameters().forEach(unusedMethods::remove);
-        }
+        symbol.getParameters().forEach(unusedMethods::remove);
         return null;
       }
 
       @Override
       public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
-        handle(tree);
+        handle(getSymbol(tree));
         return super.visitMethodInvocation(tree, null);
       }
 
       @Override
       public Void visitNewClass(NewClassTree tree, Void unused) {
-        handle(tree);
+        handle(getSymbol(tree));
         return super.visitNewClass(tree, null);
       }
 
-      private void handle(ExpressionTree tree) {
-        Symbol methodSymbol = getSymbol(tree);
-        if (methodSymbol != null) {
-          unusedMethods.remove(methodSymbol);
+      @Override
+      public Void visitAssignment(AssignmentTree tree, Void unused) {
+        handle(getSymbol(tree.getVariable()));
+        return super.visitAssignment(tree, unused);
+      }
+
+      private void handle(Symbol symbol) {
+        if (symbol instanceof MethodSymbol) {
+          unusedMethods.remove(symbol);
         }
       }
 
@@ -336,7 +341,8 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
     for (TreePath unusedPath : unusedPaths) {
       Tree unusedTree = unusedPath.getLeaf();
       MethodSymbol symbol = getSymbol((MethodTree) unusedTree);
-      String message = String.format("Private method '%s' is never used.", symbol.getSimpleName());
+
+      String message = String.format("Method '%s' is never used.", symbol.getSimpleName());
       state.reportMatch(
           buildDescription(unusedTree)
               .addFix(replaceIncludingComments(unusedPath, "", state))
@@ -353,11 +359,10 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
 
       SuggestedFix.Builder fix = SuggestedFix.builder();
 
-      int constructorCount = size(symbol.members().getSymbols(Symbol::isConstructor));
+      int constructorCount = size(scope(symbol.members()).getSymbols(Symbol::isConstructor));
       int finalFields =
           size(
-              symbol
-                  .members()
+              scope(symbol.members())
                   .getSymbols(s -> s.getKind().equals(FIELD) && s.getModifiers().contains(FINAL)));
       boolean fixable;
       if (constructorCount == trees.size()) {
@@ -368,8 +373,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
         fixable = true;
       }
 
-      String message =
-          String.format("Private constructor '%s' is never used.", symbol.getSimpleName());
+      String message = String.format("Constructor '%s' is never used.", symbol.getSimpleName());
       trees.forEach(t -> fix.merge(replaceIncludingComments(t, "", state)));
       state.reportMatch(
           buildDescription(trees.get(0).getLeaf())
@@ -379,7 +383,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
     }
   }
 
-  static boolean hasNativeMethods(CompilationUnitTree tree) {
+  private static boolean hasNativeMethods(CompilationUnitTree tree) {
     AtomicBoolean hasAnyNativeMethods = new AtomicBoolean(false);
     new TreeScanner<Void, Void>() {
       @Override

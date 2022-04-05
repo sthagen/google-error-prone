@@ -34,7 +34,6 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 
 /** Check for calls to {@code java.time} APIs that silently use the default system time-zone. */
 @BugPattern(
-    name = "JavaTimeDefaultTimeZone",
     summary = "java.time APIs that silently use the default system time-zone are not allowed.",
     explanation =
         "Using APIs that silently use the default system time-zone is dangerous. "
@@ -83,9 +82,6 @@ public final class JavaTimeDefaultTimeZone extends BugChecker
       return false;
     }
     MethodSymbol symbol = ASTHelpers.getSymbol(tree);
-    if (symbol == null) {
-      return false;
-    }
 
     switch (symbol.getSimpleName().toString()) {
       case "now":

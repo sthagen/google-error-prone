@@ -24,11 +24,13 @@ import static com.google.errorprone.matchers.Matchers.instanceMethod;
 import static com.google.errorprone.matchers.Matchers.staticEqualsInvocation;
 import static com.google.errorprone.matchers.Matchers.staticMethod;
 import static com.google.errorprone.matchers.Matchers.toType;
+import static com.google.errorprone.util.ASTHelpers.getGeneratedBy;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getReceiverType;
 import static com.google.errorprone.util.ASTHelpers.getType;
 
 import com.google.errorprone.BugPattern;
+import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker.MemberReferenceTreeMatcher;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -43,7 +45,9 @@ import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Type;
 
-/** @author avenet@google.com (Arnaud J. Venet) */
+/**
+ * @author avenet@google.com (Arnaud J. Venet)
+ */
 @BugPattern(
     summary = "An equality test between objects with incompatible types always returns false",
     severity = WARNING)
@@ -60,9 +64,15 @@ public class EqualsIncompatibleType extends BugChecker
               instanceMethod().anyClass().named("assertFalse"),
               staticMethod().anyClass().named("assertFalse")));
 
+  private final TypeCompatibilityUtils typeCompatibilityUtils;
+
+  public EqualsIncompatibleType(ErrorProneFlags flags) {
+    this.typeCompatibilityUtils = TypeCompatibilityUtils.fromFlags(flags);
+  }
+
   @Override
   public Description matchMethodInvocation(
-      MethodInvocationTree invocationTree, final VisitorState state) {
+      MethodInvocationTree invocationTree, VisitorState state) {
     if (!STATIC_EQUALS_MATCHER.matches(invocationTree, state)
         && !INSTANCE_EQUALS_MATCHER.matches(invocationTree, state)) {
       return NO_MATCH;
@@ -112,7 +122,7 @@ public class EqualsIncompatibleType extends BugChecker
   private Description handle(
       ExpressionTree invocationTree, Type receiverType, Type argumentType, VisitorState state) {
     TypeCompatibilityReport compatibilityReport =
-        TypeCompatibilityUtils.compatibilityOfTypes(receiverType, argumentType, state);
+        typeCompatibilityUtils.compatibilityOfTypes(receiverType, argumentType, state);
     if (compatibilityReport.isCompatible()) {
       return NO_MATCH;
     }
@@ -120,6 +130,10 @@ public class EqualsIncompatibleType extends BugChecker
     // Ignore callsites wrapped inside assertFalse:
     // assertFalse(objOfReceiverType.equals(objOfArgumentType))
     if (ASSERT_FALSE_MATCHER.matches(state.getPath().getParentPath().getLeaf(), state)) {
+      return NO_MATCH;
+    }
+
+    if (getGeneratedBy(state).contains("com.google.auto.value.processor.AutoValueProcessor")) {
       return NO_MATCH;
     }
 
@@ -134,12 +148,13 @@ public class EqualsIncompatibleType extends BugChecker
     return buildDescription(invocationTree)
         .setMessage(
             getMessage(
-                invocationTree,
-                receiverType,
-                argumentType,
-                compatibilityReport.lhs(),
-                compatibilityReport.rhs(),
-                state))
+                    invocationTree,
+                    receiverType,
+                    argumentType,
+                    compatibilityReport.lhs(),
+                    compatibilityReport.rhs(),
+                    state)
+                + compatibilityReport.extraReason())
         .build();
   }
 

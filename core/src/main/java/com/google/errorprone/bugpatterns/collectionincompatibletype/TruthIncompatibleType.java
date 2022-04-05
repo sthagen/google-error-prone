@@ -35,6 +35,7 @@ import static java.util.stream.Stream.concat;
 
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
+import com.google.errorprone.ErrorProneFlags;
 import com.google.errorprone.VisitorState;
 import com.google.errorprone.bugpatterns.BugChecker;
 import com.google.errorprone.bugpatterns.BugChecker.MethodInvocationTreeMatcher;
@@ -57,10 +58,7 @@ import com.sun.tools.javac.code.Type.ArrayType;
 import java.util.stream.Stream;
 
 /** A {@link BugChecker}; see the associated {@link BugPattern} annotation for details. */
-@BugPattern(
-    name = "TruthIncompatibleType",
-    summary = "Argument is not compatible with the subject's type.",
-    severity = WARNING)
+@BugPattern(summary = "Argument is not compatible with the subject's type.", severity = WARNING)
 public class TruthIncompatibleType extends BugChecker implements MethodInvocationTreeMatcher {
 
   private static final Matcher<ExpressionTree> START_OF_ASSERTION =
@@ -144,6 +142,12 @@ public class TruthIncompatibleType extends BugChecker implements MethodInvocatio
 
   private static final Supplier<Type> CORRESPONDENCE =
       typeFromString("com.google.common.truth.Correspondence");
+
+  private final TypeCompatibilityUtils typeCompatibilityUtils;
+
+  public TruthIncompatibleType(ErrorProneFlags flags) {
+    this.typeCompatibilityUtils = TypeCompatibilityUtils.fromFlags(flags);
+  }
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
@@ -413,7 +417,7 @@ public class TruthIncompatibleType extends BugChecker implements MethodInvocatio
   private Stream<Description> checkCompatibility(
       ExpressionTree tree, Type targetType, Type sourceType, VisitorState state) {
     TypeCompatibilityReport compatibilityReport =
-        TypeCompatibilityUtils.compatibilityOfTypes(targetType, sourceType, state);
+        typeCompatibilityUtils.compatibilityOfTypes(targetType, sourceType, state);
     if (compatibilityReport.isCompatible()) {
       return Stream.empty();
     }
@@ -429,8 +433,11 @@ public class TruthIncompatibleType extends BugChecker implements MethodInvocatio
             .setMessage(
                 String.format(
                     "Argument '%s' should not be passed to this method: its type `%s` is"
-                        + " not compatible with `%s`",
-                    state.getSourceForNode(tree), sourceTypeName, targetTypeName))
+                        + " not compatible with `%s`"
+                        + compatibilityReport.extraReason(),
+                    state.getSourceForNode(tree),
+                    sourceTypeName,
+                    targetTypeName))
             .build());
   }
 

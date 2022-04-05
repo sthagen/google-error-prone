@@ -699,7 +699,7 @@ public final class SuggestedFixes {
    * replacement}.
    */
   public static SuggestedFix renameVariable(
-      VariableTree tree, final String replacement, VisitorState state) {
+      VariableTree tree, String replacement, VisitorState state) {
     String name = tree.getName().toString();
     int typeEndPos = state.getEndPosition(tree.getType());
     // handle implicit lambda parameter types
@@ -716,9 +716,9 @@ public final class SuggestedFixes {
    * replacement}.
    */
   public static SuggestedFix renameVariableUsages(
-      VariableTree tree, final String replacement, VisitorState state) {
-    final SuggestedFix.Builder fix = SuggestedFix.builder();
-    final Symbol.VarSymbol sym = getSymbol(tree);
+      VariableTree tree, String replacement, VisitorState state) {
+    SuggestedFix.Builder fix = SuggestedFix.builder();
+    Symbol.VarSymbol sym = getSymbol(tree);
     new TreeScanner<Void, Void>() {
       @Override
       public Void visitIdentifier(IdentifierTree tree, Void unused) {
@@ -743,8 +743,7 @@ public final class SuggestedFixes {
   }
 
   /** Be warned, only changes method name at the declaration. */
-  public static SuggestedFix renameMethod(
-      MethodTree tree, final String replacement, VisitorState state) {
+  public static SuggestedFix renameMethod(MethodTree tree, String replacement, VisitorState state) {
     // Search tokens from beginning of method tree to beginning of method body.
     int basePos = getStartPosition(tree);
     int endPos =
@@ -764,7 +763,7 @@ public final class SuggestedFixes {
    * replacement}.
    */
   public static SuggestedFix renameMethodWithInvocations(
-      MethodTree tree, final String replacement, VisitorState state) {
+      MethodTree tree, String replacement, VisitorState state) {
     SuggestedFix.Builder fix = SuggestedFix.builder().merge(renameMethod(tree, replacement, state));
     MethodSymbol sym = getSymbol(tree);
     new TreeScanner<Void, Void>() {
@@ -895,7 +894,7 @@ public final class SuggestedFixes {
 
   /** Deletes the given exceptions from a method's throws clause. */
   public static Fix deleteExceptions(
-      MethodTree tree, final VisitorState state, List<ExpressionTree> toDelete) {
+      MethodTree tree, VisitorState state, List<ExpressionTree> toDelete) {
     List<? extends ExpressionTree> trees = tree.getThrows();
     if (toDelete.size() == trees.size()) {
       return SuggestedFix.replace(
@@ -1084,7 +1083,7 @@ public final class SuggestedFixes {
       return;
     }
     fixBuilder.merge(
-        updateAnnotationArgumentValues(suppressAnnotationTree, "value", newWarningSet));
+        updateAnnotationArgumentValues(suppressAnnotationTree, state, "value", newWarningSet));
   }
 
   private static List<? extends AnnotationTree> findAnnotationsTree(Tree tree) {
@@ -1153,20 +1152,37 @@ public final class SuggestedFixes {
   }
 
   /**
+   * @deprecated use {@link #updateAnnotationArgumentValues(AnnotationTree, VisitorState, String,
+   *     Collection)} instead
+   */
+  @Deprecated
+  public static SuggestedFix.Builder updateAnnotationArgumentValues(
+      AnnotationTree annotation, String parameterName, Collection<String> newValues) {
+    return updateAnnotationArgumentValues(annotation, null, parameterName, newValues);
+  }
+
+  /**
    * Returns a fix that updates {@code newValues} to the {@code parameterName} argument for {@code
    * annotation}, regardless of whether there is already an argument.
    *
    * <p>N.B.: {@code newValues} are source-code strings, not string literal values.
    */
   public static SuggestedFix.Builder updateAnnotationArgumentValues(
-      AnnotationTree annotation, String parameterName, Collection<String> newValues) {
+      AnnotationTree annotation,
+      VisitorState state,
+      String parameterName,
+      Collection<String> newValues) {
     if (annotation.getArguments().isEmpty()) {
       String parameterPrefix = parameterName.equals("value") ? "" : (parameterName + " = ");
       return SuggestedFix.builder()
           .replace(
               annotation,
               '@'
-                  + annotation.getAnnotationType().toString()
+                  // TODO(cushon): remove null check once deprecated overload of
+                  // updateAnnotationArgumentValues is removed
+                  + (state != null
+                      ? state.getSourceForNode(annotation.getAnnotationType())
+                      : annotation.getAnnotationType().toString())
                   + '('
                   + parameterPrefix
                   + newArgument(newValues)

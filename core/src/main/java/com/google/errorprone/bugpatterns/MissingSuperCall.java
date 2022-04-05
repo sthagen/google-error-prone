@@ -43,7 +43,9 @@ import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import java.util.Arrays;
 import javax.lang.model.element.Modifier;
 
-/** @author eaftan@google.com (Eddie Aftandilian) */
+/**
+ * @author eaftan@google.com (Eddie Aftandilian)
+ */
 @BugPattern(
     summary = "Overriding method is missing a call to overridden super method",
     severity = ERROR)
@@ -191,15 +193,12 @@ public class MissingSuperCall extends BugChecker
     @Override
     public Boolean visitMethodInvocation(MethodInvocationTree tree, Void unused) {
       boolean result = false;
-      MethodSymbol methodSym = ASTHelpers.getSymbol(tree);
-      if (methodSym != null) {
-        ExpressionTree methodSelect = tree.getMethodSelect();
-        if (methodSelect.getKind() == Kind.MEMBER_SELECT) {
-          MemberSelectTree memberSelect = (MemberSelectTree) methodSelect;
-          result =
-              ASTHelpers.isSuper(memberSelect.getExpression())
-                  && memberSelect.getIdentifier().contentEquals(overridingMethodName);
-        }
+      ExpressionTree methodSelect = tree.getMethodSelect();
+      if (methodSelect.getKind() == Kind.MEMBER_SELECT) {
+        MemberSelectTree memberSelect = (MemberSelectTree) methodSelect;
+        result =
+            ASTHelpers.isSuper(memberSelect.getExpression())
+                && memberSelect.getIdentifier().contentEquals(overridingMethodName);
       }
       return result || super.visitMethodInvocation(tree, unused);
     }
