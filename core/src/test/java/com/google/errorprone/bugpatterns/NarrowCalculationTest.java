@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Error Prone Authors.
+ * Copyright 2022 The Error Prone Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,95 +16,119 @@
 
 package com.google.errorprone.bugpatterns;
 
+import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Tests for {@link UnicodeInCode}. */
+/** Tests for {@link NarrowCalculation}. */
 @RunWith(JUnit4.class)
-public final class UnicodeInCodeTest {
+public final class NarrowCalculationTest {
   private final CompilationTestHelper helper =
-      CompilationTestHelper.newInstance(UnicodeInCode.class, getClass());
+      CompilationTestHelper.newInstance(NarrowCalculation.class, getClass());
+
+  private final BugCheckerRefactoringTestHelper refactoring =
+      BugCheckerRefactoringTestHelper.newInstance(NarrowCalculation.class, getClass());
 
   @Test
-  public void negative() {
+  public void integerDivision() {
     helper
         .addSourceLines(
             "Test.java", //
             "class Test {",
-            "  final int noUnicodeHereBoss = 1;",
+            "  // BUG: Diagnostic contains:",
+            "  final float a = 1 / 2;",
             "}")
         .doTest();
   }
 
   @Test
-  public void negativeInComment() {
+  public void integerDivision_actuallyInteger() {
     helper
         .addSourceLines(
             "Test.java", //
-            "/** \u03C0 */",
             "class Test {",
-            "  final int noUnicodeHereBoss = 1; // roughly \u03C0",
+            "  final float a = 8 / 2;",
             "}")
         .doTest();
   }
 
   @Test
-  public void negativeInStringLiteral() {
-    helper
-        .addSourceLines(
+  public void integerDivision_fix() {
+    refactoring
+        .addInputLines(
             "Test.java", //
             "class Test {",
-            "  static final String pi = \"\u03C0\";",
+            "  final float a = 1 / 2;",
+            "}")
+        .addOutputLines(
+            "Test.java", //
+            "class Test {",
+            "  final float a = 1 / 2f;",
             "}")
         .doTest();
   }
 
   @Test
-  public void negativeInCharLiteral() {
-    helper
-        .addSourceLines(
+  public void longDivision_fix() {
+    refactoring
+        .addInputLines(
             "Test.java", //
             "class Test {",
-            "  static final char pi = '\u03C0';",
+            "  final double a = 1 / 2L;",
+            "}")
+        .addOutputLines(
+            "Test.java", //
+            "class Test {",
+            "  final double a = 1 / 2.0;",
             "}")
         .doTest();
   }
 
   @Test
-  public void positive() {
+  public void targetTypeInteger_noFinding() {
     helper
         .addSourceLines(
             "Test.java", //
             "class Test {",
-            "  // BUG: Diagnostic contains: Unicode character (\\u03c0)",
-            "  static final double \u03C0 = 3;",
+            "  final int a = 1 / 2;",
             "}")
         .doTest();
   }
 
   @Test
-  public void suppressibleAtClassLevel() {
+  public void multiplication_doesNotOverflow() {
     helper
         .addSourceLines(
             "Test.java", //
-            "@SuppressWarnings(\"UnicodeInCode\")",
             "class Test {",
-            "  static final double \u03C0 = 3;",
+            "  final long a = 2 * 100;",
             "}")
         .doTest();
   }
 
   @Test
-  public void suppressibleAtMethodLevel() {
+  public void multiplication_wouldOverflow() {
     helper
         .addSourceLines(
             "Test.java", //
             "class Test {",
-            "  @SuppressWarnings(\"UnicodeInCode\")",
-            "  void test() {",
-            "    double \u03C0 = 3;",
+            "  // BUG: Diagnostic contains:",
+            "  final long a = 1_000_000_000 * 1_000_000_000;",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void multiplication_couldOverflow() {
+    helper
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  void t(int a) {",
+            "    // BUG: Diagnostic contains: 2L * a",
+            "    long b = 2 * a;",
             "  }",
             "}")
         .doTest();

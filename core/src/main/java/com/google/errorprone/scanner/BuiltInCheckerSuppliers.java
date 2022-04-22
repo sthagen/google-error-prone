@@ -101,7 +101,6 @@ import com.google.errorprone.bugpatterns.DeprecatedVariable;
 import com.google.errorprone.bugpatterns.DifferentNameButSame;
 import com.google.errorprone.bugpatterns.DiscardedPostfixExpression;
 import com.google.errorprone.bugpatterns.DistinctVarargsChecker;
-import com.google.errorprone.bugpatterns.DivZero;
 import com.google.errorprone.bugpatterns.DoNotCallChecker;
 import com.google.errorprone.bugpatterns.DoNotCallSuggester;
 import com.google.errorprone.bugpatterns.DoNotClaimAnnotations;
@@ -121,6 +120,7 @@ import com.google.errorprone.bugpatterns.EqualsReference;
 import com.google.errorprone.bugpatterns.EqualsUnsafeCast;
 import com.google.errorprone.bugpatterns.EqualsUsingHashCode;
 import com.google.errorprone.bugpatterns.EqualsWrongThing;
+import com.google.errorprone.bugpatterns.ErroneousBitwiseExpression;
 import com.google.errorprone.bugpatterns.ErroneousThreadPoolConstructorChecker;
 import com.google.errorprone.bugpatterns.ExpectedExceptionChecker;
 import com.google.errorprone.bugpatterns.ExtendingJUnitAssert;
@@ -143,7 +143,6 @@ import com.google.errorprone.bugpatterns.FuzzyEqualsShouldNotBeUsedInEqualsMetho
 import com.google.errorprone.bugpatterns.GetClassOnAnnotation;
 import com.google.errorprone.bugpatterns.GetClassOnClass;
 import com.google.errorprone.bugpatterns.GetClassOnEnum;
-import com.google.errorprone.bugpatterns.HashCodeToString;
 import com.google.errorprone.bugpatterns.HashtableContains;
 import com.google.errorprone.bugpatterns.HidingField;
 import com.google.errorprone.bugpatterns.IdentityBinaryExpression;
@@ -233,6 +232,7 @@ import com.google.errorprone.bugpatterns.MultipleUnaryOperatorsInMethodCall;
 import com.google.errorprone.bugpatterns.MustBeClosedChecker;
 import com.google.errorprone.bugpatterns.MutablePublicArray;
 import com.google.errorprone.bugpatterns.NCopiesOfChar;
+import com.google.errorprone.bugpatterns.NarrowCalculation;
 import com.google.errorprone.bugpatterns.NarrowingCompoundAssignment;
 import com.google.errorprone.bugpatterns.NegativeCharLiteral;
 import com.google.errorprone.bugpatterns.NestedInstanceOfConditions;
@@ -282,9 +282,7 @@ import com.google.errorprone.bugpatterns.ProtoRedundantSet;
 import com.google.errorprone.bugpatterns.ProtoStringFieldReferenceEquality;
 import com.google.errorprone.bugpatterns.ProtoTruthMixedDescriptors;
 import com.google.errorprone.bugpatterns.ProtocolBufferOrdinal;
-import com.google.errorprone.bugpatterns.ProtosAsKeyOfSetOrMap;
 import com.google.errorprone.bugpatterns.PublicApiNamedStreamShouldReturnStream;
-import com.google.errorprone.bugpatterns.PublicConstructorForAbstractClass;
 import com.google.errorprone.bugpatterns.RandomCast;
 import com.google.errorprone.bugpatterns.RandomModInteger;
 import com.google.errorprone.bugpatterns.ReachabilityFenceUsage;
@@ -645,6 +643,7 @@ public class BuiltInCheckerSuppliers {
           FromTemporalAccessor.class,
           FunctionalInterfaceMethodChanged.class,
           FuturesGetCheckedIllegalExceptionType.class,
+          FuzzyEqualsShouldNotBeUsedInEqualsMethod.class,
           GetClassOnAnnotation.class,
           GetClassOnClass.class,
           GuardedByChecker.class,
@@ -818,6 +817,7 @@ public class BuiltInCheckerSuppliers {
           EqualsIncompatibleType.class,
           EqualsUnsafeCast.class,
           EqualsUsingHashCode.class,
+          ErroneousBitwiseExpression.class,
           ErroneousThreadPoolConstructorChecker.class,
           EscapedEntity.class,
           ExtendingJUnitAssert.class,
@@ -901,6 +901,7 @@ public class BuiltInCheckerSuppliers {
           MultipleParallelOrSequentialCalls.class,
           MultipleUnaryOperatorsInMethodCall.class,
           MutablePublicArray.class,
+          NarrowCalculation.class,
           NarrowingCompoundAssignment.class,
           NegativeCharLiteral.class,
           NestedInstanceOfConditions.class,
@@ -1015,7 +1016,6 @@ public class BuiltInCheckerSuppliers {
           DeduplicateConstants.class,
           DepAnn.class,
           DifferentNameButSame.class,
-          DivZero.class,
           EmptyIfStatement.class,
           EmptyTopLevelDeclaration.class,
           EqualsBrokenForNull.class,
@@ -1035,9 +1035,7 @@ public class BuiltInCheckerSuppliers {
           FloggerWithoutCause.class,
           ForEachIterable.class,
           FunctionalInterfaceClash.class,
-          FuzzyEqualsShouldNotBeUsedInEqualsMethod.class,
           HardCodedSdCardPath.class,
-          HashCodeToString.class,
           ImmutableMemberCollection.class,
           ImmutableRefactoring.class,
           ImmutableSetForContains.class,
@@ -1071,9 +1069,7 @@ public class BuiltInCheckerSuppliers {
           PrimitiveArrayPassedToVarargsMethod.class,
           PrivateConstructorForNoninstantiableModule.class,
           PrivateConstructorForUtilityClass.class,
-          ProtosAsKeyOfSetOrMap.class,
           PublicApiNamedStreamShouldReturnStream.class,
-          PublicConstructorForAbstractClass.class,
           QualifierWithTypeUse.class,
           RedundantOverride.class,
           RedundantThrows.class,

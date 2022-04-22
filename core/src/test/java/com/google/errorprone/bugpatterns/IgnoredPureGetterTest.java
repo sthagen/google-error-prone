@@ -143,6 +143,94 @@ public final class IgnoredPureGetterTest {
   }
 
   @Test
+  public void autoBuilder_getters() {
+    helper
+        .addSourceLines(
+            "Named.java",
+            "import com.google.auto.value.AutoBuilder;",
+            "import java.util.Optional;",
+            "public class Named {",
+            "  Named(String name, String nickname) {}",
+            "  @AutoBuilder",
+            "  public abstract static class Builder {",
+            "    public abstract Builder setName(String x);",
+            "    public abstract Builder setNickname(String x);",
+            "    abstract String getName();",
+            "    abstract Optional<String> getNickname();",
+            "    abstract Named autoBuild();",
+            "    public Named build() {",
+            "      if (!getNickname().isPresent()) {",
+            "        setNickname(getName());",
+            "      }",
+            "      return autoBuild();",
+            "    }",
+            "  }",
+            "}")
+        .addSourceLines(
+            "B.java",
+            "class B {",
+            "  void test(Named.Builder builder) {",
+            // The setters are OK
+            "    builder.setName(\"Stumpy\");",
+            "    builder.setNickname(\"Stumps\");",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getName();",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getNickname();",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.autoBuild();",
+            // build() isn't covered since it's non-abstract
+            "    builder.build();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void autoBuilder_buildIsntCrv() {
+    helper
+        .addSourceLines(
+            "Named.java",
+            "import com.google.auto.value.AutoBuilder;",
+            "import java.time.LocalTime;",
+            "@AutoBuilder(callMethod = \"of\", ofClass = LocalTime.class)",
+            "interface LocalTimeBuilder {",
+            "  LocalTimeBuilder setHour(int hour);",
+            "  LocalTimeBuilder setMinute(int minute);",
+            "  LocalTimeBuilder setSecond(int second);",
+            "  LocalTimeBuilder setNanoOfSecond(int nanoOfSecond);",
+            "  int getHour();",
+            "  int getMinute();",
+            "  int getSecond();",
+            "  int getNanoOfSecond();",
+            "  LocalTime build();", // calls: LocalTime.of(...)
+            "}")
+        .addSourceLines(
+            "B.java",
+            "class B {",
+            "  void test(LocalTimeBuilder builder) {",
+            // the setters are treated as CIRV:
+            "    builder.setHour(12);",
+            "    builder.setMinute(12);",
+            "    builder.setSecond(12);",
+            // the getters are treated as CRV:
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getHour();",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getMinute();",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getSecond();",
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.getNanoOfSecond();",
+            // TODO(b/229107551): this shouldn't be treated as CRV
+            "    // BUG: Diagnostic contains: IgnoredPureGetter",
+            "    builder.build();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void refactoringHelper() {
     refactoringHelper
         .addInputLines(

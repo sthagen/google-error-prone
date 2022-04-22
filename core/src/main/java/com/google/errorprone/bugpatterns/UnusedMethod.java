@@ -30,6 +30,7 @@ import static com.google.errorprone.suppliers.Suppliers.typeFromString;
 import static com.google.errorprone.util.ASTHelpers.canBeRemoved;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.google.errorprone.util.ASTHelpers.isGeneratedConstructor;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 import static com.google.errorprone.util.ASTHelpers.scope;
 import static com.google.errorprone.util.ASTHelpers.shouldKeep;
@@ -102,6 +103,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
           "javax.annotation.PostConstruct",
           "javax.inject.Inject",
           "javax.persistence.PostLoad",
+          "org.apache.beam.sdk.transforms.DoFn.ProcessElement",
           "org.aspectj.lang.annotation.Pointcut",
           "org.aspectj.lang.annotation.Before",
           "org.springframework.context.annotation.Bean",
@@ -130,6 +132,10 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
     AtomicBoolean ignoreUnusedMethods = new AtomicBoolean(false);
 
     class MethodFinder extends SuppressibleTreePathScanner<Void, Void> {
+      MethodFinder(VisitorState state) {
+        super(state);
+      }
+
       @Override
       public Void visitClass(ClassTree tree, Void unused) {
         if (exemptedBySuperType(getType(tree), state)) {
@@ -202,6 +208,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
         }
         MethodSymbol methodSymbol = getSymbol(tree);
         if (isExemptedConstructor(methodSymbol, state)
+            || isGeneratedConstructor(tree)
             || SERIALIZATION_METHODS.matches(tree, state)) {
           return false;
         }
@@ -229,7 +236,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
         return false;
       }
     }
-    new MethodFinder().scan(state.getPath(), null);
+    new MethodFinder(state).scan(state.getPath(), null);
 
     class FilterUsedMethods extends TreePathScanner<Void, Void> {
       @Override

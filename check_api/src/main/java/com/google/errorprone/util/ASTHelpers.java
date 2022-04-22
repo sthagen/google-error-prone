@@ -1159,16 +1159,29 @@ public class ASTHelpers {
     return sym.owner == null ? null : sym.owner.enclClass();
   }
 
-  /** Return the enclosing {@code PackageSymbol} of the given symbol, or {@code null}. */
+  /**
+   * Return the enclosing {@code PackageSymbol} of the given symbol, or {@code null}.
+   *
+   * <p>Prefer this to {@link Symbol#packge}, which throws a {@link NullPointerException} for
+   * symbols that are not contained by a package: https://bugs.openjdk.java.net/browse/JDK-8231911
+   */
+  @Nullable
   public static PackageSymbol enclosingPackage(Symbol sym) {
-    return sym.packge();
+    Symbol curr = sym;
+    while (curr != null) {
+      if (curr.getKind().equals(ElementKind.PACKAGE)) {
+        return (PackageSymbol) curr;
+      }
+      curr = curr.owner;
+    }
+    return null;
   }
 
   /** Return true if the given symbol is defined in the current package. */
   public static boolean inSamePackage(Symbol targetSymbol, VisitorState state) {
     JCCompilationUnit compilationUnit = (JCCompilationUnit) state.getPath().getCompilationUnit();
     PackageSymbol usePackage = compilationUnit.packge;
-    PackageSymbol targetPackage = targetSymbol.packge();
+    PackageSymbol targetPackage = enclosingPackage(targetSymbol);
 
     return targetPackage != null
         && usePackage != null

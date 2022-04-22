@@ -16,6 +16,9 @@
 
 package com.google.errorprone.bugpatterns;
 
+import com.google.auto.value.processor.AutoBuilderProcessor;
+import com.google.auto.value.processor.AutoValueProcessor;
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -706,6 +709,89 @@ public class CheckReturnValueTest {
   }
 
   @Test
+  public void constructor_anonymousClassInheritsCIRV() {
+    compilationHelperLookingAtAllConstructors()
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  @com.google.errorprone.annotations.CanIgnoreReturnValue",
+            "  public Test() {}",
+            "  public static void foo() {",
+            "    new Test() {};",
+            "    new Test() {{ System.out.println(\"Lookie, instance initializer\"); }};",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void constructor_anonymousClassInheritsCRV() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  @com.google.errorprone.annotations.CheckReturnValue",
+            "  public Test() {}",
+            "  public static void foo() {",
+            "    // BUG: Diagnostic contains: ",
+            "    new Test() {};",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void constructor_hasOuterInstance() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  class Inner {",
+            "    @com.google.errorprone.annotations.CheckReturnValue",
+            "    public Inner() {}",
+            "  }",
+            "  public static void foo() {",
+            "    // BUG: Diagnostic contains: ",
+            "    new Test().new Inner() {};",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void constructor_anonymousClassInheritsCRV_syntheticConstructor() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  @com.google.errorprone.annotations.CheckReturnValue",
+            "  static class Nested {}",
+            "  public static void foo() {",
+            "    // BUG: Diagnostic contains: ",
+            "    new Nested() {};", // The "called" constructor is synthetic, but within @CRV Nested
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void constructor_inheritsFromCrvInterface() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  @com.google.errorprone.annotations.CheckReturnValue",
+            "  static interface IFace {}",
+            "  public static void foo() {",
+            //  TODO(b/226203690): It's arguable that this might need to be @CRV?
+            //   The superclass of the anonymous class is Object, not IFace, but /shrug
+            "    new IFace() {};",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void constructor_throwingContexts() {
     compilationHelper
         .addSourceLines(
@@ -761,6 +847,22 @@ public class CheckReturnValueTest {
   }
 
   @Test
+  public void allMethods_withoutCIRVAnnotation() {
+    compilationHelperLookingAtAllMethods()
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  public int bar() { return 42; }",
+            "  public static void foo() {",
+            "    // BUG: Diagnostic contains: Ignored return value of 'bar', which wasn't"
+                + " annotated with @CanIgnoreReturnValue",
+            "    new Test().bar();",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void usingElementInTestExpected() {
     compilationHelperLookingAtAllConstructors()
         .addSourceLines(
@@ -789,8 +891,136 @@ public class CheckReturnValueTest {
         .doTest();
   }
 
+  @Test
+  public void testAutoValueBuilderSetterMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Animal.java",
+            "package com.google.frobber;",
+            "import com.google.auto.value.AutoValue;",
+            "import com.google.errorprone.annotations.CheckReturnValue;",
+            "@AutoValue",
+            "@CheckReturnValue",
+            "abstract class Animal {",
+            "  abstract String name();",
+            "  abstract int numberOfLegs();",
+            "  static Builder builder() {",
+            "    return new AutoValue_Animal.Builder();",
+            "  }",
+            "  @AutoValue.Builder",
+            "  abstract static class Builder {",
+            "    abstract Builder setName(String value);",
+            "    abstract Builder setNumberOfLegs(int value);",
+            "    abstract Animal build();",
+            "  }",
+            "}")
+        .addSourceLines(
+            "AnimalCaller.java",
+            "package com.google.frobber;",
+            "public final class AnimalCaller {",
+            "  static void testAnimal() {",
+            "    Animal.Builder builder = Animal.builder();",
+            "    builder.setNumberOfLegs(4);", // AutoValue.Builder setters are implicitly @CIRV
+            "    // BUG: Diagnostic contains: Ignored return value of 'build'",
+            "    builder.build();",
+            "  }",
+            "}")
+        .setArgs(ImmutableList.of("-processor", AutoValueProcessor.class.getName()))
+        .doTest();
+  }
+
+  @Test
+  public void testAutoBuilderSetterMethods() {
+    compilationHelper
+        .addSourceLines(
+            "Person.java",
+            "package com.google.frobber;",
+            "public final class Person {",
+            "  public Person(String name, int id) {}",
+            "}")
+        .addSourceLines(
+            "PersonBuilder.java",
+            "package com.google.frobber;",
+            "import com.google.auto.value.AutoBuilder;",
+            "import com.google.errorprone.annotations.CheckReturnValue;",
+            "@CheckReturnValue",
+            "@AutoBuilder(ofClass = Person.class)",
+            "abstract class PersonBuilder {",
+            "  static PersonBuilder personBuilder() {",
+            "    return new AutoBuilder_PersonBuilder();",
+            "  }",
+            "  abstract PersonBuilder setName(String name);",
+            "  abstract PersonBuilder setId(int id);",
+            "  abstract Person build();",
+            "}")
+        .addSourceLines(
+            "PersonCaller.java",
+            "package com.google.frobber;",
+            "public final class PersonCaller {",
+            "  static void testPersonBuilder() {",
+            "    // BUG: Diagnostic contains: Ignored return value of 'personBuilder'",
+            "    PersonBuilder.personBuilder();",
+            "    PersonBuilder builder = PersonBuilder.personBuilder();",
+            "    builder.setName(\"kurt\");", // AutoBuilder setters are implicitly @CIRV
+            "    builder.setId(42);", // AutoBuilder setters are implicitly @CIRV
+            "    // BUG: Diagnostic contains: Ignored return value of 'build'",
+            "    builder.build();",
+            "  }",
+            "}")
+        .setArgs(ImmutableList.of("-processor", AutoBuilderProcessor.class.getName()))
+        .doTest();
+  }
+
+  @Test
+  public void testAutoBuilderSetterMethods_withInterface() {
+    compilationHelper
+        .addSourceLines(
+            "LogUtil.java",
+            "package com.google.frobber;",
+            "import java.util.logging.Level;",
+            "public class LogUtil {",
+            "  public static void log(Level severity, String message) {}",
+            "}")
+        .addSourceLines(
+            "Caller.java",
+            "package com.google.frobber;",
+            "import com.google.auto.value.AutoBuilder;",
+            "import java.util.logging.Level;",
+            "import com.google.errorprone.annotations.CheckReturnValue;",
+            "@CheckReturnValue",
+            "@AutoBuilder(callMethod = \"log\", ofClass = LogUtil.class)",
+            "public interface Caller {",
+            "  static Caller logCaller() {",
+            "    return new AutoBuilder_Caller();",
+            "  }",
+            "  Caller setSeverity(Level level);",
+            "  Caller setMessage(String message);",
+            "  void call(); // calls: LogUtil.log(severity, message)",
+            "}")
+        .addSourceLines(
+            "LogCaller.java",
+            "package com.google.frobber;",
+            "import java.util.logging.Level;",
+            "public final class LogCaller {",
+            "  static void testLogCaller() {",
+            "    // BUG: Diagnostic contains: Ignored return value of 'logCaller'",
+            "    Caller.logCaller();",
+            "    Caller caller = Caller.logCaller();",
+            "    caller.setMessage(\"hi\");", // AutoBuilder setters are implicitly @CIRV
+            "    caller.setSeverity(Level.FINE);", // AutoBuilder setters are implicitly @CIRV
+            "    caller.call();",
+            "  }",
+            "}")
+        .setArgs(ImmutableList.of("-processor", AutoBuilderProcessor.class.getName()))
+        .doTest();
+  }
+
   private CompilationTestHelper compilationHelperLookingAtAllConstructors() {
     return compilationHelper.setArgs(
         "-XepOpt:" + CheckReturnValue.CHECK_ALL_CONSTRUCTORS + "=true");
+  }
+
+  private CompilationTestHelper compilationHelperLookingAtAllMethods() {
+    return compilationHelper.setArgs("-XepOpt:" + CheckReturnValue.CHECK_ALL_METHODS + "=true");
   }
 }

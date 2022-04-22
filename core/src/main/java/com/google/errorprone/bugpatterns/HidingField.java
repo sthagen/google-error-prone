@@ -16,6 +16,7 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
+import static com.google.errorprone.util.ASTHelpers.enclosingPackage;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static java.util.stream.Collectors.toCollection;
 
@@ -58,7 +59,11 @@ public class HidingField extends BugChecker implements ClassTreeMatcher {
         classTree.getMembers().stream()
             .filter(mem -> mem instanceof VariableTree)
             .map(mem -> (VariableTree) mem)
-            .filter(mem -> !isSuppressed(getSymbol(mem)) && !isIgnoredType(mem) && !isStatic(mem))
+            .filter(
+                mem ->
+                    !isSuppressed(getSymbol(mem), visitorState)
+                        && !isIgnoredType(mem)
+                        && !isStatic(mem))
             .collect(toCollection(ArrayList::new));
 
     ClassSymbol classSymbol = getSymbol(classTree);
@@ -132,7 +137,7 @@ public class HidingField extends BugChecker implements ClassTreeMatcher {
         && !parentVariable.getModifiers().contains(Modifier.PROTECTED)
         && !parentVariable.getModifiers().contains(Modifier.PUBLIC)) { // package-private variable
 
-      if (!parentVariable.packge().equals(getSymbol(currClass).packge())) {
+      if (!enclosingPackage(parentVariable).equals(getSymbol(currClass).packge())) {
         return true;
       }
     }

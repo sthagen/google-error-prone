@@ -22,11 +22,13 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.fixes.SuggestedFixes.prettyType;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
+import static com.google.errorprone.util.ASTHelpers.enclosingPackage;
 import static com.google.errorprone.util.ASTHelpers.getModifiers;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.sun.tools.javac.util.Position.NOPOS;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.ImmutableSet;
@@ -175,14 +177,14 @@ public class UnnecessaryLambda extends BugChecker
    * e.g. don't rewrite uses of {@link Predicate} in compilation units that call other methods like
    * {#link Predicate#add}.
    */
-  boolean canFix(Tree type, Symbol sym, VisitorState state) {
+  private boolean canFix(Tree type, Symbol sym, VisitorState state) {
     Symbol descriptor;
     try {
       descriptor = state.getTypes().findDescriptorSymbol(getType(type).asElement());
     } catch (FunctionDescriptorLookupError e) {
       return false;
     }
-    if (!PACKAGES_TO_FIX.contains(descriptor.packge().getQualifiedName().toString())) {
+    if (!PACKAGES_TO_FIX.contains(enclosingPackage(descriptor).getQualifiedName().toString())) {
       return false;
     }
     class Scanner extends TreePathScanner<Void, Void> {
@@ -246,7 +248,11 @@ public class UnnecessaryLambda extends BugChecker
       replacement.append(";");
       replacement.append("}");
     }
-    fix.replace(state.getEndPosition(modifiers) + 1, endPosition, replacement.toString());
+    int modifiedEndPos = state.getEndPosition(modifiers);
+    fix.replace(
+        modifiedEndPos == NOPOS ? getStartPosition(tree) : modifiedEndPos + 1,
+        endPosition,
+        replacement.toString());
   }
 
   private static void replaceUseWithMethodReference(

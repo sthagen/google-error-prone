@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 The Error Prone Authors.
+ * Copyright 2022 The Error Prone Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.CompilationTestHelper;
@@ -21,22 +20,32 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * @author cushon@google.com (Liam Miller-Cushon)
- */
+/** Tests for {@link ErroneousBitwiseExpression}. */
 @RunWith(JUnit4.class)
-public class DivZeroTest {
-
-  private final CompilationTestHelper compilationHelper =
-      CompilationTestHelper.newInstance(DivZero.class, getClass());
+public final class ErroneousBitwiseExpressionTest {
+  private final CompilationTestHelper helper =
+      CompilationTestHelper.newInstance(ErroneousBitwiseExpression.class, getClass());
 
   @Test
-  public void testPositiveCase() {
-    compilationHelper.addSourceFile("DivZeroPositiveCases.java").doTest();
+  public void bitwiseAnd() {
+    helper
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  // BUG: Diagnostic contains: 1 | 2",
+            "  double flags = 1 & 2;",
+            "}")
+        .doTest();
   }
 
   @Test
-  public void testNegativeCase() {
-    compilationHelper.addSourceFile("DivZeroNegativeCases.java").doTest();
+  public void bitwiseAnd_noFinding() {
+    helper
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  double flags = 2 & 10;",
+            "}")
+        .doTest();
   }
 }
