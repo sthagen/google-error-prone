@@ -48,6 +48,7 @@ import com.google.errorprone.bugpatterns.BadComparable;
 import com.google.errorprone.bugpatterns.BadImport;
 import com.google.errorprone.bugpatterns.BadInstanceof;
 import com.google.errorprone.bugpatterns.BadShiftAmount;
+import com.google.errorprone.bugpatterns.BanJNDI;
 import com.google.errorprone.bugpatterns.BanSerializableRead;
 import com.google.errorprone.bugpatterns.BareDotMetacharacter;
 import com.google.errorprone.bugpatterns.BigDecimalEquals;
@@ -601,6 +602,7 @@ public class BuiltInCheckerSuppliers {
           AutoValueConstructorOrderChecker.class,
           BadAnnotationImplementation.class,
           BadShiftAmount.class,
+          BanJNDI.class,
           BoxedPrimitiveEquality.class,
           BundleDeserializationCast.class,
           ChainingConstructorIgnoresParameter.class,
@@ -628,6 +630,7 @@ public class BuiltInCheckerSuppliers {
           DurationGetTemporalUnit.class,
           DurationTemporalUnit.class,
           DurationToLongTimeUnit.class,
+          EmptyTopLevelDeclaration.class,
           EqualsHashCode.class,
           EqualsNaN.class,
           EqualsNull.class,
@@ -1017,7 +1020,6 @@ public class BuiltInCheckerSuppliers {
           DepAnn.class,
           DifferentNameButSame.class,
           EmptyIfStatement.class,
-          EmptyTopLevelDeclaration.class,
           EqualsBrokenForNull.class,
           EqualsMissingNullable.class,
           ExpectedExceptionChecker.class,
