@@ -18,6 +18,7 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ExternalCanIgnoreReturnValue.externalIgnoreList;
+import static com.google.errorprone.bugpatterns.checkreturnvalue.ProtoRules.mutableProtos;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ProtoRules.protoBuilders;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy.EXPECTED;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy.OPTIONAL;
@@ -80,6 +81,7 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
             mapAnnotationSimpleName(CHECK_RETURN_VALUE, EXPECTED),
             mapAnnotationSimpleName(CAN_IGNORE_RETURN_VALUE, OPTIONAL),
             protoBuilders(),
+            mutableProtos(),
             externalIgnoreList(),
             globalDefault(methodPolicy, constructorPolicy));
   }
@@ -148,7 +150,12 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
     return methodToInspect(tree).stream()
         .flatMap(method -> evaluator.evaluations(method, state))
         .findFirst()
-        .map(evaluation -> ImmutableMap.of("annotation_scope", evaluation.scope()))
+        .map(
+            evaluation ->
+                ImmutableMap.of(
+                    "rule", evaluation.rule(),
+                    "policy", evaluation.policy(),
+                    "scope", evaluation.scope()))
         .orElse(ImmutableMap.of());
   }
 
