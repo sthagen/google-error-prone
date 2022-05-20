@@ -26,6 +26,7 @@ import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isJavaIdentifierStart;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -36,7 +37,9 @@ import com.sun.source.tree.ExpressionTree;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Type.ArrayType;
+import com.sun.tools.javac.code.Type.ClassType;
 import com.sun.tools.javac.code.Type.StructuralTypeMapping;
+import com.sun.tools.javac.code.TypeMetadata;
 import com.sun.tools.javac.code.Types;
 import java.util.List;
 
@@ -60,7 +63,7 @@ public abstract class Api {
             .collect(toImmutableList()));
   }
 
-  private static String fullyErasedAndUnannotatedType(Type type, Types types) {
+  static String fullyErasedAndUnannotatedType(Type type, Types types) {
     // Removes type arguments, replacing w/ upper bounds
     Type erasedType = types.erasureRecursive(type);
     Type unannotatedType = erasedType.accept(ANNOTATION_REMOVER, null);
@@ -79,10 +82,15 @@ public abstract class Api {
           return t.baseType();
         }
 
+        @Override
+        public Type visitClassType(ClassType t, Void unused) {
+          return super.visitClassType(t.cloneWithMetadata(TypeMetadata.EMPTY), unused);
+        }
+
         // Remove annotations from all enclosing containers
         @Override
         public Type visitArrayType(ArrayType t, Void unused) {
-          return super.visitArrayType((ArrayType) t.baseType(), unused);
+          return super.visitArrayType(t.cloneWithMetadata(TypeMetadata.EMPTY), unused);
         }
       };
 
@@ -138,8 +146,23 @@ public abstract class Api {
    *   <li>an instance method with types erased (e.g., {@code java.util.List#add(java.lang.Object)})
    * </ul>
    */
-  static Api parse(String api) {
-    Parser p = new Parser(api);
+  @VisibleForTesting
+  public static Api parse(String api) {
+    return parse(api, false);
+  }
+
+  /**
+   * Parses an API string into an {@link Api}. Example API strings are:
+   *
+   * <ul>
+   *   <li>a constructor (e.g., {@code java.net.URI#<init>(java.lang.String)})
+   *   <li>a static method (e.g., {@code java.net.URI#create(java.lang.String)})
+   *   <li>an instance method (e.g., {@code java.util.List#get(int)})
+   *   <li>an instance method with types erased (e.g., {@code java.util.List#add(java.lang.Object)})
+   * </ul>
+   */
+  static Api parse(String api, boolean assumeNoWhitespace) {
+    Parser p = new Parser(api, assumeNoWhitespace);
 
     // Let's parse this in 3 parts:
     //   * Fully-qualified owning name, followed by #
@@ -157,10 +180,12 @@ public abstract class Api {
 
   private static final class Parser {
     private final String api;
+    private final boolean assumeNoWhitespace;
     private int position = -1;
 
-    Parser(String api) {
+    Parser(String api, boolean assumeNoWhitespace) {
       this.api = api;
+      this.assumeNoWhitespace = assumeNoWhitespace;
     }
 
     String owningType() {
@@ -335,11 +360,15 @@ public abstract class Api {
         checkArgument(
             position < api.length(), "Could not parse '%s' as it must contain an '%s'", delimiter);
         next = api.charAt(position);
-      } while (whitespace().matches(next));
+      } while (!assumeNoWhitespace && whitespace().matches(next));
       return next;
     }
 
     void ensureNoMoreCharacters() {
+      if (assumeNoWhitespace) {
+        return;
+      }
+
       while (++position < api.length()) {
         check(whitespace().matches(api.charAt(position)), api, "it should end in ')'");
       }
