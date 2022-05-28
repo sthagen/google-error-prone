@@ -415,6 +415,7 @@ import com.google.errorprone.bugpatterns.apidiff.Java8ApiChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.ArgumentSelectionDefectChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AssertEqualsArgumentOrderChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AutoValueConstructorOrderChecker;
+import com.google.errorprone.bugpatterns.checkreturnvalue.CanIgnoreReturnValueSuggester;
 import com.google.errorprone.bugpatterns.checkreturnvalue.UsingJsr305CheckReturnValue;
 import com.google.errorprone.bugpatterns.collectionincompatibletype.CollectionIncompatibleType;
 import com.google.errorprone.bugpatterns.collectionincompatibletype.CollectionUndefinedEquality;
@@ -491,6 +492,7 @@ import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.ExtendsObject;
 import com.google.errorprone.bugpatterns.nullness.FieldMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ParameterMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable;
@@ -827,6 +829,7 @@ public class BuiltInCheckerSuppliers {
           ErroneousThreadPoolConstructorChecker.class,
           EscapedEntity.class,
           ExtendingJUnitAssert.class,
+          ExtendsObject.class,
           FallThrough.class,
           Finally.class,
           FloatCast.class,
@@ -1012,6 +1015,7 @@ public class BuiltInCheckerSuppliers {
           BinderIdentityRestoredDangerously.class, // TODO: enable this by default.
           BindingToUnqualifiedCommonType.class,
           BooleanParameter.class,
+          CanIgnoreReturnValueSuggester.class,
           CatchingUnchecked.class,
           CheckedExceptionNotThrown.class,
           ClassName.class,
