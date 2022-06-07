@@ -302,6 +302,7 @@ import com.google.errorprone.bugpatterns.ReturnsNullCollection;
 import com.google.errorprone.bugpatterns.RobolectricShadowDirectlyOn;
 import com.google.errorprone.bugpatterns.RxReturnValueIgnored;
 import com.google.errorprone.bugpatterns.SameNameButDifferent;
+import com.google.errorprone.bugpatterns.SelfAlwaysReturnsThis;
 import com.google.errorprone.bugpatterns.SelfAssignment;
 import com.google.errorprone.bugpatterns.SelfComparison;
 import com.google.errorprone.bugpatterns.SelfEquals;
@@ -494,6 +495,7 @@ import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ExtendsObject;
 import com.google.errorprone.bugpatterns.nullness.FieldMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.NullArgumentForNonNullParameter;
 import com.google.errorprone.bugpatterns.nullness.ParameterMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
@@ -706,6 +708,7 @@ public class BuiltInCheckerSuppliers {
           NonCanonicalStaticImport.class,
           NonFinalCompileTimeConstant.class,
           NonRuntimeAnnotation.class,
+          NullArgumentForNonNullParameter.class,
           NullTernary.class,
           NullableOnContainingClass.class,
           OptionalEquality.class,
@@ -949,6 +952,7 @@ public class BuiltInCheckerSuppliers {
           RxReturnValueIgnored.class,
           SameNameButDifferent.class,
           ScopeAnnotationOnInterfaceOrAbstractClass.class,
+          SelfAlwaysReturnsThis.class,
           ShortCircuitBoolean.class,
           StaticAssignmentInConstructor.class,
           StaticAssignmentOfThrowable.class,
