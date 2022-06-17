@@ -416,6 +416,7 @@ import com.google.errorprone.bugpatterns.apidiff.Java8ApiChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.ArgumentSelectionDefectChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AssertEqualsArgumentOrderChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AutoValueConstructorOrderChecker;
+import com.google.errorprone.bugpatterns.checkreturnvalue.BuilderReturnThis;
 import com.google.errorprone.bugpatterns.checkreturnvalue.CanIgnoreReturnValueSuggester;
 import com.google.errorprone.bugpatterns.checkreturnvalue.NoCanIgnoreReturnValueOnClasses;
 import com.google.errorprone.bugpatterns.checkreturnvalue.UsingJsr305CheckReturnValue;
@@ -706,6 +707,7 @@ public class BuiltInCheckerSuppliers {
           MoreThanOneScopeAnnotationOnClass.class,
           MustBeClosedChecker.class,
           NCopiesOfChar.class,
+          NoCanIgnoreReturnValueOnClasses.class,
           NonCanonicalStaticImport.class,
           NonFinalCompileTimeConstant.class,
           NonRuntimeAnnotation.class,
@@ -1020,6 +1022,7 @@ public class BuiltInCheckerSuppliers {
           BinderIdentityRestoredDangerously.class, // TODO: enable this by default.
           BindingToUnqualifiedCommonType.class,
           BooleanParameter.class,
+          BuilderReturnThis.class,
           CanIgnoreReturnValueSuggester.class,
           CatchingUnchecked.class,
           CheckedExceptionNotThrown.class,
@@ -1074,7 +1077,6 @@ public class BuiltInCheckerSuppliers {
           MultiVariableDeclaration.class,
           MultipleTopLevelClasses.class,
           NoAllocationChecker.class,
-          NoCanIgnoreReturnValueOnClasses.class,
           NonCanonicalStaticMemberImport.class,
           PackageLocation.class,
           ParameterComment.class,
