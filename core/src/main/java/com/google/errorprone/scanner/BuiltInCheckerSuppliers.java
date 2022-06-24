@@ -61,6 +61,7 @@ import com.google.errorprone.bugpatterns.BugPatternNaming;
 import com.google.errorprone.bugpatterns.ByteBufferBackingArray;
 import com.google.errorprone.bugpatterns.CacheLoaderNull;
 import com.google.errorprone.bugpatterns.CannotMockFinalClass;
+import com.google.errorprone.bugpatterns.CannotMockFinalMethod;
 import com.google.errorprone.bugpatterns.CanonicalDuration;
 import com.google.errorprone.bugpatterns.CatchAndPrintStackTrace;
 import com.google.errorprone.bugpatterns.CatchFail;
@@ -799,7 +800,6 @@ public class BuiltInCheckerSuppliers {
           BugPatternNaming.class,
           ByteBufferBackingArray.class,
           CacheLoaderNull.class,
-          CannotMockFinalClass.class,
           CanonicalDuration.class,
           CatchAndPrintStackTrace.class,
           CatchFail.class,
@@ -1024,6 +1024,8 @@ public class BuiltInCheckerSuppliers {
           BooleanParameter.class,
           BuilderReturnThis.class,
           CanIgnoreReturnValueSuggester.class,
+          CannotMockFinalClass.class,
+          CannotMockFinalMethod.class,
           CatchingUnchecked.class,
           CheckedExceptionNotThrown.class,
           ClassName.class,
