@@ -17,9 +17,11 @@
 package com.google.errorprone.bugpatterns.nullness;
 
 import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
+import com.google.errorprone.util.RuntimeVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -130,6 +132,84 @@ public class ReturnMissingNullableTest {
             "  public String getMessage(int x) {",
             "    // BUG: Diagnostic contains: @Nullable",
             "    return (x >= 0 ? null : \"negative\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testSwitchExpressionTree() {
+    assumeTrue(RuntimeVersion.isAtLeast12());
+
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "public class LiteralNullReturnTest {",
+            "  public String getMessage(int x) {",
+            "    // BUG: Diagnostic contains: @Nullable",
+            "    return switch (x) {",
+            "      case 0 -> null;",
+            "      default -> \"non-zero\";",
+            "    };",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testSwitchExpressionTree_negative() {
+    assumeTrue(RuntimeVersion.isAtLeast12());
+
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "public class LiteralNullReturnTest {",
+            "  public String getMessage(int x) {",
+            "    return switch (x) {",
+            "      case 0 -> \"zero\";",
+            "      default -> \"non-zero\";",
+            "    };",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testSwitchStatement() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "public class LiteralNullReturnTest {",
+            "  public String getMessage(int x) {",
+            "    switch (x) {",
+            "      case 0:",
+            "        // BUG: Diagnostic contains: @Nullable",
+            "        return null;",
+            "      default:",
+            "        return \"non-zero\";",
+            "    }",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testSwitchStatement_negative() {
+    createCompilationTestHelper()
+        .addSourceLines(
+            "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
+            "package com.google.errorprone.bugpatterns.nullness;",
+            "public class LiteralNullReturnTest {",
+            "  public String getMessage(int x) {",
+            "    switch (x) {",
+            "      case 0:",
+            "        return \"zero\";",
+            "      default:",
+            "        return \"non-zero\";",
+            "    }",
             "  }",
             "}")
         .doTest();
@@ -720,10 +800,10 @@ public class ReturnMissingNullableTest {
         .addOutputLines(
             "com/google/errorprone/bugpatterns/nullness/LiteralNullReturnTest.java",
             "package com.google.errorprone.bugpatterns.nullness;",
-            "import javax.annotation.Nullable;",
+            "import org.jspecify.nullness.Nullable;",
             "public class LiteralNullReturnTest {",
-            "  @Nullable ",
-            "  public String getMessage(boolean b) {",
+            "",
+            "  public @Nullable String getMessage(boolean b) {",
             "    if (b) {",
             "      return null;",
             "    } else {",
@@ -1541,8 +1621,8 @@ public class ReturnMissingNullableTest {
         .addOutputLines(
             "out/Test.java",
             "class T {",
-            "  @javax.annotation.Nullable private final Object method(boolean b) { return b ? null"
-                + " : 0; }",
+            "  @org.jspecify.nullness.Nullable private final Object method(boolean b) { return b ?"
+                + " null : 0; }",
             "  class Nullable {}",
             "}")
         .doTest();
@@ -1564,9 +1644,9 @@ public class ReturnMissingNullableTest {
             "}")
         .addOutputLines(
             "out/Test.java",
-            "import javax.annotation.Nullable;",
+            "import org.jspecify.nullness.Nullable;",
             "class T {",
-            "  @Nullable private final Object method(boolean b) {",
+            "  private final @Nullable Object method(boolean b) {",
             "    if (b) {",
             "      return null;",
             "    } else {",
