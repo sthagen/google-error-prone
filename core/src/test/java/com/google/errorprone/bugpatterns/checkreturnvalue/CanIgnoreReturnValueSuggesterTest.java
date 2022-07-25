@@ -451,4 +451,35 @@ public class CanIgnoreReturnValueSuggesterTest {
             "}")
         .doTest();
   }
+
+  @Test
+  public void testConverter_b240039465() {
+    helper
+        .addInputLines(
+            "Parent.java",
+            "package com.google.frobber;",
+            "import com.google.errorprone.annotations.CanIgnoreReturnValue;",
+            "abstract class Parent<X> {",
+            "  @CanIgnoreReturnValue",
+            "  X doFrom(String in) { return from(in); }",
+            "  abstract X from(String value);",
+            "}")
+        .expectUnchanged()
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client extends Parent<Integer> {",
+            // While doFrom(String) is @CIRV, since it returns Integer, and not Client, we don't add
+            // @CIRV here.
+            "  public Integer badMethod(String value) {",
+            "    return doFrom(value);",
+            "  }",
+            "  @Override",
+            "  public Integer from(String value) {",
+            "    return Integer.parseInt(value);",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
 }
