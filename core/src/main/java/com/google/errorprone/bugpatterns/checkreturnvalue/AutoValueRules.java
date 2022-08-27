@@ -20,9 +20,9 @@ import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy.OPTIONAL;
 import static com.google.errorprone.util.ASTHelpers.enclosingClass;
 import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
+import static com.google.errorprone.util.ASTHelpers.isAbstract;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 import static com.google.errorprone.util.ASTHelpers.streamSuperMethods;
-import static com.sun.tools.javac.code.Flags.ABSTRACT;
 import static java.util.stream.Stream.concat;
 
 import com.google.errorprone.VisitorState;
@@ -96,10 +96,6 @@ public final class AutoValueRules {
 
     protected abstract ResultUsePolicy autoMethodPolicy(
         MethodSymbol abstractMethod, ClassSymbol autoClass, VisitorState state);
-
-    private static boolean isAbstract(MethodSymbol method) {
-      return (method.flags() & ABSTRACT) != 0;
-    }
 
     @Override
     public Optional<ResultUsePolicy> evaluateMethod(MethodSymbol method, VisitorState state) {
