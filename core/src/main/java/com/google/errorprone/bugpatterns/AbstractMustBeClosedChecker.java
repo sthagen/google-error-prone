@@ -65,6 +65,7 @@ import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.util.Position;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
@@ -356,10 +357,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
 
   private Optional<TryBlock> introduceSingleStatementTry(
       ExpressionTree tree, StatementTree stmt, VisitorState state) {
-    Type type = getType(tree);
-    if (type == null) {
-      return Optional.empty();
-    }
     SuggestedFix.Builder fix = SuggestedFix.builder();
     String name = suggestName(tree);
     if (state.getPath().getParentPath().getLeaf() instanceof ExpressionStatementTree) {
@@ -371,10 +368,7 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
         new TryBlock(
             stmt,
             fix.prefixWith(
-                stmt,
-                String.format(
-                    "try (%s %s = %s) {",
-                    qualifyType(state, fix, type), name, state.getSourceForNode(tree)))));
+                stmt, String.format("try (var %s = %s) {", name, state.getSourceForNode(tree)))));
   }
 
   private Optional<TryBlock> extractToResourceInCurrentTry(
@@ -397,10 +391,6 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
 
   private Optional<TryBlock> splitVariableDeclarationAroundTry(
       ExpressionTree tree, VariableTree var, VisitorState state) {
-    Type type = getType(tree);
-    if (type == null) {
-      return Optional.empty();
-    }
     int initPos = getStartPosition(var.getInitializer());
     int afterTypePos = state.getEndPosition(var.getType());
     String name = suggestName(tree);
@@ -412,12 +402,8 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
                     afterTypePos,
                     initPos,
                     String.format(
-                        " %s;\ntry (%s %s = %s) {\n%s =",
-                        var.getName(),
-                        qualifyType(state, fix, type),
-                        name,
-                        state.getSourceForNode(tree),
-                        var.getName()))
+                        " %s;\ntry (var %s = %s) {\n%s =",
+                        var.getName(), name, state.getSourceForNode(tree), var.getName()))
                 .replace(tree, name)));
   }
 
@@ -427,6 +413,10 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     if (enclosingBlock == null) {
       return Optional.empty();
     }
+    Tree declTree = decl.getType();
+    String declType =
+        state.getEndPosition(declTree) == Position.NOPOS ? "var" : state.getSourceForNode(declTree);
+
     return Optional.of(
         new TryBlock(
             enclosingBlock,
@@ -435,9 +425,7 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
                     decl,
                     String.format(
                         "try (%s %s = %s) {",
-                        state.getSourceForNode(decl.getType()),
-                        decl.getName().toString(),
-                        state.getSourceForNode(decl.getInitializer())))
+                        declType, decl.getName(), state.getSourceForNode(decl.getInitializer())))
                 .delete(decl)));
   }
 
