@@ -16,6 +16,7 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static com.google.common.collect.Streams.stream;
 import static com.google.errorprone.fixes.SuggestedFixes.qualifyType;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.instanceMethod;
@@ -32,13 +33,12 @@ import static com.google.errorprone.util.ASTHelpers.isConsideredFinal;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
 
+import com.google.auto.value.AutoValue;
 import com.google.common.base.CaseFormat;
-import com.google.common.base.Strings;
-import com.google.common.base.Verify;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Streams;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import com.google.errorprone.VisitorState;
+import com.google.errorprone.annotations.ForOverride;
 import com.google.errorprone.annotations.MustBeClosed;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
@@ -66,8 +66,6 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.util.Position;
-import java.util.Collection;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -95,10 +93,51 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
       toType(
           MethodInvocationTree.class, staticMethod().onClass("org.mockito.Mockito").named("when"));
 
-  /** Scans a method body for invocations matching {@code m}, and emitting them as a single fix. */
+  static final class NameSuggester {
+    private final Multiset<String> assignedNamesInThisMethod = HashMultiset.create();
+    /** Returns basename if there are no conflicts, then basename + "2", then basename + "3"... */
+    String uniquifyName(String basename) {
+      int numPreviousConflicts = assignedNamesInThisMethod.add(basename, 1);
+      if (numPreviousConflicts == 0) {
+        // First time using this name.
+        return basename;
+      }
+      // If we already have `var foo`, then `var foo2` seems like a good next choice.
+      return basename + (numPreviousConflicts + 1);
+    }
+
+    /**
+     * @param tree must be either MethodInvocationTree or NewClassTree
+     */
+    String suggestName(ExpressionTree tree) {
+      String symbolName;
+      switch (tree.getKind()) {
+        case NEW_CLASS:
+          symbolName = getSymbol(((NewClassTree) tree).getIdentifier()).getSimpleName().toString();
+          break;
+        case METHOD_INVOCATION:
+          symbolName = getReturnType(tree).asElement().getSimpleName().toString();
+          break;
+        default:
+          throw new AssertionError(tree.getKind());
+      }
+      return uniquifyName(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, symbolName));
+    }
+  }
+
+  /**
+   * Scans a method body for invocations matching {@code matcher}, emitting them as a single fix.
+   */
   protected Description scanEntireMethodFor(
-      Matcher<? super MethodInvocationTree> m, MethodTree tree, VisitorState state) {
-    FixAggregator aggregator = findingPerMethod();
+      Matcher<? super ExpressionTree> matcher, MethodTree tree, VisitorState state) {
+    BlockTree body = tree.getBody();
+    if (body == null) {
+      return NO_MATCH;
+    }
+    SuggestedFix.Builder fixBuilder = SuggestedFix.builder();
+    NameSuggester suggester = new NameSuggester();
+    Multiset<Tree> closeBraceLocations = HashMultiset.create();
+    Tree[] firstIssuedFixLocation = new Tree[1];
     new TreePathScanner<Void, Void>() {
       @Override
       public Void visitMethod(MethodTree methodTree, Void aVoid) {
@@ -106,45 +145,109 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
         return null;
       }
 
-      @Override
-      public Void visitMethodInvocation(MethodInvocationTree methodInvocationTree, Void aVoid) {
+      private void visitNewClassOrMethodInvocation(ExpressionTree tree) {
         VisitorState localState = state.withPath(getCurrentPath());
-        if (m.matches(methodInvocationTree, localState)) {
-          Description description =
-              matchNewClassOrMethodInvocation(methodInvocationTree, localState, aggregator);
-          // This shouldn't return fixes - aggregator is per-method, so it should just save
-          // up some potential fixes for us to combine later.
-          Verify.verify(description.fixes.isEmpty());
+        if (matcher.matches(tree, localState)) {
+          matchNewClassOrMethodInvocation(tree, localState, suggester)
+              .ifPresent(
+                  change -> {
+                    fixBuilder.merge(change.otherFixes());
+                    change.closeBraceAfter().ifPresent(closeBraceLocations::add);
+                    if (firstIssuedFixLocation[0] == null) {
+                      // Attach the finding to the first invocation that broke the rules.
+                      firstIssuedFixLocation[0] = tree;
+                    }
+                  });
         }
-        return super.visitMethodInvocation(methodInvocationTree, aVoid);
       }
-    }.scan(tree.getBody(), null);
-    return aggregator.flush().map(fix -> describeMatch(tree, fix)).orElse(NO_MATCH);
+
+      @Override
+      public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
+        visitNewClassOrMethodInvocation(tree);
+        return super.visitMethodInvocation(tree, unused);
+      }
+
+      @Override
+      public Void visitNewClass(NewClassTree tree, Void unused) {
+        visitNewClassOrMethodInvocation(tree);
+        return super.visitNewClass(tree, unused);
+      }
+    }.scan(new TreePath(state.getPath(), body), null);
+
+    if (firstIssuedFixLocation[0] == null) {
+      // No findings fired, even with empty fixes
+      return NO_MATCH;
+    }
+    closeBraceLocations.forEachEntry((t, count) -> fixBuilder.postfixWith(t, "}".repeat(count)));
+    return describeMatch(firstIssuedFixLocation[0], fixBuilder.build());
+  }
+
+  /**
+   * Error Prone's fix application logic doesn't like it when a fix suggests multiple identical
+   * insertions at the same position. This Change class breaks up a SuggestedFix into two parts: a
+   * position at which to insert a close brace, and a SuggestedFix of other related changes. We use
+   * this to aggregate all the suggested changes within a method, so that we can handle adding
+   * multiple try blocks with the same scope. Instead of emitting N fixes that each add a new
+   * close-brace at the end of that scope, we emit a single fix that adds N close braces.
+   */
+  @AutoValue
+  protected abstract static class Change {
+    abstract SuggestedFix otherFixes();
+
+    abstract Optional<Tree> closeBraceAfter();
+
+    @AutoValue.Builder
+    abstract static class Builder {
+      abstract Builder otherFixes(SuggestedFix value);
+
+      abstract Builder closeBraceAfter(Tree value);
+
+      abstract Change build();
+
+      /**
+       * A shortcut for {@code Optional.of(build())}. Many operations taking a Change expect an
+       * {@code Optional<Change>}, and if you have a Builder already, you're clearly not planning to
+       * return empty(), so this is a convenient way to make the Optional implicit.
+       */
+      Optional<Change> wrapped() {
+        return Optional.of(build());
+      }
+    }
+
+    static Builder builder(SuggestedFix otherFixes) {
+      return new AutoValue_AbstractMustBeClosedChecker_Change.Builder().otherFixes(otherFixes);
+    }
+
+    static Optional<Change> of(SuggestedFix fix) {
+      return builder(fix).wrapped();
+    }
   }
 
   /**
    * Check that the expression {@code tree} occurs within the resource variable initializer of a
    * try-with-resources statement.
    */
-  protected Description matchNewClassOrMethodInvocation(
-      ExpressionTree tree, VisitorState state, FixAggregator aggregator) {
+  private final Optional<Change> matchNewClassOrMethodInvocation(
+      ExpressionTree tree, VisitorState state, NameSuggester suggester) {
     if (isInStaticInitializer(state)) {
-      return NO_MATCH;
+      return Optional.empty();
     }
-    Description description = checkClosed(tree, state, aggregator);
-    if (description == NO_MATCH) {
-      return NO_MATCH;
-    }
-    if (UnusedReturnValueMatcher.expectedExceptionTest(state)
-        || UnusedReturnValueMatcher.mockitoInvocation(tree, state)
-        || MOCKITO_MATCHER.matches(state.getPath().getParentPath().getLeaf(), state)) {
-      return NO_MATCH;
-    }
-    return description;
+    return checkClosed(tree, state, suggester)
+        .filter(
+            unusedFix ->
+                !(UnusedReturnValueMatcher.expectedExceptionTest(state)
+                    || UnusedReturnValueMatcher.mockitoInvocation(tree, state)
+                    || MOCKITO_MATCHER.matches(state.getPath().getParentPath().getLeaf(), state)
+                    || exemptChange(tree, state)));
   }
 
-  private Description checkClosed(
-      ExpressionTree tree, VisitorState state, FixAggregator aggregator) {
+  @ForOverride
+  protected boolean exemptChange(ExpressionTree tree, VisitorState state) {
+    return false;
+  }
+
+  private Optional<Change> checkClosed(
+      ExpressionTree tree, VisitorState state, NameSuggester suggester) {
     MethodTree callerMethodTree = enclosingMethod(state);
     TreePath path = state.getPath();
     OUTER:
@@ -160,22 +263,21 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
               // Ignore invocations of annotated methods and constructors that occur in the return
               // statement of an annotated caller method, since invocations of the caller are
               // enforced.
-              return NO_MATCH;
+              return Optional.empty();
             }
             // The caller method is not annotated, so the closing of the returned resource is not
             // enforced. Suggest fixing this by annotating the caller method.
-            return describeMatch(
-                tree,
+            return Change.of(
                 SuggestedFix.builder()
                     .prefixWith(callerMethodTree, "@MustBeClosed\n")
                     .addImport(MustBeClosed.class.getCanonicalName())
                     .build());
           }
           // If enclosingMethod returned null, we must be returning from a statement lambda.
-          return handleTailPositionInLambda(tree, state);
+          return handleTailPositionInLambda(state);
         case LAMBDA_EXPRESSION:
           // The method invocation is the body of an expression lambda.
-          return handleTailPositionInLambda(tree, state);
+          return handleTailPositionInLambda(state);
         case CONDITIONAL_EXPRESSION:
           ConditionalExpressionTree conditionalExpressionTree =
               (ConditionalExpressionTree) path.getLeaf();
@@ -205,44 +307,46 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
             if (var.getKind() == ElementKind.RESOURCE_VARIABLE
                 || isClosedInFinallyClause(var, path, state)
                 || variableInitializationCountsAsClosing(var)) {
-              return NO_MATCH;
+              return Optional.empty();
             }
           }
           break;
         case ASSIGNMENT:
           // We shouldn't suggest a try/finally fix when we know the variable is going to be saved
           // for later.
-          return emptyFix(tree);
+          return findingWithNoFix();
         default:
           break;
       }
       // The constructor or method invocation does not occur within the resource variable
       // initializer of a try-with-resources statement.
-      Description.Builder description = buildDescription(tree);
-      addFix(description, tree, state, aggregator);
-      return description.build();
+      return fix(tree, state, suggester);
     }
   }
 
-  private Description handleTailPositionInLambda(ExpressionTree tree, VisitorState state) {
+  protected Optional<Change> fix(ExpressionTree tree, VisitorState state, NameSuggester suggester) {
+    return chooseFixType(tree, state, suggester);
+  }
+
+  private static Optional<Change> handleTailPositionInLambda(VisitorState state) {
     LambdaExpressionTree lambda =
         ASTHelpers.findEnclosingNode(state.getPath(), LambdaExpressionTree.class);
     if (lambda == null) {
       // Apparently we're not inside a lambda?!
-      return emptyFix(tree);
+      return findingWithNoFix();
     }
     if (hasAnnotation(
         state.getTypes().findDescriptorSymbol(getType(lambda).tsym),
         MUST_BE_CLOSED_ANNOTATION_NAME,
         state)) {
-      return NO_MATCH;
+      return Optional.empty();
     }
 
-    return emptyFix(tree);
+    return findingWithNoFix();
   }
 
-  private Description emptyFix(Tree tree) {
-    return describeMatch(tree);
+  private static Optional<Change> findingWithNoFix() {
+    return Change.of(SuggestedFix.emptyFix());
   }
 
   private static boolean variableInitializationCountsAsClosing(VarSymbol var) {
@@ -257,7 +361,7 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
   // static final List<Pattern> PATS = STRS.stream().map(s -> Pattern.compile(s)).collect(toList());
   // is fine, but is hard to detect in a general way.
   private static boolean isInStaticInitializer(VisitorState state) {
-    return Streams.stream(state.getPath())
+    return stream(state.getPath())
         .anyMatch(
             tree ->
                 (tree instanceof VariableTree
@@ -327,7 +431,8 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     return closed[0];
   }
 
-  private Optional<TryBlock> chooseFixType(ExpressionTree tree, VisitorState state) {
+  private static Optional<Change> chooseFixType(
+      ExpressionTree tree, VisitorState state, NameSuggester suggester) {
     TreePath path = state.getPath();
     Tree parent = path.getParentPath().getLeaf();
     if (parent instanceof VariableTree) {
@@ -338,76 +443,74 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
       return Optional.empty();
     }
     if (!(stmt instanceof VariableTree)) {
-      return introduceSingleStatementTry(tree, stmt, state);
+      return introduceSingleStatementTry(tree, stmt, state, suggester);
     }
     VarSymbol varSym = getSymbol((VariableTree) stmt);
     if (varSym.getKind() == ElementKind.RESOURCE_VARIABLE) {
-      return extractToResourceInCurrentTry(tree, stmt, state);
+      return extractToResourceInCurrentTry(tree, stmt, state, suggester);
     }
-    return splitVariableDeclarationAroundTry(tree, (VariableTree) stmt, state);
+    return splitVariableDeclarationAroundTry(tree, (VariableTree) stmt, state, suggester);
   }
 
-  protected void addFix(
-      Description.Builder description,
-      ExpressionTree tree,
-      VisitorState state,
-      FixAggregator aggregator) {
-    chooseFixType(tree, state).flatMap(aggregator::report).ifPresent(description::addFix);
-  }
-
-  private Optional<TryBlock> introduceSingleStatementTry(
-      ExpressionTree tree, StatementTree stmt, VisitorState state) {
+  private static Optional<Change> introduceSingleStatementTry(
+      ExpressionTree tree, StatementTree stmt, VisitorState state, NameSuggester suggester) {
     SuggestedFix.Builder fix = SuggestedFix.builder();
-    String name = suggestName(tree);
+    String name = suggester.suggestName(tree);
     if (state.getPath().getParentPath().getLeaf() instanceof ExpressionStatementTree) {
       fix.delete(stmt);
     } else {
       fix.replace(tree, name);
     }
-    return Optional.of(
-        new TryBlock(
-            stmt,
+    return Change.builder(
             fix.prefixWith(
-                stmt, String.format("try (var %s = %s) {", name, state.getSourceForNode(tree)))));
+                    stmt, String.format("try (var %s = %s) {", name, state.getSourceForNode(tree)))
+                .build())
+        .closeBraceAfter(stmt)
+        .wrapped();
   }
 
-  private Optional<TryBlock> extractToResourceInCurrentTry(
-      ExpressionTree tree, StatementTree declaringStatement, VisitorState state) {
+  private static Optional<Change> extractToResourceInCurrentTry(
+      ExpressionTree tree,
+      StatementTree declaringStatement,
+      VisitorState state,
+      NameSuggester suggester) {
     Type type = getType(tree);
     if (type == null) {
       return Optional.empty();
     }
-    String name = suggestName(tree);
+    String name = suggester.suggestName(tree);
     SuggestedFix.Builder fix = SuggestedFix.builder();
-    return Optional.of(
-        new TryBlock(
-            fix.prefixWith(
-                    declaringStatement,
-                    String.format(
-                        "%s %s = %s;",
-                        qualifyType(state, fix, type), name, state.getSourceForNode(tree)))
-                .replace(tree, name)));
+    return Change.of(
+        SuggestedFix.builder()
+            .prefixWith(
+                declaringStatement,
+                String.format(
+                    "%s %s = %s;",
+                    qualifyType(state, fix, type), name, state.getSourceForNode(tree)))
+            .replace(tree, name)
+            .build());
   }
 
-  private Optional<TryBlock> splitVariableDeclarationAroundTry(
-      ExpressionTree tree, VariableTree var, VisitorState state) {
+  private static Optional<Change> splitVariableDeclarationAroundTry(
+      ExpressionTree tree, VariableTree var, VisitorState state, NameSuggester suggester) {
     int initPos = getStartPosition(var.getInitializer());
     int afterTypePos = state.getEndPosition(var.getType());
-    String name = suggestName(tree);
-    SuggestedFix.Builder fix = SuggestedFix.builder();
-    return Optional.of(
-        new TryBlock(
-            var,
-            fix.replace(
+    String name = suggester.suggestName(tree);
+    return Change.builder(
+            SuggestedFix.builder()
+                .replace(
                     afterTypePos,
                     initPos,
                     String.format(
                         " %s;\ntry (var %s = %s) {\n%s =",
                         var.getName(), name, state.getSourceForNode(tree), var.getName()))
-                .replace(tree, name)));
+                .replace(tree, name)
+                .build())
+        .closeBraceAfter(var)
+        .wrapped();
   }
 
-  private Optional<TryBlock> wrapTryFinallyAroundVariableScope(
+  private static Optional<Change> wrapTryFinallyAroundVariableScope(
       VariableTree decl, VisitorState state) {
     BlockTree enclosingBlock = state.findEnclosing(BlockTree.class);
     if (enclosingBlock == null) {
@@ -417,133 +520,16 @@ public abstract class AbstractMustBeClosedChecker extends BugChecker {
     String declType =
         state.getEndPosition(declTree) == Position.NOPOS ? "var" : state.getSourceForNode(declTree);
 
-    return Optional.of(
-        new TryBlock(
-            enclosingBlock,
+    return Change.builder(
             SuggestedFix.builder()
+                .delete(decl)
                 .prefixWith(
                     decl,
                     String.format(
                         "try (%s %s = %s) {",
                         declType, decl.getName(), state.getSourceForNode(decl.getInitializer())))
-                .delete(decl)));
-  }
-
-  // Will be either MethodInvocationTree or NewClassTree
-  private String suggestName(ExpressionTree tree) {
-    String symbolName;
-    switch (tree.getKind()) {
-      case NEW_CLASS:
-        symbolName = getSymbol(((NewClassTree) tree).getIdentifier()).getSimpleName().toString();
-        break;
-      case METHOD_INVOCATION:
-        symbolName = getReturnType(tree).asElement().getSimpleName().toString();
-        break;
-      default:
-        throw new AssertionError(tree.getKind());
-    }
-    return CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, symbolName);
-  }
-
-  /**
-   * Allows us to aggregate multiple changes into a single SuggestedFix. The fix-applying machinery
-   * assumes that inserting the same text at the same location multiple times is a mistake, so if we
-   * create several try blocks that end at the same line, the insertions of } will conflict. This
-   * class separates out the close-brace location from the other fixes, so that the close-braces can
-   * all be inserted at once atomically.
-   */
-  private static class TryBlock {
-    final Optional<Tree> closeBraceAfter;
-    final SuggestedFix.Builder otherChanges;
-
-    /** For changes that don't need to insert a close brace. */
-    TryBlock(SuggestedFix.Builder changes) {
-      this.closeBraceAfter = Optional.empty();
-      this.otherChanges = changes;
-    }
-
-    TryBlock(Tree closeBraceAfter, SuggestedFix.Builder otherChanges) {
-      this.closeBraceAfter = Optional.of(closeBraceAfter);
-      this.otherChanges = otherChanges;
-    }
-  }
-
-  /** A strategy for handling and potentially combining multiple fixes. */
-  protected interface FixAggregator {
-    /**
-     * Attempt to report a fix. A non-empty result should be reported as if by {@link
-     * VisitorState#reportMatch(Description)}. An empty result implies that the fix is being saved
-     * up to be later emitted by {@link #flush()}.
-     */
-    Optional<SuggestedFix> report(TryBlock fix);
-
-    /**
-     * Returns a single fix containing all the changes saved up by earlier calls to {@link
-     * #report(TryBlock)}
-     */
-    Optional<SuggestedFix> flush();
-  }
-
-  private static final class FindingPerMethod implements FixAggregator {
-    private FindingPerMethod() {}
-
-    private final ListMultimap<Optional<Tree>, TryBlock> reports = ArrayListMultimap.create();
-
-    @Override
-    public Optional<SuggestedFix> report(TryBlock fix) {
-      // Overlapping close brace is the only thing we need to coalesce by
-      reports.put(fix.closeBraceAfter, fix);
-      return Optional.empty();
-    }
-
-    @Override
-    public Optional<SuggestedFix> flush() {
-      if (reports.isEmpty()) {
-        return Optional.empty();
-      }
-      SuggestedFix.Builder fix = SuggestedFix.builder();
-      for (Map.Entry<Optional<Tree>, Collection<TryBlock>> e : reports.asMap().entrySet()) {
-        Optional<Tree> block = e.getKey();
-        Collection<TryBlock> changes = e.getValue();
-
-        block.ifPresent(b -> fix.postfixWith(b, Strings.repeat("}", changes.size())));
-        for (TryBlock change : changes) {
-          fix.merge(change.otherChanges);
-        }
-      }
-
-      reports.clear();
-      return Optional.of(fix.build());
-    }
-  }
-
-  /** A FixAggregator that saves up all its findings from within a single method to emit at once. */
-  protected FixAggregator findingPerMethod() {
-    return new FindingPerMethod();
-  }
-
-  private static final class FindingPerSite implements FixAggregator {
-    private FindingPerSite() {}
-
-    private static final FindingPerSite INSTANCE = new FindingPerSite();
-
-    @Override
-    public Optional<SuggestedFix> report(TryBlock t) {
-      return Optional.of(
-          t.closeBraceAfter
-              .map(where -> t.otherChanges.postfixWith(where, "}"))
-              .orElse(t.otherChanges)
-              .build());
-    }
-
-    @Override
-    public Optional<SuggestedFix> flush() {
-      return Optional.empty();
-    }
-  }
-
-  /** A FixAggregator that emits a separate fix for each method usage. */
-  protected FixAggregator findingPerSite() {
-    return FindingPerSite.INSTANCE;
+                .build())
+        .closeBraceAfter(enclosingBlock)
+        .wrapped();
   }
 }
