@@ -16,6 +16,7 @@
 
 package com.google.errorprone.bugpatterns;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.bugpatterns.CheckReturnValue.MessageTrailerStyle.NONE;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.AutoValueRules.autoBuilders;
@@ -30,10 +31,19 @@ import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy
 import static com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy.OPTIONAL;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.Rules.globalDefault;
 import static com.google.errorprone.bugpatterns.checkreturnvalue.Rules.mapAnnotationSimpleName;
+import static com.google.errorprone.fixes.SuggestedFix.emptyFix;
+import static com.google.errorprone.fixes.SuggestedFixes.qualifyType;
+import static com.google.errorprone.util.ASTHelpers.enclosingClass;
+import static com.google.errorprone.util.ASTHelpers.getAnnotationsWithSimpleName;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.hasDirectAnnotationWithSimpleName;
+import static com.google.errorprone.util.ASTHelpers.isGeneratedConstructor;
+import static com.google.errorprone.util.ASTHelpers.isLocal;
+import static com.sun.source.tree.Tree.Kind.METHOD;
+import static java.util.stream.Collectors.joining;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
@@ -44,6 +54,8 @@ import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.bugpatterns.checkreturnvalue.PackagesRule;
 import com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicy;
 import com.google.errorprone.bugpatterns.checkreturnvalue.ResultUsePolicyEvaluator;
+import com.google.errorprone.fixes.Fix;
+import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
 import com.google.errorprone.util.ASTHelpers;
@@ -55,12 +67,16 @@ import com.sun.source.tree.MemberReferenceTree.ReferenceMode;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.NewClassTree;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.Type.MethodType;
+import com.sun.tools.javac.processing.JavacProcessingEnvironment;
+import java.util.List;
 import java.util.Optional;
 import javax.lang.model.element.ElementKind;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * @author eaftan@google.com (Eddie Aftandilian)
@@ -74,6 +90,8 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
 
   private static final String CHECK_RETURN_VALUE = "CheckReturnValue";
   private static final String CAN_IGNORE_RETURN_VALUE = "CanIgnoreReturnValue";
+  private static final ImmutableList<String> MUTUALLY_EXCLUSIVE_ANNOTATIONS =
+      ImmutableList.of(CHECK_RETURN_VALUE, CAN_IGNORE_RETURN_VALUE);
 
   public static final String CHECK_ALL_CONSTRUCTORS = "CheckReturnValue:CheckAllConstructors";
   public static final String CHECK_ALL_METHODS = "CheckReturnValue:CheckAllMethods";
@@ -81,8 +99,6 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
   static final String CRV_PACKAGES = "CheckReturnValue:Packages";
 
   private final MessageTrailerStyle messageTrailerStyle;
-  private final Optional<ResultUsePolicy> constructorPolicy;
-  private final Optional<ResultUsePolicy> methodPolicy;
   private final ResultUsePolicyEvaluator evaluator;
 
   public CheckReturnValue(ErrorProneFlags flags) {
@@ -91,8 +107,6 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
         flags
             .getEnum("CheckReturnValue:MessageTrailerStyle", MessageTrailerStyle.class)
             .orElse(NONE);
-    this.constructorPolicy = defaultPolicy(flags, CHECK_ALL_CONSTRUCTORS);
-    this.methodPolicy = defaultPolicy(flags, CHECK_ALL_METHODS);
 
     ResultUsePolicyEvaluator.Builder builder =
         ResultUsePolicyEvaluator.builder()
@@ -116,7 +130,13 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
     flags
         .getList(CRV_PACKAGES)
         .ifPresent(packagePatterns -> builder.addRule(PackagesRule.fromPatterns(packagePatterns)));
-    this.evaluator = builder.addRule(globalDefault(methodPolicy, constructorPolicy)).build();
+    this.evaluator =
+        builder
+            .addRule(
+                globalDefault(
+                    defaultPolicy(flags, CHECK_ALL_METHODS),
+                    defaultPolicy(flags, CHECK_ALL_CONSTRUCTORS)))
+            .build();
   }
 
   private static Optional<ResultUsePolicy> defaultPolicy(ErrorProneFlags flags, String flag) {
@@ -192,9 +212,6 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
         .orElse(ImmutableMap.of());
   }
 
-  private static final String BOTH_ERROR =
-      "@CheckReturnValue and @CanIgnoreReturnValue cannot both be applied to the same %s";
-
   /**
    * Validate {@code @CheckReturnValue} and {@link CanIgnoreReturnValue} usage on methods.
    *
@@ -206,24 +223,20 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
   @Override
   public Description matchMethod(MethodTree tree, VisitorState state) {
     MethodSymbol method = ASTHelpers.getSymbol(tree);
-
-    boolean checkReturn = hasDirectAnnotationWithSimpleName(method, CHECK_RETURN_VALUE);
-    boolean canIgnore = hasDirectAnnotationWithSimpleName(method, CAN_IGNORE_RETURN_VALUE);
-
-    // TODO(cgdecker): We can check this with evaluator.checkForConflicts now, though I want to
-    //  think more about how we build and format error messages in that.
-    if (checkReturn && canIgnore) {
-      return buildDescription(tree).setMessage(String.format(BOTH_ERROR, "method")).build();
+    ImmutableList<String> presentAnnotations = presentCrvRelevantAnnotations(method);
+    switch (presentAnnotations.size()) {
+      case 0:
+        return Description.NO_MATCH;
+      case 1:
+        break;
+      default:
+        // TODO(cgdecker): We can check this with evaluator.checkForConflicts now, though I want to
+        //  think more about how we build and format error messages in that.
+        return buildDescription(tree)
+            .setMessage(conflictingAnnotations(presentAnnotations, "method"))
+            .build();
     }
 
-    String annotationToValidate;
-    if (checkReturn) {
-      annotationToValidate = CHECK_RETURN_VALUE;
-    } else if (canIgnore) {
-      annotationToValidate = CAN_IGNORE_RETURN_VALUE;
-    } else {
-      return Description.NO_MATCH;
-    }
     if (method.getKind() != ElementKind.METHOD) {
       // skip constructors (which javac thinks are void-returning)
       return Description.NO_MATCH;
@@ -232,8 +245,21 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
       return Description.NO_MATCH;
     }
     String message =
-        String.format("@%s may not be applied to void-returning methods", annotationToValidate);
+        String.format(
+            "@%s may not be applied to void-returning methods", presentAnnotations.get(0));
     return buildDescription(tree).setMessage(message).build();
+  }
+
+  private static ImmutableList<String> presentCrvRelevantAnnotations(Symbol symbol) {
+    return MUTUALLY_EXCLUSIVE_ANNOTATIONS.stream()
+        .filter(a -> hasDirectAnnotationWithSimpleName(symbol, a))
+        .collect(toImmutableList());
+  }
+
+  private static String conflictingAnnotations(List<String> annotations, String targetType) {
+    return annotations.stream().map(a -> "@" + a).collect(joining(" and "))
+        + " cannot be applied to the same "
+        + targetType;
   }
 
   /**
@@ -242,10 +268,13 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
    */
   @Override
   public Description matchClass(ClassTree tree, VisitorState state) {
-    if (hasDirectAnnotationWithSimpleName(ASTHelpers.getSymbol(tree), CHECK_RETURN_VALUE)
-        && hasDirectAnnotationWithSimpleName(ASTHelpers.getSymbol(tree), CAN_IGNORE_RETURN_VALUE)) {
-      return buildDescription(tree).setMessage(String.format(BOTH_ERROR, "class")).build();
+    ImmutableList<String> presentAnnotations = presentCrvRelevantAnnotations(getSymbol(tree));
+    if (presentAnnotations.size() > 1) {
+      return buildDescription(tree)
+          .setMessage(conflictingAnnotations(presentAnnotations, "class"))
+          .build();
     }
+
     return Description.NO_MATCH;
   }
 
@@ -266,6 +295,7 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
                 + "%s",
             shortCall, shortCallWithoutNew, apiTrailer(symbol, state));
     return buildDescription(invocationTree)
+        .addFix(fixAtDeclarationSite(symbol, state))
         .addAllFixes(fixesAtCallSite(invocationTree, state))
         .setMessage(message)
         .build();
@@ -293,11 +323,7 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
   protected Description describeReturnValueIgnored(MemberReferenceTree tree, VisitorState state) {
     MethodSymbol symbol = getSymbol(tree);
     Type type = state.getTypes().memberType(getType(tree.getQualifierExpression()), symbol);
-    // TODO(cgdecker): There are probably other types than MethodType that we could resolve here
-    String parensAndMaybeEllipsis =
-        type instanceof MethodType && ((MethodType) type).getParameterTypes().isEmpty()
-            ? "()"
-            : "(...)";
+    String parensAndMaybeEllipsis = type.getParameterTypes().isEmpty() ? "()" : "(...)";
 
     String shortCallWithoutNew;
     String shortCall;
@@ -318,8 +344,8 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
     String message =
         String.format(
             "The result of `%s` must be used\n"
-                + "`%s` acts as an implementation of `%s`.\n"
-                + "— which is a `void` method, so it doesn't use the result of `%s`.\n"
+                + "`%s` acts as an implementation of `%s`"
+                + " -- which is a `void` method, so it doesn't use the result of `%s`.\n"
                 + "\n"
                 + "To use the result, you may need to restructure your code.\n"
                 + "\n"
@@ -336,12 +362,19 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
             parensAndMaybeEllipsis,
             shortCallWithoutNew,
             apiTrailer(symbol, state));
-    return buildDescription(tree).setMessage(message).build();
+    return buildDescription(tree)
+        .setMessage(message)
+        .addFix(fixAtDeclarationSite(symbol, state))
+        .build();
   }
 
   private String apiTrailer(MethodSymbol symbol, VisitorState state) {
-    if (symbol.enclClass().isAnonymous()) {
-      // I don't think we have a defined format for members of anonymous classes.
+    // (isLocal returns true for both local classes and anonymous classes. That's good for us.)
+    if (isLocal(enclosingClass(symbol))) {
+      /*
+       * We don't have a defined format for members of local and anonymous classes. After all, their
+       * generated class names can change easily as other such classes are introduced.
+       */
       return "";
     }
     switch (messageTrailerStyle) {
@@ -359,5 +392,32 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
   enum MessageTrailerStyle {
     NONE,
     API_ERASED_SIGNATURE,
+  }
+
+  /** Returns a fix that adds {@code @CanIgnoreReturnValue} to the given symbol, if possible. */
+  private static Fix fixAtDeclarationSite(MethodSymbol symbol, VisitorState state) {
+    MethodTree method = findDeclaration(symbol, state);
+    if (method == null || isGeneratedConstructor(method)) {
+      return emptyFix();
+    }
+    SuggestedFix.Builder fix = SuggestedFix.builder();
+    fix.prefixWith(
+        method, "@" + qualifyType(state, fix, CanIgnoreReturnValue.class.getName()) + " ");
+    getAnnotationsWithSimpleName(method.getModifiers().getAnnotations(), CHECK_RETURN_VALUE)
+        .forEach(fix::delete);
+    fix.setShortDescription("Annotate the method with @CanIgnoreReturnValue");
+    return fix.build();
+  }
+
+  private static @Nullable MethodTree findDeclaration(Symbol symbol, VisitorState state) {
+    JavacProcessingEnvironment javacEnv = JavacProcessingEnvironment.instance(state.context);
+    TreePath declPath = Trees.instance(javacEnv).getPath(symbol);
+    // Skip fields declared in other compilation units since we can't make a fix for them here.
+    if (declPath != null
+        && declPath.getCompilationUnit() == state.getPath().getCompilationUnit()
+        && (declPath.getLeaf().getKind() == METHOD)) {
+      return (MethodTree) declPath.getLeaf();
+    }
+    return null;
   }
 }
