@@ -2257,16 +2257,25 @@ public class ASTHelpers {
       for (CatchTree catchTree : tree.getCatches()) {
         Type type = getType(catchTree.getParameter());
 
-        Set<Type> matchingTypes = new HashSet<>();
+        Set<Type> caughtTypes = new HashSet<>();
+        Set<Type> capturedTypes = new HashSet<>();
         for (Type unionMember : extractTypes(type)) {
           for (Type thrownType : getThrownTypes()) {
+            // If the thrown type is a subtype of the caught type, we caught it, and it doesn't flow
+            // through to any subsequent catches.
             if (types.isSubtype(thrownType, unionMember)) {
-              matchingTypes.add(thrownType);
+              caughtTypes.add(thrownType);
+              capturedTypes.add(thrownType);
+            }
+            // If our caught type is a subtype of a thrown type, we caught something, but didn't
+            // remove it from the list of things the try {} block throws.
+            if (types.isSubtype(unionMember, thrownType)) {
+              capturedTypes.add(unionMember);
             }
           }
         }
-        getThrownTypes().removeAll(matchingTypes);
-        thrownTypesByVariable.putAll(getSymbol(catchTree.getParameter()), matchingTypes);
+        getThrownTypes().removeAll(caughtTypes);
+        thrownTypesByVariable.putAll(getSymbol(catchTree.getParameter()), capturedTypes);
       }
       for (CatchTree catchTree : tree.getCatches()) {
         scan(catchTree.getBlock(), null);
@@ -2446,12 +2455,9 @@ public class ASTHelpers {
   }
 
   public static EnumSet<Flags.Flag> asFlagSet(long flags) {
-    flags &= ~(ANONCONSTR_BASED | Flags.POTENTIALLY_AMBIGUOUS);
+    flags &= ~(Flags.ANONCONSTR_BASED | Flags.POTENTIALLY_AMBIGUOUS);
     return Flags.asFlagSet(flags);
   }
-
-  // TODO(cushon): replace with Flags.ANONCONSTR_BASED once we're on JDK >= 10
-  static final long ANONCONSTR_BASED = 1L << 57;
 
   /** Returns true if the given source code contains comments. */
   public static boolean stringContainsComments(CharSequence source, Context context) {
