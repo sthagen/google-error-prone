@@ -16,15 +16,16 @@
 
 package com.google.errorprone.bugpatterns.checkreturnvalue;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.fixes.SuggestedFixes.qualifyType;
+import static com.google.errorprone.util.ASTHelpers.getAnnotationWithSimpleName;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getReturnType;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
-import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
+import static com.google.errorprone.util.ASTHelpers.isSameType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
-import static com.google.errorprone.util.ASTHelpers.isVoidType;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
 
 import com.google.errorprone.BugPattern;
@@ -34,15 +35,19 @@ import com.google.errorprone.bugpatterns.BugChecker.MethodTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.suppliers.Supplier;
+import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.LambdaExpressionTree;
-import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.NewClassTree;
+import com.sun.source.tree.ParenthesizedTree;
 import com.sun.source.tree.ReturnTree;
 import com.sun.source.tree.StatementTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.TypeCastTree;
+import com.sun.source.util.SimpleTreeVisitor;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Type;
@@ -72,48 +77,54 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
     // We have a number of preconditions we can check early to ensure that this method could
     // possibly be @CIRV-suggestible, before attempting a deeper scan of the method.
     if (methodSymbol.isStatic()
-        || methodTree.getBody() == null
-        // These methods should probably be @CheckReturnValue!
+        // the return type must be the same as the enclosing type (this skips void methods too)
+        || !isSameType(methodSymbol.owner.type, methodSymbol.getReturnType(), state)
+        // nb: these methods should probably be @CheckReturnValue!
+        // They'd likely be excluded naturally by the isSimpleReturnThisMethod check below, but we
+        // check for them explicitly here.
         || isDefinitionOfZeroArgSelf(methodSymbol)
         // Constructors can't "return", and generally shouldn't be @CIRV
         || methodTree.getReturnType() == null
-        // methods whose return type is void or Void can't have @CIRV
-        || isVoidType(getType(methodTree.getReturnType()), state)
         // b/236423646 - These methods that do nothing *but* `return this;` are likely to be
         // overridden in other contexts, and we've decided that these methods shouldn't be annotated
         // automatically.
         || isSimpleReturnThisMethod(methodTree)
         // TODO(kak): This appears to be a performance optimization for refactoring passes?
-        || isSubtype(methodSymbol.owner.type, PROTO_BUILDER.get(state), state)
-        || hasAnnotation(methodSymbol, CIRV, state)) {
+        || isSubtype(methodSymbol.owner.type, PROTO_BUILDER.get(state), state)) {
       return Description.NO_MATCH;
     }
 
-    // if the enclosing type is already annotated with CIRV, we could theoretically _not_ directly
-    // annotate the method but we're likely to discourage annotating types with CIRV: b/229776283
-    // if the method is already directly annotated w/ @CRV, bail out
-    if (hasAnnotation(methodTree, CRV, state)) {
-      // TODO(kak): we might want to actually _remove_ @CRV and add @CIRV in this case!
+    // if the method is already directly annotated w/ @CRV or @CIRV, bail out
+    if (hasAnnotation(methodTree, CRV, state) || hasAnnotation(methodSymbol, CIRV, state)) {
       return Description.NO_MATCH;
     }
 
     // OK, now the real implementation: For each possible return branch, does the expression
     // returned look like "this" or instance methods that are also @CanIgnoreReturnValue.
-    if (!methodReturnsIgnorableValues(methodTree, state)) {
-      return Description.NO_MATCH;
+    if (methodReturnsIgnorableValues(methodTree, state)) {
+      SuggestedFix.Builder fix = SuggestedFix.builder();
+
+      // if the method is annotated with @RIU, we need to remove it before adding @CIRV
+      AnnotationTree riuAnnotation =
+          getAnnotationWithSimpleName(
+              methodTree.getModifiers().getAnnotations(), "ResultIgnorabilityUnspecified");
+      if (riuAnnotation != null) {
+        fix.delete(riuAnnotation);
+      }
+
+      String cirvName = qualifyType(state, fix, CIRV);
+      // we could add a trailing comment (e.g., @CanIgnoreReturnValue // returns `this`), but all
+      // developers will become familiar with these annotations sooner or later
+      fix.prefixWith(methodTree, "@" + cirvName + "\n");
+
+      return describeMatch(methodTree, fix.build());
     }
 
-    SuggestedFix.Builder fix = SuggestedFix.builder();
-    String cirvName = qualifyType(state, fix, CIRV);
-    // we could add a trailing comment (e.g., @CanIgnoreReturnValue // returns `this`), but all
-    // developers will become familiar with these annotations sooner or later
-    fix.prefixWith(methodTree, "@" + cirvName + "\n");
-
-    return describeMatch(methodTree, fix.build());
+    return Description.NO_MATCH;
   }
 
   private static boolean isSimpleReturnThisMethod(MethodTree methodTree) {
-    if (methodTree.getBody().getStatements().size() == 1) {
+    if (methodTree.getBody() != null && methodTree.getBody().getStatements().size() == 1) {
       StatementTree onlyStatement = methodTree.getBody().getStatements().get(0);
       if (onlyStatement instanceof ReturnTree) {
         return returnsThisOrSelf((ReturnTree) onlyStatement);
@@ -132,29 +143,40 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
 
   /** Returns whether or not the given {@link ReturnTree} returns exactly {@code this}. */
   private static boolean returnsThisOrSelf(ReturnTree returnTree) {
-    return isIdentifier(returnTree.getExpression(), "this")
-        || (returnTree.getExpression() instanceof MethodInvocationTree
-            && isCallToZeroArgSelf((MethodInvocationTree) returnTree.getExpression()));
+    return maybeCastThis(returnTree.getExpression());
   }
 
-  // this.self() or self()
-  private static boolean isCallToZeroArgSelf(MethodInvocationTree mit) {
-    if (!mit.getArguments().isEmpty()) {
-      return false;
-    }
-    if (isIdentifier(mit.getMethodSelect(), "self")) {
-      return true;
-    }
-    if (mit.getMethodSelect() instanceof MemberSelectTree) {
-      MemberSelectTree methodSelect = (MemberSelectTree) mit.getMethodSelect();
-      return isIdentifier(methodSelect.getExpression(), "this")
-          && methodSelect.getIdentifier().contentEquals("self");
-    }
-    return false;
+  private static boolean maybeCastThis(Tree tree) {
+    return firstNonNull(
+        new SimpleTreeVisitor<Boolean, Void>() {
+          @Override
+          public Boolean visitParenthesized(ParenthesizedTree tree, Void unused) {
+            return visit(tree.getExpression(), null);
+          }
+
+          @Override
+          public Boolean visitTypeCast(TypeCastTree tree, Void unused) {
+            return visit(tree.getExpression(), null);
+          }
+
+          @Override
+          public Boolean visitIdentifier(IdentifierTree tree, Void unused) {
+            return tree.getName().contentEquals("this");
+            // TODO(cpovirk): Or a field that is always set to `this`, as in SelfAlwaysReturnsThis.
+          }
+
+          @Override
+          public Boolean visitMethodInvocation(MethodInvocationTree tree, Void unused) {
+            return getSymbol(tree).getSimpleName().contentEquals("self")
+                || getSymbol(tree).getSimpleName().contentEquals("getThis");
+          }
+        }.visit(tree, null),
+        false);
   }
 
   private static boolean isDefinitionOfZeroArgSelf(MethodSymbol methodSymbol) {
-    return methodSymbol.getSimpleName().contentEquals("self")
+    return (methodSymbol.getSimpleName().contentEquals("self")
+            || methodSymbol.getSimpleName().contentEquals("getThis"))
         && methodSymbol.getParameters().isEmpty();
   }
 

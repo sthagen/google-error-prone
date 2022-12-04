@@ -57,6 +57,151 @@ public class CanIgnoreReturnValueSuggesterTest {
   }
 
   @Test
+  public void testParenthesizedCastThis() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  private String name;",
+            "  public Client setName(String name) {",
+            "    this.name = name;",
+            "    return ((Client) (this));",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import com.google.errorprone.annotations.CanIgnoreReturnValue;",
+            "public final class Client {",
+            "  private String name;",
+            "  @CanIgnoreReturnValue",
+            "  public Client setName(String name) {",
+            "    this.name = name;",
+            "    return ((Client) (this));",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnsInputParam() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  public String method(String name) {",
+            "    return name;",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testReturnsInputParamWithMultipleReturns() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  public String method(String a, String b) {",
+            "    if (System.currentTimeMillis() > 0) { return a; }",
+            "    return b;",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testReturnsInputParamWithMultipleReturns_oneReturnIsConstant() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  public String method(String a, String b) {",
+            "    if (System.currentTimeMillis() > 0) { return a; }",
+            "    return \"hi\";",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testReturnsInputParamWithTernary() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  public String method(String a, String b) {",
+            "    return (System.currentTimeMillis() > 0) ? a : b;",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testBuilder_abstractClass() {
+    helper
+        .addInputLines(
+            "Builder.java",
+            "package com.google.frobber;",
+            "public abstract class Builder {",
+            "  public abstract Builder setName(String name);",
+            "  public abstract Builder clone();",
+            "  public abstract Builder copy();",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testBuilder_interface() {
+    helper
+        .addInputLines(
+            "Builder.java",
+            "package com.google.frobber;",
+            "public interface Builder {",
+            "  Builder setName(String name);",
+            "  Builder copy();",
+            "  Builder clone();",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void testAutoValueBuilder() {
+    helper
+        .addInputLines(
+            "Animal.java",
+            "package com.google.frobber;",
+            "import com.google.auto.value.AutoValue;",
+            "@AutoValue",
+            "abstract class Animal {",
+            "  abstract String name();",
+            "  abstract int numberOfLegs();",
+            "  static Builder builder() {",
+            "    return null;",
+            "  }",
+            "  @AutoValue.Builder",
+            "  abstract static class Builder {",
+            "    abstract Builder setName(String value);",
+            "    abstract Builder setNumberOfLegs(int value);",
+            "    abstract Animal build();",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
   public void testReturnSelf_b234875737() {
     helper
         .addInputLines(
@@ -84,6 +229,40 @@ public class CanIgnoreReturnValueSuggesterTest {
             "    return self();",
             "  }",
             "  private Client self() {",
+            "    return this;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void testReturnGetThis() {
+    helper
+        .addInputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "public final class Client {",
+            "  private String name;",
+            "  public Client setName(String name) {",
+            "    this.name = name;",
+            "    return getThis();",
+            "  }",
+            "  private Client getThis() {",
+            "    return this;",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Client.java",
+            "package com.google.frobber;",
+            "import com.google.errorprone.annotations.CanIgnoreReturnValue;",
+            "public final class Client {",
+            "  private String name;",
+            "  @CanIgnoreReturnValue",
+            "  public Client setName(String name) {",
+            "    this.name = name;",
+            "    return getThis();",
+            "  }",
+            "  private Client getThis() {",
             "    return this;",
             "  }",
             "}")
