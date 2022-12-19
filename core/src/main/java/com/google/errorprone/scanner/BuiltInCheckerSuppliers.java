@@ -44,6 +44,7 @@ import com.google.errorprone.bugpatterns.AutoValueBuilderDefaultsInConstructor;
 import com.google.errorprone.bugpatterns.AutoValueFinalMethods;
 import com.google.errorprone.bugpatterns.AutoValueImmutableFields;
 import com.google.errorprone.bugpatterns.AutoValueSubclassLeaked;
+import com.google.errorprone.bugpatterns.AvoidObjectArrays;
 import com.google.errorprone.bugpatterns.BadAnnotationImplementation;
 import com.google.errorprone.bugpatterns.BadComparable;
 import com.google.errorprone.bugpatterns.BadImport;
@@ -245,6 +246,7 @@ import com.google.errorprone.bugpatterns.NarrowCalculation;
 import com.google.errorprone.bugpatterns.NarrowingCompoundAssignment;
 import com.google.errorprone.bugpatterns.NegativeCharLiteral;
 import com.google.errorprone.bugpatterns.NestedInstanceOfConditions;
+import com.google.errorprone.bugpatterns.NewFileSystem;
 import com.google.errorprone.bugpatterns.NoAllocationChecker;
 import com.google.errorprone.bugpatterns.NonAtomicVolatileUpdate;
 import com.google.errorprone.bugpatterns.NonCanonicalStaticImport;
@@ -669,7 +671,6 @@ public class BuiltInCheckerSuppliers {
           HashtableContains.class,
           IdentityBinaryExpression.class,
           IdentityHashMapBoxing.class,
-          IgnoredPureGetter.class,
           ImmutableChecker.class,
           ImpossibleNullComparison.class,
           Incomparable.class,
@@ -861,6 +862,7 @@ public class BuiltInCheckerSuppliers {
           GetClassOnEnum.class,
           HidingField.class,
           IdentityHashMapUsage.class,
+          IgnoredPureGetter.class,
           ImmutableAnnotationChecker.class,
           ImmutableEnumChecker.class,
           InconsistentCapitalization.class,
@@ -933,6 +935,7 @@ public class BuiltInCheckerSuppliers {
           NarrowingCompoundAssignment.class,
           NegativeCharLiteral.class,
           NestedInstanceOfConditions.class,
+          NewFileSystem.class,
           NonAtomicVolatileUpdate.class,
           NonCanonicalType.class,
           NonOverridingEquals.class,
@@ -1033,6 +1036,7 @@ public class BuiltInCheckerSuppliers {
           AssertFalse.class,
           AssistedInjectAndInjectOnConstructors.class,
           AutoFactoryAtInject.class,
+          AvoidObjectArrays.class,
           BanSerializableRead.class,
           BinderIdentityRestoredDangerously.class, // TODO: enable this by default.
           BindingToUnqualifiedCommonType.class,

@@ -1893,4 +1893,99 @@ public class GuardedByCheckerTest {
             "}")
         .doTest();
   }
+
+  @Test
+  public void immediateLambdas() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "import java.util.Optional;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  @GuardedBy(\"this\") private final List<String> xs = new ArrayList<>();",
+            "  @GuardedBy(\"ys\") private final List<String> ys = new ArrayList<>();",
+            "  public synchronized void add(Optional<String> x) {",
+            "    x.ifPresent(y -> xs.add(y));",
+            "    x.ifPresent(xs::add);",
+            "    // BUG: Diagnostic contains:",
+            "    x.ifPresent(y -> ys.add(y));",
+            "    // BUG: Diagnostic contains:",
+            "    x.ifPresent(ys::add);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReferences_shouldBeFlagged() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "import java.util.Optional;",
+            "import java.util.function.Predicate;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  @GuardedBy(\"this\") private final List<String> xs = new ArrayList<>();",
+            "  private final List<Predicate<String>> preds = new ArrayList<>();",
+            "  public synchronized void test() {",
+            "    // BUG: Diagnostic contains:",
+            "    preds.add(xs::contains);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReference_referencedMethodIsFlagged() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "import java.util.Optional;",
+            "import java.util.function.Predicate;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  private final List<Predicate<String>> preds = new ArrayList<>();",
+            "  public synchronized void test() {",
+            "    Optional.of(\"foo\").ifPresent(this::frobnicate);",
+            "    // BUG: Diagnostic contains: should be guarded by",
+            "    preds.add(this::frobnicate);",
+            "  }",
+            "  @GuardedBy(\"this\")",
+            "  public boolean frobnicate(String x) {",
+            "    return true;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReference_flaggedOff_methodReferencesNotFlagged() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.ArrayList;",
+            "import java.util.List;",
+            "import java.util.Optional;",
+            "import java.util.function.Predicate;",
+            "import javax.annotation.concurrent.GuardedBy;",
+            "class Test {",
+            "  private final List<Predicate<String>> preds = new ArrayList<>();",
+            "  public synchronized void test() {",
+            "    Optional.of(\"foo\").ifPresent(this::frobnicate);",
+            "    preds.add(this::frobnicate);",
+            "  }",
+            "  @GuardedBy(\"this\")",
+            "  public boolean frobnicate(String x) {",
+            "    return true;",
+            "  }",
+            "}")
+        .setArgs("-XepOpt:GuardedBy:CheckMemberReferences=false")
+        .doTest();
+  }
 }

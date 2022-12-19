@@ -808,6 +808,21 @@ public class ASTHelpers {
   }
 
   /**
+   * Flag for record types, canonical record constructors and type members that are part of a
+   * record's state vector. Can be replaced by {@code com.sun.tools.javac.code.Flags.RECORD} once
+   * the minimum JDK version is 14.
+   */
+  private static final long RECORD_FLAG = 1L << 61;
+
+  /**
+   * Returns whether the given {@link Symbol} is a record, a record's canonical constructor or a
+   * member that is part of a record's state vector.
+   */
+  public static boolean isRecord(Symbol symbol) {
+    return (symbol.flags() & RECORD_FLAG) == RECORD_FLAG;
+  }
+
+  /**
    * Determines whether a symbol has an annotation of the given type. This includes annotations
    * inherited from superclasses due to {@code @Inherited}.
    *
@@ -2441,6 +2456,29 @@ public class ASTHelpers {
   }
 
   /**
+   * Returns true if the given method symbol is public (both the method and the enclosing class) and
+   * does <i>not</i> have a super-method (i.e., it is not an {@code @Override}).
+   *
+   * <p>This method is useful (in part) for determining whether to suggest API improvements or not.
+   */
+  public static boolean methodIsPublicAndNotAnOverride(MethodSymbol method, VisitorState state) {
+    // don't match non-public APIs
+    Symbol symbol = method;
+    while (symbol != null && !(symbol instanceof PackageSymbol)) {
+      if (!symbol.getModifiers().contains(Modifier.PUBLIC)) {
+        return false;
+      }
+      symbol = symbol.owner;
+    }
+
+    // don't match overrides (even "effective overrides")
+    if (!findSuperMethods(method, state.getTypes()).isEmpty()) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Returns true if the given method symbol is abstract.
    *
    * <p><b>Note:</b> this API does not consider interface {@code default} methods to be abstract.
@@ -2549,8 +2587,16 @@ public class ASTHelpers {
      * we see a start position, we then also look for an end position, which *is* absent for
      * lambda parameters, even under javac8. Possibly we could get by looking *only* for the end
      * position, but I'm keeping both checks now that I have something that appears to work.
+     *
+     * Note that the .isImplicitlyTyped() method on JCVariableDecl returns the wrong answer after
+     * type attribution has occurred.
      */
     return getStartPosition(tree.getType()) == -1 || state.getEndPosition(tree.getType()) == -1;
+  }
+
+  /** Returns {@code true} if this symbol was declared in Kotlin source. */
+  public static boolean isKotlin(Symbol symbol, VisitorState state) {
+    return hasAnnotation(symbol.enclClass(), "kotlin.Metadata", state);
   }
 
   private ASTHelpers() {}
