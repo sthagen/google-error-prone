@@ -219,4 +219,39 @@ public final class NonCanonicalTypeTest {
             "}")
         .doTest();
   }
+
+  // TODO(cushon): the fix for this should be Super<?>.Inner, not Super.Inner
+  @Test
+  public void innerArray() {
+    compilationHelper
+        .addSourceLines(
+            "Super.java", //
+            "class Super<T> {",
+            "  class Inner {}",
+            "}")
+        .addSourceLines(
+            "Super.java", //
+            "class Sub<T> extends Super<T> {",
+            "}")
+        .addSourceLines(
+            "Test.java", //
+            "class Test {",
+            "  // BUG: Diagnostic contains: `Super.Inner` was referred to by the non-canonical name"
+                + " `Sub.Inner`",
+            "  Sub<?>.Inner[] x;",
+            "}")
+        .doTest();
+  }
+
+  // see https://github.com/google/error-prone/issues/3639
+  @Test
+  public void moduleInfo() {
+    compilationHelper
+        .addSourceLines(
+            "module-info.java", //
+            "module testmodule {",
+            "  requires java.base;",
+            "}")
+        .doTest();
+  }
 }

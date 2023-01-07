@@ -69,12 +69,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 
 /** Matches comparison of proto fields to {@code null}. */
 @BugPattern(
     summary = "This value cannot be null, and comparing it to null may be misleading.",
-    name = "ProtoFieldNullComparison",
-    altNames = "ImpossibleNullComparison",
+    name = "ImpossibleNullComparison",
+    altNames = "ProtoFieldNullComparison",
     severity = ERROR)
 public final class ImpossibleNullComparison extends BugChecker
     implements CompilationUnitTreeMatcher {
@@ -145,6 +146,7 @@ public final class ImpossibleNullComparison extends BugChecker
   private final boolean matchTestAssertions;
   private final boolean matchOptionalAndMultimap;
 
+  @Inject
   public ImpossibleNullComparison(ErrorProneFlags flags) {
     this.matchTestAssertions =
         flags.getBoolean("ProtoFieldNullComparison:MatchTestAssertions").orElse(true);

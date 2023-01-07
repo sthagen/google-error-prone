@@ -39,6 +39,7 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.Reachability;
 import com.google.errorprone.util.RuntimeVersion;
+import com.google.errorprone.util.SourceVersion;
 import com.sun.source.tree.BreakTree;
 import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.ExpressionTree;
@@ -55,6 +56,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import javax.inject.Inject;
 
 /** Checks for statement switches that can be expressed as an equivalent expression switch. */
 @BugPattern(
@@ -78,6 +80,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
 
   private final boolean enableDirectConversion;
 
+  @Inject
   public StatementSwitchToExpressionSwitch(ErrorProneFlags flags) {
     this.enableDirectConversion =
         flags.getBoolean("StatementSwitchToExpressionSwitch:EnableDirectConversion").orElse(false);
@@ -85,8 +88,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
 
   @Override
   public Description matchSwitch(SwitchTree switchTree, VisitorState state) {
-    // Expression switches finalized in Java 14
-    if (!RuntimeVersion.isAtLeast14()) {
+    if (!SourceVersion.supportsSwitchExpressions(state.context)) {
       return NO_MATCH;
     }
 
@@ -122,7 +124,12 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
 
       List<? extends StatementTree> statements = caseTree.getStatements();
       CaseFallThru caseFallThru = CaseFallThru.MAYBE_FALLS_THRU;
-      if (statements.isEmpty()) {
+      if (statements == null) {
+        // This case must be of kind CaseTree.CaseKind.RULE, and thus this is already an expression
+        // switch; no need to continue analysis.
+        return AnalysisResult.of(
+            /* canConvertDirectlyToExpressionSwitch= */ false, ImmutableList.of());
+      } else if (statements.isEmpty()) {
         // If the code for this case is just an empty block, then it must fall thru
         caseFallThru = CaseFallThru.DEFINITELY_DOES_FALL_THRU;
         // Can group with the next case (unless this is the last case)
@@ -145,11 +152,11 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
         } else {
           allCasesHaveDefiniteControlFlow &=
               !fallsIntoDefaultCase
-                  && CaseFallThru.DEFINITELY_DOES_NOT_FALL_THRU.equals(caseFallThru);
+                  && caseFallThru.equals(CaseFallThru.DEFINITELY_DOES_NOT_FALL_THRU);
         }
       } else {
         // Cases other than default
-        allCasesHaveDefiniteControlFlow &= !CaseFallThru.MAYBE_FALLS_THRU.equals(caseFallThru);
+        allCasesHaveDefiniteControlFlow &= !caseFallThru.equals(CaseFallThru.MAYBE_FALLS_THRU);
       }
     }
 
@@ -241,7 +248,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
         // If block is just space or a single "break;" with no explanatory comments, then remove
         // it to eliminate redundancy and improve readability
         if (trimmedTransformedBlockSource.isEmpty()
-            || "break;".equals(trimmedTransformedBlockSource)) {
+            || trimmedTransformedBlockSource.equals("break;")) {
           replacementCodeBuilder.append("{}");
         } else {
           replacementCodeBuilder.append("{").append(transformedBlockSource).append("\n}");
@@ -312,7 +319,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
   private static ImmutableList<StatementTree> filterOutRedundantBreak(CaseTree caseTree) {
     boolean caseEndsWithUnlabelledBreak =
         Streams.findLast(caseTree.getStatements().stream())
-            .filter(statement -> BREAK.equals(statement.getKind()))
+            .filter(statement -> statement.getKind().equals(BREAK))
             .filter(breakTree -> ((BreakTree) breakTree).getLabel() == null)
             .isPresent();
     return caseEndsWithUnlabelledBreak

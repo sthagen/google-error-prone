@@ -29,8 +29,9 @@ import com.google.errorprone.bugpatterns.BugChecker.MemberSelectTreeMatcher;
 import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.Visibility;
-import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.ParameterizedTypeTree;
+import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.util.Position;
@@ -88,7 +89,12 @@ public final class NonCanonicalType extends BugChecker implements MemberSelectTr
     if (!(sym instanceof Symbol.TypeSymbol)) {
       return null;
     }
-    return sym.owner.getQualifiedName() + "." + sym.getSimpleName();
+    Symbol owner = sym.owner;
+    if (owner == null) {
+      // module symbols don't have owners
+      return null;
+    }
+    return owner.getQualifiedName() + "." + sym.getSimpleName();
   }
 
   private static final Pattern PACKAGE_CLASS_NAME_SPLITTER = Pattern.compile("(.*?)\\.([A-Z].*)");
@@ -115,7 +121,7 @@ public final class NonCanonicalType extends BugChecker implements MemberSelectTr
    * Find the non-canonical name which is being used to refer to this type. We can't just use {@code
    * getSymbol}, given that points to the same symbol as the canonical name.
    */
-  private static String getNonCanonicalName(ExpressionTree tree) {
+  private static String getNonCanonicalName(Tree tree) {
     switch (tree.getKind()) {
       case IDENTIFIER:
         return getSymbol(tree).getQualifiedName().toString();
@@ -128,8 +134,10 @@ public final class NonCanonicalType extends BugChecker implements MemberSelectTr
         return getNonCanonicalName(memberSelectTree.getExpression())
             + "."
             + memberSelectTree.getIdentifier();
+      case PARAMETERIZED_TYPE:
+        return getNonCanonicalName(((ParameterizedTypeTree) tree).getType());
       default:
-        throw new AssertionError();
+        throw new AssertionError(tree.getKind());
     }
   }
 }

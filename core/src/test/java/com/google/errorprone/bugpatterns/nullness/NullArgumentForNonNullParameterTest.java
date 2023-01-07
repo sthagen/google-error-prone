@@ -35,7 +35,7 @@ public class NullArgumentForNonNullParameterTest {
           .setArgs("-XepOpt:Nullness:Conservative=false");
 
   @Test
-  public void testPositivePrimitive() {
+  public void positivePrimitive() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -51,7 +51,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testPositiveAnnotatedNonnullAggressive() {
+  public void positiveAnnotatedNonnullAggressive() {
     aggressiveHelper
         .addSourceLines(
             "Foo.java",
@@ -67,7 +67,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testNegativeAnnotatedNonnullConservative() {
+  public void negativeAnnotatedNonnullConservative() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -82,7 +82,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testPositiveJavaOptionalOf() {
+  public void positiveJavaOptionalOf() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -97,7 +97,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testPositiveGuavaOptionalOf() {
+  public void positiveGuavaOptionalOf() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -112,7 +112,54 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testNegativeNullMarkedComGoogleCommonButNullable() {
+  public void positiveGuavaImmutableSetOf() {
+    conservativeHelper
+        .addSourceLines(
+            "Foo.java",
+            "import com.google.common.collect.ImmutableSet;",
+            "class Foo {",
+            "  void foo() {",
+            "    // BUG: Diagnostic contains: ",
+            "    ImmutableSet.of(null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void positiveGuavaImmutableSetBuilderAdd() {
+    conservativeHelper
+        .addSourceLines(
+            "Foo.java",
+            "import com.google.common.collect.ImmutableSet;",
+            "class Foo {",
+            "  void foo(boolean b) {",
+            "    // BUG: Diagnostic contains: ",
+            // We use a ternary to avoid:
+            // "non-varargs call of varargs method with inexact argument type for last parameter"
+            "    ImmutableSet.builder().add(b ? 1 : null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void positiveArgumentCaptorForClass() {
+    conservativeHelper
+        .addSourceLines(
+            "Foo.java",
+            "import org.mockito.ArgumentCaptor;",
+            "class Foo {",
+            "  void foo() {",
+            "    // BUG: Diagnostic contains: ",
+            "    ArgumentCaptor.forClass(null);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void negativeNullMarkedComGoogleCommonButNullable() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -126,7 +173,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testPositiveNullMarkedOtherPackageAggressive() {
+  public void positiveNullMarkedOtherPackageAggressive() {
     aggressiveHelper
         .addSourceLines(
             "Foo.java",
@@ -143,7 +190,7 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testNegativeNullMarkedNonComGoogleCommonPackageConservative() {
+  public void negativeNullMarkedNonComGoogleCommonPackageConservative() {
     conservativeHelper
         .addSourceLines(
             "Foo.java",
@@ -159,14 +206,14 @@ public class NullArgumentForNonNullParameterTest {
   }
 
   @Test
-  public void testNegativeNullMarkedTypeVariable() {
+  public void negativeNullMarkedTypeVariable() {
     aggressiveHelper
         .addSourceLines(
             "Foo.java",
-            "import com.google.common.collect.ImmutableSet;",
+            "import com.google.common.collect.ConcurrentHashMultiset;",
             "class Foo {",
             "  void foo() {",
-            "    ImmutableSet.of(null);",
+            "    ConcurrentHashMultiset.create().add(null);",
             "  }",
             "}")
         .doTest();

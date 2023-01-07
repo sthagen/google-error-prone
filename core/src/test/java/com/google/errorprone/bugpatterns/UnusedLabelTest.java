@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The Error Prone Authors.
+ * Copyright 2023 The Error Prone Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,58 +22,49 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public final class CannotMockFinalMethodTest {
-  private final CompilationTestHelper compilationHelper =
-      CompilationTestHelper.newInstance(CannotMockFinalMethod.class, getClass());
+public final class UnusedLabelTest {
+  private final CompilationTestHelper helper =
+      CompilationTestHelper.newInstance(UnusedLabel.class, getClass());
 
   @Test
-  public void whenCall_flagged() {
-    compilationHelper
+  public void positive() {
+    helper
         .addSourceLines(
             "Test.java",
-            "import static org.mockito.Mockito.when;",
             "class Test {",
-            "  final Integer foo() {",
-            "    return 1;",
-            "  }",
             "  void test() {",
             "    // BUG: Diagnostic contains:",
-            "    when(this.foo());",
+            "    label: while(true) {}",
             "  }",
             "}")
         .doTest();
   }
 
   @Test
-  public void verifyCall_flagged() {
-    compilationHelper
+  public void usedInBreak_noFinding() {
+    helper
         .addSourceLines(
             "Test.java",
-            "import static org.mockito.Mockito.verify;",
             "class Test {",
-            "  final Integer foo() {",
-            "    return 1;",
-            "  }",
             "  void test() {",
-            "    // BUG: Diagnostic contains:",
-            "    verify(this).foo();",
+            "    label: while(true) {",
+            "      break label;",
+            "    }",
             "  }",
             "}")
         .doTest();
   }
 
   @Test
-  public void negative() {
-    compilationHelper
+  public void usedInContinue_noFinding() {
+    helper
         .addSourceLines(
             "Test.java",
-            "import static org.mockito.Mockito.when;",
             "class Test {",
-            "  Integer foo() {",
-            "    return 1;",
-            "  }",
             "  void test() {",
-            "    when(this.foo());",
+            "    label: while(true) {",
+            "      continue label;",
+            "    }",
             "  }",
             "}")
         .doTest();

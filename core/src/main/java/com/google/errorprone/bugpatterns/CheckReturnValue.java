@@ -84,6 +84,7 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.inject.Inject;
 import javax.lang.model.element.ElementKind;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -93,6 +94,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 @BugPattern(
     altNames = {"ResultOfMethodCallIgnored", "ReturnValueIgnored"},
     summary = "The result of this call must be used",
+    documentSuppression = false, // We prefer `var unused`, as covered in CheckReturnValue.md.
     severity = ERROR)
 public class CheckReturnValue extends AbstractReturnValueIgnored
     implements MethodTreeMatcher, ClassTreeMatcher {
@@ -139,6 +141,7 @@ public class CheckReturnValue extends AbstractReturnValueIgnored
   private final MessageTrailerStyle messageTrailerStyle;
   private final ResultUsePolicyEvaluator<VisitorState, Symbol, MethodSymbol> evaluator;
 
+  @Inject
   public CheckReturnValue(ErrorProneFlags flags) {
     super(flags);
     this.messageTrailerStyle =

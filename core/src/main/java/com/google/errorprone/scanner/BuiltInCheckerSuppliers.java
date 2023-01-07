@@ -63,7 +63,7 @@ import com.google.errorprone.bugpatterns.BugPatternNaming;
 import com.google.errorprone.bugpatterns.ByteBufferBackingArray;
 import com.google.errorprone.bugpatterns.CacheLoaderNull;
 import com.google.errorprone.bugpatterns.CannotMockFinalClass;
-import com.google.errorprone.bugpatterns.CannotMockFinalMethod;
+import com.google.errorprone.bugpatterns.CannotMockMethod;
 import com.google.errorprone.bugpatterns.CanonicalDuration;
 import com.google.errorprone.bugpatterns.CatchAndPrintStackTrace;
 import com.google.errorprone.bugpatterns.CatchFail;
@@ -169,6 +169,7 @@ import com.google.errorprone.bugpatterns.IndexOfChar;
 import com.google.errorprone.bugpatterns.InexactVarargsConditional;
 import com.google.errorprone.bugpatterns.InfiniteRecursion;
 import com.google.errorprone.bugpatterns.InitializeInline;
+import com.google.errorprone.bugpatterns.InjectOnBugCheckers;
 import com.google.errorprone.bugpatterns.InputStreamSlowMultibyteRead;
 import com.google.errorprone.bugpatterns.InsecureCipherMode;
 import com.google.errorprone.bugpatterns.InstanceOfAndCastMatchWrongType;
@@ -197,6 +198,7 @@ import com.google.errorprone.bugpatterns.JUnitParameterMethodNotFound;
 import com.google.errorprone.bugpatterns.JavaLangClash;
 import com.google.errorprone.bugpatterns.JavaUtilDateChecker;
 import com.google.errorprone.bugpatterns.JdkObsolete;
+import com.google.errorprone.bugpatterns.LabelledBreakTarget;
 import com.google.errorprone.bugpatterns.LambdaFunctionalInterface;
 import com.google.errorprone.bugpatterns.LenientFormatStringValidation;
 import com.google.errorprone.bugpatterns.LiteByteStringUtf8;
@@ -394,6 +396,7 @@ import com.google.errorprone.bugpatterns.UnsynchronizedOverridesSynchronized;
 import com.google.errorprone.bugpatterns.UnusedAnonymousClass;
 import com.google.errorprone.bugpatterns.UnusedCollectionModifiedInPlace;
 import com.google.errorprone.bugpatterns.UnusedException;
+import com.google.errorprone.bugpatterns.UnusedLabel;
 import com.google.errorprone.bugpatterns.UnusedMethod;
 import com.google.errorprone.bugpatterns.UnusedNestedClass;
 import com.google.errorprone.bugpatterns.UnusedTypeParameter;
@@ -409,6 +412,7 @@ import com.google.errorprone.bugpatterns.WildcardImport;
 import com.google.errorprone.bugpatterns.WithSignatureDiscouraged;
 import com.google.errorprone.bugpatterns.WrongOneof;
 import com.google.errorprone.bugpatterns.XorPower;
+import com.google.errorprone.bugpatterns.YodaCondition;
 import com.google.errorprone.bugpatterns.android.BinderIdentityRestoredDangerously;
 import com.google.errorprone.bugpatterns.android.BundleDeserializationCast;
 import com.google.errorprone.bugpatterns.android.FragmentInjection;
@@ -871,6 +875,7 @@ public class BuiltInCheckerSuppliers {
           IncorrectMainMethod.class,
           IncrementInForLoopAndHeader.class,
           InheritDoc.class,
+          InjectOnBugCheckers.class,
           InjectOnConstructorOfAbstractClass.class,
           InjectedConstructorAnnotations.class,
           InlineFormatString.class,
@@ -909,6 +914,7 @@ public class BuiltInCheckerSuppliers {
           JodaPlusMinusLong.class,
           JodaTimeConverterManager.class,
           JodaWithDurationAddedLong.class,
+          LabelledBreakTarget.class,
           LiteEnumValueOf.class,
           LiteProtoToString.class,
           LockNotBeforeTry.class,
@@ -974,7 +980,6 @@ public class BuiltInCheckerSuppliers {
           ScopeAnnotationOnInterfaceOrAbstractClass.class,
           SelfAlwaysReturnsThis.class,
           ShortCircuitBoolean.class,
-          StatementSwitchToExpressionSwitch.class,
           StaticAssignmentInConstructor.class,
           StaticAssignmentOfThrowable.class,
           StaticGuardedByInstance.class,
@@ -1001,7 +1006,6 @@ public class BuiltInCheckerSuppliers {
           TypeParameterUnusedInFormals.class,
           URLEqualsHashCode.class,
           UndefinedEquals.class,
-          UnescapedEntity.class,
           UnicodeEscape.class,
           UnnecessaryAssignment.class,
           UnnecessaryLambda.class,
@@ -1014,6 +1018,7 @@ public class BuiltInCheckerSuppliers {
           UnsafeFinalization.class,
           UnsafeReflectiveConstructionCast.class,
           UnsynchronizedOverridesSynchronized.class,
+          UnusedLabel.class,
           UnusedMethod.class,
           UnusedNestedClass.class,
           UnusedTypeParameter.class,
@@ -1046,7 +1051,7 @@ public class BuiltInCheckerSuppliers {
           BuilderReturnThis.class,
           CanIgnoreReturnValueSuggester.class,
           CannotMockFinalClass.class,
-          CannotMockFinalMethod.class,
+          CannotMockMethod.class,
           CatchingUnchecked.class,
           CheckedExceptionNotThrown.class,
           ClassName.class,
@@ -1119,6 +1124,7 @@ public class BuiltInCheckerSuppliers {
           ReturnsNullCollection.class,
           ScopeOnModule.class,
           ScopeOrQualifierAnnotationRetention.class,
+          StatementSwitchToExpressionSwitch.class,
           StaticOrDefaultInterfaceMethod.class,
           StaticQualifiedUsingExpression.class,
           StronglyTypeByteString.class,
@@ -1138,6 +1144,7 @@ public class BuiltInCheckerSuppliers {
           TryWithResourcesVariable.class,
           TypeParameterNaming.class,
           TypeToString.class,
+          UnescapedEntity.class, // TODO(b/263817298): re-enable
           UngroupedOverloads.class,
           UnnecessarilyFullyQualified.class,
           UnnecessarilyUsedValue.class,
@@ -1158,7 +1165,8 @@ public class BuiltInCheckerSuppliers {
           VarChecker.class,
           Varifier.class,
           VoidMissingNullable.class,
-          WildcardImport.class
+          WildcardImport.class,
+          YodaCondition.class
           // keep-sorted end
           );
 

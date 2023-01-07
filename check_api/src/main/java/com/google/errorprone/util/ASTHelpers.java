@@ -42,7 +42,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.errorprone.VisitorState;
-import com.google.errorprone.annotations.InlineMe;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.NullnessAnalysis;
 import com.google.errorprone.matchers.JUnitMatchers;
@@ -1004,17 +1003,6 @@ public class ASTHelpers {
   }
 
   /**
-   * @deprecated use {@link #shouldKeep} instead
-   */
-  @Deprecated
-  @InlineMe(
-      replacement = "ASTHelpers.shouldKeep(tree)",
-      imports = "com.google.errorprone.util.ASTHelpers")
-  public static boolean isUsedReflectively(Tree tree) {
-    return shouldKeep(tree);
-  }
-
-  /**
    * Returns true if any of the given tree is a declaration annotated with an annotation with the
    * simple name {@code @UsedReflectively} or {@code @Keep}, or any annotations meta-annotated with
    * an annotation with that simple name.
@@ -1037,6 +1025,9 @@ public class ASTHelpers {
           || tsym.getSimpleName().contentEquals(KEEP)) {
         return true;
       }
+      if (ANNOTATIONS_CONSIDERED_KEEP.contains(tsym.getQualifiedName().toString())) {
+        return true;
+      }
       if (hasDirectAnnotationWithSimpleName(tsym, USED_REFLECTIVELY)
           || hasDirectAnnotationWithSimpleName(tsym, KEEP)) {
         return true;
@@ -1044,6 +1035,13 @@ public class ASTHelpers {
     }
     return false;
   }
+
+  /**
+   * Additional annotations which can't be annotated with {@code @Keep}, but should be treated as
+   * though they are.
+   */
+  private static final ImmutableSet<String> ANNOTATIONS_CONSIDERED_KEEP =
+      ImmutableSet.of("org.apache.beam.sdk.transforms.DoFn.ProcessElement");
 
   private static final String USED_REFLECTIVELY = "UsedReflectively";
 

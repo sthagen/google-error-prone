@@ -99,10 +99,16 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
       ImmutableSet.of(
           "com.fasterxml.jackson.annotation.JsonCreator",
           "com.fasterxml.jackson.annotation.JsonValue",
+          "com.google.acai.AfterTest",
+          "com.google.acai.BeforeSuite",
+          "com.google.acai.BeforeTest",
+          "com.google.caliper.Benchmark",
+          "com.google.common.eventbus.Subscribe",
           "com.google.inject.Provides",
           "com.google.inject.Inject",
           "com.google.inject.multibindings.ProvidesIntoMap",
           "com.google.inject.multibindings.ProvidesIntoSet",
+          "com.google.inject.throwingproviders.CheckedProvides",
           "com.tngtech.java.junit.dataprovider.DataProvider",
           "jakarta.annotation.PreDestroy",
           "jakarta.annotation.PostConstruct",
@@ -247,9 +253,7 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
           return false;
         }
         MethodSymbol methodSymbol = getSymbol(tree);
-        if (!methodSymbol.isPrivate()
-            && classesMadeVisible.stream()
-                .anyMatch(t -> isSubtype(t.type, methodSymbol.owner.type, state))) {
+        if (!canBeRemoved(methodSymbol, state)) {
           return false;
         }
         if (isExemptedConstructor(methodSymbol, state)
@@ -265,8 +269,13 @@ public final class UnusedMethod extends BugChecker implements CompilationUnitTre
             return false;
           }
         }
+        if (!methodSymbol.isPrivate()
+            && classesMadeVisible.stream()
+                .anyMatch(t -> isSubtype(t.type, methodSymbol.owner.type, state))) {
+          return false;
+        }
 
-        return canBeRemoved(methodSymbol, state);
+        return true;
       }
 
       private boolean isExemptedConstructor(MethodSymbol methodSymbol, VisitorState state) {

@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.inject.Inject;
 import javax.lang.model.element.Name;
 
 /**
@@ -57,6 +58,7 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
 
   private final Boolean batchFindings;
 
+  @Inject
   public UngroupedOverloads(ErrorProneFlags flags) {
     batchFindings = flags.getBoolean("UngroupedOverloads:BatchFindings").orElse(false);
   }
@@ -96,7 +98,9 @@ public class UngroupedOverloads extends BugChecker implements ClassTreeMatcher {
       Tree member = classTree.getMembers().get(i);
       if (member instanceof MethodTree) {
         MethodTree methodTree = (MethodTree) member;
-        methods.put(OverloadKey.create(methodTree), MemberWithIndex.create(i, methodTree));
+        if (!ASTHelpers.isGeneratedConstructor(methodTree)) {
+          methods.put(OverloadKey.create(methodTree), MemberWithIndex.create(i, methodTree));
+        }
       }
     }
     ImmutableList<Description> descriptions =
