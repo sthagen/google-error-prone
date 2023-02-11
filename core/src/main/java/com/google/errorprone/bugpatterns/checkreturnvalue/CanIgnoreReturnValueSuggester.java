@@ -17,6 +17,7 @@
 package com.google.errorprone.bugpatterns.checkreturnvalue;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.fixes.SuggestedFixes.qualifyType;
 import static com.google.errorprone.util.ASTHelpers.getAnnotationWithSimpleName;
@@ -27,6 +28,7 @@ import static com.google.errorprone.util.ASTHelpers.hasAnnotation;
 import static com.google.errorprone.util.ASTHelpers.isAbstract;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
 import static com.google.errorprone.util.ASTHelpers.isSubtype;
+import static com.google.errorprone.util.ASTHelpers.shouldKeep;
 import static com.google.errorprone.util.ASTHelpers.stripParentheses;
 
 import com.google.common.collect.ImmutableSet;
@@ -78,17 +80,32 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
   private static final Supplier<Type> PROTO_BUILDER =
       VisitorState.memoize(s -> s.getTypeFromString("com.google.protobuf.MessageLite.Builder"));
 
+  private static final ImmutableSet<String> BANNED_METHOD_PREFIXES =
+      ImmutableSet.of("get", "is", "has", "new", "clone", "copy");
+
   @Override
   public Description matchMethod(MethodTree methodTree, VisitorState state) {
     MethodSymbol methodSymbol = getSymbol(methodTree);
 
     // if the method is already directly annotated w/ @CRV or @CIRV, bail out
-    if (hasAnnotation(methodTree, CRV, state) || hasAnnotation(methodSymbol, CIRV, state)) {
+    if (hasAnnotation(methodSymbol, CRV, state) || hasAnnotation(methodSymbol, CIRV, state)) {
       return Description.NO_MATCH;
     }
 
-    // if the method always returns input params, make it CIRV
-    if (methodAlwaysReturnsInputParam(methodTree)) {
+    // if the method is annotated with an annotation that is @Keep, bail out
+    if (shouldKeep(methodTree)) {
+      return Description.NO_MATCH;
+    }
+
+    // if the method looks like an accessor, bail out
+    String methodName = methodSymbol.getSimpleName().toString();
+    // TODO(kak): we also may want to check if methodSymbol.getParameters().isEmpty()
+    if (BANNED_METHOD_PREFIXES.stream().anyMatch(methodName::startsWith)) {
+      return Description.NO_MATCH;
+    }
+
+    // if the method always return a single input param (of the same type), make it CIRV
+    if (methodAlwaysReturnsInputParam(methodTree, state)) {
       return annotateWithCanIgnoreReturnValue(methodTree, state);
     }
 
@@ -118,7 +135,7 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
     }
 
     // if the method looks like a builder, or if it always returns `this`, then make it @CIRV
-    if (methodLooksLikeBuilder(methodSymbol, state)
+    if (classLooksLikeBuilder(methodSymbol.owner, state)
         || methodReturnsIgnorableValues(methodTree, state)) {
       return annotateWithCanIgnoreReturnValue(methodTree, state);
     }
@@ -153,17 +170,10 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
             || hasAnnotation(owner, "com.google.auto.value.AutoBuilder", state));
   }
 
-  private static final ImmutableSet<String> BANNED_BUILDER_METHOD_PREFIXES =
-      ImmutableSet.of("new", "clone", "copy");
-
-  private static boolean methodLooksLikeBuilder(MethodSymbol methodSymbol, VisitorState state) {
-    boolean enclosingTypeIsImmutable =
-        hasAnnotation(methodSymbol.owner, IMMUTABLE, state)
-            || hasAnnotation(methodSymbol.owner, AUTO_VALUE, state);
-    String methodName = methodSymbol.getSimpleName().toString();
-    return methodSymbol.owner.getSimpleName().toString().contains("Builder")
-        && BANNED_BUILDER_METHOD_PREFIXES.stream().noneMatch(methodName::startsWith)
-        && !enclosingTypeIsImmutable;
+  private static boolean classLooksLikeBuilder(Symbol owner, VisitorState state) {
+    boolean classIsImmutable =
+        hasAnnotation(owner, IMMUTABLE, state) || hasAnnotation(owner, AUTO_VALUE, state);
+    return owner.getSimpleName().toString().endsWith("Builder") && !classIsImmutable;
   }
 
   private static boolean isSimpleReturnThisMethod(MethodTree methodTree) {
@@ -287,7 +297,7 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
     return scanner.atLeastOneReturn && scanner.allReturnsIgnorable;
   }
 
-  private static boolean methodAlwaysReturnsInputParam(MethodTree methodTree) {
+  private static boolean methodAlwaysReturnsInputParam(MethodTree methodTree, VisitorState state) {
     // short-circuit if the method has no parameters
     if (methodTree.getParameters().isEmpty()) {
       return false;
@@ -318,11 +328,18 @@ public final class CanIgnoreReturnValueSuggester extends BugChecker implements M
 
     AllReturnsAreInputParams scanner = new AllReturnsAreInputParams();
     scanner.scan(methodTree, null);
-    // there must be only 1 symbol returned and it must be a method parameter symbol
-    return (scanner.returnedSymbols.size() == 1)
-        && methodTree.getParameters().stream()
-            .map(ASTHelpers::getSymbol)
+    // if we have more than 1 returned symbol, then the value isn't ignorable
+    if (scanner.returnedSymbols.size() != 1) {
+      return false;
+    }
+    Symbol returnedSymbol = getOnlyElement(scanner.returnedSymbols);
+    if (returnedSymbol == null) {
+      return false;
+    }
+    MethodSymbol methodSymbol = getSymbol(methodTree);
+    return isSameType(returnedSymbol.type, methodSymbol.getReturnType(), state)
+        && methodSymbol.getParameters().stream()
             .filter(ASTHelpers::isConsideredFinal)
-            .anyMatch(sym -> sym.equals(scanner.returnedSymbols.iterator().next()));
+            .anyMatch(returnedSymbol::equals);
   }
 }

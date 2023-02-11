@@ -257,6 +257,7 @@ public class CanIgnoreReturnValueSuggesterTest {
             "  public abstract Builder enableDeathStar();",
             "  public abstract Builder clone();",
             "  public abstract Builder copy();",
+            "  public abstract Builder getCopy();",
             "  public abstract Builder newBuilder();",
             "}")
         .addOutputLines(
@@ -270,6 +271,7 @@ public class CanIgnoreReturnValueSuggesterTest {
             "  public abstract Builder enableDeathStar();",
             "  public abstract Builder clone();",
             "  public abstract Builder copy();",
+            "  public abstract Builder getCopy();",
             "  public abstract Builder newBuilder();",
             "}")
         .doTest();
@@ -810,6 +812,21 @@ public class CanIgnoreReturnValueSuggesterTest {
             "  abstract static class Builder {",
             "    abstract Builder setName(String value);",
             "    abstract AnimalBuilder build();",
+            "  }",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void providesMethod_b267362954() {
+    helper
+        .addInputLines(
+            "Example.java",
+            "package com.google.frobber;",
+            "public final class Example {",
+            "  static CharSequence provideName(String name) {",
+            "    return name;",
             "  }",
             "}")
         .expectUnchanged()
