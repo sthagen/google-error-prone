@@ -165,15 +165,9 @@ public final class ThreadSafety {
      * example, when testing a class for immutability, this should be @Immutable.
      */
     @CanIgnoreReturnValue
-    public Builder markerAnnotations(Set<String> markerAnnotations) {
-      return markerAnnotations(ImmutableSet.copyOf(markerAnnotations));
-    }
-
-    // TODO(ringwalt): Remove this constructor. We need it for binary compatibility.
-    @CanIgnoreReturnValue
-    public Builder markerAnnotations(ImmutableSet<String> markerAnnotations) {
+    public Builder markerAnnotations(Iterable<String> markerAnnotations) {
       checkNotNull(markerAnnotations);
-      this.markerAnnotations = markerAnnotations;
+      this.markerAnnotations = ImmutableSet.copyOf(markerAnnotations);
       return this;
     }
 
@@ -184,15 +178,9 @@ public final class ThreadSafety {
      * thread-safe.
      */
     @CanIgnoreReturnValue
-    public Builder acceptedAnnotations(Set<String> acceptedAnnotations) {
-      return acceptedAnnotations(ImmutableSet.copyOf(acceptedAnnotations));
-    }
-
-    // TODO(ringwalt): Remove this constructor. We need it for binary compatibility.
-    @CanIgnoreReturnValue
-    public Builder acceptedAnnotations(ImmutableSet<String> acceptedAnnotations) {
+    public Builder acceptedAnnotations(Iterable<String> acceptedAnnotations) {
       checkNotNull(acceptedAnnotations);
-      this.acceptedAnnotations = acceptedAnnotations;
+      this.acceptedAnnotations = ImmutableSet.copyOf(acceptedAnnotations);
       return this;
     }
 
@@ -206,7 +194,7 @@ public final class ThreadSafety {
 
     /** An annotation which marks a generic parameter as a container type. */
     @CanIgnoreReturnValue
-    public Builder containerOfAnnotation(Set<String> containerOfAnnotation) {
+    public Builder containerOfAnnotation(Iterable<String> containerOfAnnotation) {
       checkNotNull(containerOfAnnotation);
       this.containerOfAnnotation = ImmutableSet.copyOf(containerOfAnnotation);
       return this;
@@ -222,7 +210,7 @@ public final class ThreadSafety {
 
     /** An annotation which, when found on a class, should suppress the test */
     @CanIgnoreReturnValue
-    public Builder suppressAnnotation(Set<String> suppressAnnotation) {
+    public Builder suppressAnnotation(Iterable<String> suppressAnnotation) {
       checkNotNull(suppressAnnotation);
       this.suppressAnnotation = ImmutableSet.copyOf(suppressAnnotation);
       return this;
@@ -248,7 +236,7 @@ public final class ThreadSafety {
      * only be instantiated with thread-safe types.
      */
     @CanIgnoreReturnValue
-    public Builder typeParameterAnnotation(Set<String> typeParameterAnnotation) {
+    public Builder typeParameterAnnotation(Iterable<String> typeParameterAnnotation) {
       checkNotNull(typeParameterAnnotation);
       this.typeParameterAnnotation = ImmutableSet.copyOf(typeParameterAnnotation);
       return this;
@@ -707,36 +695,25 @@ public final class ThreadSafety {
   @Nullable
   private AnnotationInfo getAnnotation(
       Symbol sym, ImmutableSet<String> annotationsToCheck, VisitorState state) {
-    for (String annotation : annotationsToCheck) {
-      AnnotationInfo info = getAnnotation(sym, state, annotation, containerOfAnnotation);
-      if (info != null) {
-        return info;
-      }
-    }
-    return null;
-  }
-
-  @Nullable
-  private AnnotationInfo getAnnotation(
-      Symbol sym, VisitorState state, String annotation, ImmutableSet<String> elementAnnotation) {
     if (sym == null) {
       return null;
     }
     Optional<Compound> attr =
         sym.getRawAttributes().stream()
-            .filter(a -> a.type.tsym.getQualifiedName().contentEquals(annotation))
+            .filter(a -> annotationsToCheck.contains(a.type.tsym.getQualifiedName().toString()))
             .findAny();
     if (attr.isPresent()) {
       ImmutableList<String> containerElements = containerOf(state, attr.get());
-      if (!elementAnnotation.isEmpty() && containerElements.isEmpty()) {
-
+      if (!containerOfAnnotation.isEmpty() && containerElements.isEmpty()) {
         containerElements =
             sym.getTypeParameters().stream()
                 .filter(
                     p ->
                         p.getAnnotationMirrors().stream()
                             .anyMatch(
-                                a -> elementAnnotation.contains(a.type.tsym.flatName().toString())))
+                                a ->
+                                    containerOfAnnotation.contains(
+                                        a.type.tsym.flatName().toString())))
                 .map(p -> p.getSimpleName().toString())
                 .collect(toImmutableList());
       }
