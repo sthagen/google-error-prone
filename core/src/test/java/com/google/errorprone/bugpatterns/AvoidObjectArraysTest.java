@@ -77,6 +77,20 @@ public class AvoidObjectArraysTest {
   }
 
   @Test
+  public void methodParam_instanceMethods_withIterableOverload() {
+    compilationHelper
+        .addSourceLines(
+            "IterableSubject.java",
+            "public class IterableSubject {",
+            "  public final void containsAnyIn(Iterable<?> expected) {",
+            "  }",
+            "  public final void containsAnyIn(Object[] expected) {",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void returnType_instanceMethods() {
     compilationHelper
         .addSourceLines(
