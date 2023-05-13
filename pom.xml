@@ -42,7 +42,7 @@
     <flogger.version>0.7.4</flogger.version>
     <maven-javadoc-plugin.version>3.3.1</maven-javadoc-plugin.version>
     <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
-    <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
+    <nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
     <protobuf.version>3.19.2</protobuf.version>
     <grpc.version>1.43.2</grpc.version>
     <jspecify.version>0.2.0</jspecify.version>
@@ -137,9 +137,36 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+        <version>6.4.0</version>
+        <executions>
+          <execution>
+            <id>generate-OSGi-manifest</id>
+            <goals>
+              <goal>bnd-process</goal>
+            </goals>
+            <configuration>
+              <bnd><![CDATA[
+                Bundle-SymbolicName: com.google.$<replacestring;$<replacestring;${project.artifactId};^error_prone;errorprone>;_;.>
+                Automatic-Module-Name: $<Bundle-SymbolicName>
+                -exportcontents: com.google.errorprone*
+                -noextraheaders: true
+                -removeheaders: Private-Package
+              ]]></bnd>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>3.2.2</version>
+        <configuration>
+          <archive>
+            <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+          </archive>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -208,7 +235,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.22.2</version>
+        <version>3.1.0</version>
         <configuration>
           <argLine>
             -Xmx1g
@@ -301,6 +328,29 @@
             </executions>
           </plugin>
         </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>custom-test-runtime-version</id>
+      <activation>
+        <property>
+          <name>surefire.jdk-toolchain-version</name>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                <jdkToolchain>
+                  <version>${surefire.jdk-toolchain-version}</version>
+                </jdkToolchain>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
       </build>
     </profile>
   </profiles>
