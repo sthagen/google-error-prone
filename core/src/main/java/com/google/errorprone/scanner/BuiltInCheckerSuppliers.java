@@ -227,6 +227,7 @@ import com.google.errorprone.bugpatterns.MissingDefault;
 import com.google.errorprone.bugpatterns.MissingFail;
 import com.google.errorprone.bugpatterns.MissingImplementsComparable;
 import com.google.errorprone.bugpatterns.MissingOverride;
+import com.google.errorprone.bugpatterns.MissingRefasterAnnotation;
 import com.google.errorprone.bugpatterns.MissingSuperCall;
 import com.google.errorprone.bugpatterns.MissingTestCall;
 import com.google.errorprone.bugpatterns.MisusedDayOfYear;
@@ -515,6 +516,7 @@ import com.google.errorprone.bugpatterns.javadoc.ReturnFromVoid;
 import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
 import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
+import com.google.errorprone.bugpatterns.nullness.DereferenceWithNullBranch;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ExtendsObject;
@@ -651,6 +653,7 @@ public class BuiltInCheckerSuppliers {
           DangerousLiteralNullChecker.class,
           DeadException.class,
           DeadThread.class,
+          DereferenceWithNullBranch.class,
           DiscardedPostfixExpression.class,
           DoNotCallChecker.class,
           DoNotMockChecker.class,
@@ -938,6 +941,7 @@ public class BuiltInCheckerSuppliers {
           MissingFail.class,
           MissingImplementsComparable.class,
           MissingOverride.class,
+          MissingRefasterAnnotation.class,
           MissingSummary.class,
           MixedMutabilityReturnType.class,
           MockNotUsedInProduction.class,
