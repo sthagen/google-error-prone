@@ -172,6 +172,7 @@ import com.google.errorprone.bugpatterns.InexactVarargsConditional;
 import com.google.errorprone.bugpatterns.InfiniteRecursion;
 import com.google.errorprone.bugpatterns.InitializeInline;
 import com.google.errorprone.bugpatterns.InjectOnBugCheckers;
+import com.google.errorprone.bugpatterns.InlineTrivialConstant;
 import com.google.errorprone.bugpatterns.InputStreamSlowMultibyteRead;
 import com.google.errorprone.bugpatterns.InsecureCipherMode;
 import com.google.errorprone.bugpatterns.InstanceOfAndCastMatchWrongType;
@@ -394,6 +395,7 @@ import com.google.errorprone.bugpatterns.UnnecessaryOptionalGet;
 import com.google.errorprone.bugpatterns.UnnecessaryParentheses;
 import com.google.errorprone.bugpatterns.UnnecessarySetDefault;
 import com.google.errorprone.bugpatterns.UnnecessaryStaticImport;
+import com.google.errorprone.bugpatterns.UnnecessaryStringBuilder;
 import com.google.errorprone.bugpatterns.UnnecessaryTestMethodPrefix;
 import com.google.errorprone.bugpatterns.UnnecessaryTypeArgument;
 import com.google.errorprone.bugpatterns.UnsafeFinalization;
@@ -613,6 +615,14 @@ public class BuiltInCheckerSuppliers {
    */
   public static ScannerSupplier errorChecks() {
     return allChecks().filter(Predicates.in(ENABLED_ERRORS));
+  }
+
+  /**
+   * Returns a {@link ScannerSupplier} with the {@link BugChecker}s that are in the ENABLED_WARNINGS
+   * list.
+   */
+  public static ScannerSupplier warningChecks() {
+    return allChecks().filter(Predicates.in(ENABLED_WARNINGS));
   }
 
   /** A list of all checks with severity ERROR that are on by default. */
@@ -890,6 +900,7 @@ public class BuiltInCheckerSuppliers {
           InjectOnConstructorOfAbstractClass.class,
           InjectedConstructorAnnotations.class,
           InlineFormatString.class,
+          InlineTrivialConstant.class,
           Inliner.class,
           InputStreamSlowMultibyteRead.class,
           InstanceOfAndCastMatchWrongType.class,
@@ -1030,6 +1041,7 @@ public class BuiltInCheckerSuppliers {
           UnnecessaryMethodInvocationMatcher.class,
           UnnecessaryMethodReference.class,
           UnnecessaryParentheses.class,
+          UnnecessaryStringBuilder.class,
           UnrecognisedJavadocTag.class,
           UnsafeFinalization.class,
           UnsafeReflectiveConstructionCast.class,

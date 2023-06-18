@@ -19,8 +19,10 @@ package com.google.errorprone.bugpatterns;
 import static com.google.errorprone.BugPattern.SeverityLevel.WARNING;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.predicates.TypePredicates.anyOf;
+import static com.google.errorprone.predicates.TypePredicates.anything;
 import static com.google.errorprone.predicates.TypePredicates.isDescendantOf;
 import static com.google.errorprone.predicates.TypePredicates.isExactType;
+import static com.google.errorprone.predicates.TypePredicates.not;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
 import static com.google.errorprone.util.ASTHelpers.getType;
 import static com.google.errorprone.util.ASTHelpers.isSameType;
@@ -39,9 +41,9 @@ import com.sun.tools.javac.code.Type;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-/** Flags instances of non-API types from being accepted or returned in public APIs. */
+/** Flags instances of non-API types from being accepted or returned in APIs. */
 @BugPattern(
-    summary = "Certain types should not be passed across public API boundaries.",
+    summary = "Certain types should not be passed across API boundaries.",
     // something about reducing build visibility
     severity = WARNING)
 public final class NonApiType extends BugChecker implements MethodTreeMatcher {
@@ -53,8 +55,13 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
   private static final String INTERFACES_NOT_IMPLS_LINK = "";
   private static final String PRIMITIVE_ARRAYS_LINK = "";
   private static final String PROTO_TIME_SERIALIZATION_LINK = "";
+  private static final String ITERATOR_LINK = "";
+  private static final String STREAM_LINK = "";
   private static final String OPTIONAL_AS_PARAM_LINK = "";
   private static final String PREFER_JDK_OPTIONAL_LINK = "";
+
+  private static final TypePredicate NON_GRAPH_WRAPPER =
+      not(isDescendantOf("com.google.apps.framework.producers.GraphWrapper"));
 
   private static final ImmutableSet<TypeToCheck> NON_API_TYPES =
       ImmutableSet.of(
@@ -91,19 +98,23 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
           // ImmutableFoo as params
           withPublicVisibility(
               isExactType("com.google.common.collect.ImmutableCollection"),
+              NON_GRAPH_WRAPPER,
               "Consider accepting a java.util.Collection or Iterable instead. "
                   + TYPE_GENERALITY_LINK,
               ApiElementType.PARAMETER),
           withPublicVisibility(
               isExactType("com.google.common.collect.ImmutableList"),
+              NON_GRAPH_WRAPPER,
               "Consider accepting a java.util.List or Iterable instead. " + TYPE_GENERALITY_LINK,
               ApiElementType.PARAMETER),
           withPublicVisibility(
               isExactType("com.google.common.collect.ImmutableSet"),
+              NON_GRAPH_WRAPPER,
               "Consider accepting a java.util.Set or Iterable instead. " + TYPE_GENERALITY_LINK,
               ApiElementType.PARAMETER),
           withPublicVisibility(
               isExactType("com.google.common.collect.ImmutableMap"),
+              NON_GRAPH_WRAPPER,
               "Consider accepting a java.util.Map instead. " + TYPE_GENERALITY_LINK,
               ApiElementType.PARAMETER),
 
@@ -126,6 +137,20 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
                   isExactType("java.util.TreeMap")),
               "Prefer a java.util.Map instead. " + INTERFACES_NOT_IMPLS_LINK,
               ApiElementType.ANY),
+
+          // Iterators
+          withPublicVisibility(
+              isDescendantOf("java.util.Iterator"),
+              "Prefer returning a Stream (or collecting to an ImmutableList/ImmutableSet) instead. "
+                  + ITERATOR_LINK,
+              ApiElementType.RETURN_TYPE),
+          // TODO(b/279464660): consider also warning on an Iterator as a ApiElementType.PARAMETER
+
+          // Streams
+          withPublicVisibility(
+              isDescendantOf("java.util.stream.Stream"),
+              "Prefer accepting an Iterable or Collection instead. " + STREAM_LINK,
+              ApiElementType.PARAMETER),
 
           // ProtoTime
           withPublicVisibility(
@@ -179,21 +204,27 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
 
   @Override
   public Description matchMethod(MethodTree tree, VisitorState state) {
+    Type enclosingType = getSymbol(tree).owner.type;
+
     boolean isPublicApi =
         methodIsPublicAndNotAnOverride(getSymbol(tree), state)
             && state.errorProneOptions().isPubliclyVisibleTarget();
 
     for (Tree parameter : tree.getParameters()) {
-      checkType(parameter, ApiElementType.PARAMETER, isPublicApi, state);
+      checkType(parameter, ApiElementType.PARAMETER, isPublicApi, enclosingType, state);
     }
-    checkType(tree.getReturnType(), ApiElementType.RETURN_TYPE, isPublicApi, state);
+    checkType(tree.getReturnType(), ApiElementType.RETURN_TYPE, isPublicApi, enclosingType, state);
 
     // the accumulated matches (if any) are reported via state.reportMatch(...)
     return NO_MATCH;
   }
 
   private void checkType(
-      Tree tree, ApiElementType elementType, boolean isPublicApi, VisitorState state) {
+      Tree tree,
+      ApiElementType elementType,
+      boolean isPublicApi,
+      Type enclosingType,
+      VisitorState state) {
     if (isSuppressed(tree, state)) {
       return;
     }
@@ -202,7 +233,7 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
       return;
     }
     for (TypeToCheck typeToCheck : NON_API_TYPES) {
-      if (typeToCheck.matches(type, state)) {
+      if (typeToCheck.matches(type, enclosingType, state)) {
         if (typeToCheck.elementType() == ApiElementType.ANY
             || typeToCheck.elementType() == elementType) {
           if (isPublicApi || typeToCheck.visibility() == ApiVisibility.ANY) {
@@ -227,34 +258,47 @@ public final class NonApiType extends BugChecker implements MethodTreeMatcher {
 
   private static TypeToCheck withPublicVisibility(
       TypePredicate typePredicate, String failureMessage, ApiElementType elementType) {
+    return withPublicVisibility(typePredicate, anything(), failureMessage, elementType);
+  }
+
+  private static TypeToCheck withPublicVisibility(
+      TypePredicate typePredicate,
+      TypePredicate enclosingTypePredicate,
+      String failureMessage,
+      ApiElementType elementType) {
     return new AutoValue_NonApiType_TypeToCheck(
-        typePredicate, failureMessage, ApiVisibility.PUBLIC, elementType);
+        typePredicate, enclosingTypePredicate, failureMessage, ApiVisibility.PUBLIC, elementType);
   }
 
   private static TypeToCheck withAnyVisibility(
       TypePredicate typePredicate, String failureMessage, ApiElementType elementType) {
     return new AutoValue_NonApiType_TypeToCheck(
-        typePredicate, failureMessage, ApiVisibility.ANY, elementType);
+        typePredicate, anything(), failureMessage, ApiVisibility.ANY, elementType);
   }
 
   @AutoValue
   abstract static class TypeToCheck {
 
-    final boolean matches(Type type, VisitorState state) {
-      Deque<Type> types = new ArrayDeque<>();
-      types.add(type);
-      while (!types.isEmpty()) {
-        Type head = types.poll();
-        if (typePredicate().apply(head, state)) {
-          return true;
+    final boolean matches(Type type, Type enclosingType, VisitorState state) {
+      // only fire this check inside certain subtypes
+      if (enclosingTypePredicate().apply(enclosingType, state)) {
+        Deque<Type> types = new ArrayDeque<>();
+        types.add(type);
+        while (!types.isEmpty()) {
+          Type head = types.poll();
+          if (typePredicate().apply(head, state)) {
+            return true;
+          }
+          types.addAll(head.getTypeArguments());
         }
-        types.addAll(head.getTypeArguments());
       }
       // TODO(kak): do we want to check var-args as well?
       return false;
     }
 
     abstract TypePredicate typePredicate();
+
+    abstract TypePredicate enclosingTypePredicate();
 
     abstract String failureMessage();
 
