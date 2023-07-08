@@ -153,6 +153,7 @@ import com.google.errorprone.bugpatterns.GetClassOnClass;
 import com.google.errorprone.bugpatterns.GetClassOnEnum;
 import com.google.errorprone.bugpatterns.HashtableContains;
 import com.google.errorprone.bugpatterns.HidingField;
+import com.google.errorprone.bugpatterns.ICCProfileGetInstance;
 import com.google.errorprone.bugpatterns.IdentityBinaryExpression;
 import com.google.errorprone.bugpatterns.IdentityHashMapBoxing;
 import com.google.errorprone.bugpatterns.IdentityHashMapUsage;
@@ -799,7 +800,6 @@ public class BuiltInCheckerSuppliers {
           UnsafeWildcard.class,
           UnusedAnonymousClass.class,
           UnusedCollectionModifiedInPlace.class,
-          UseCorrectAssertInTests.class,
           Validator.class,
           VarTypeName.class,
           WrongOneof.class,
@@ -886,6 +886,7 @@ public class BuiltInCheckerSuppliers {
           FutureReturnValueIgnored.class,
           GetClassOnEnum.class,
           HidingField.class,
+          ICCProfileGetInstance.class,
           IdentityHashMapUsage.class,
           IgnoredPureGetter.class,
           ImmutableAnnotationChecker.class,
@@ -1188,6 +1189,7 @@ public class BuiltInCheckerSuppliers {
           UnsafeLocaleUsage.class,
           UnusedException.class,
           UrlInSee.class,
+          UseCorrectAssertInTests.class,
           UseEnumSwitch.class,
           UsingJsr305CheckReturnValue.class,
           VarChecker.class,
