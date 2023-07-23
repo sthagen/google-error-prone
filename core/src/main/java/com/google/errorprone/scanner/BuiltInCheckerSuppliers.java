@@ -40,6 +40,7 @@ import com.google.errorprone.bugpatterns.AssertThrowsMultipleStatements;
 import com.google.errorprone.bugpatterns.AssertionFailureIgnored;
 import com.google.errorprone.bugpatterns.AsyncCallableReturnsNull;
 import com.google.errorprone.bugpatterns.AsyncFunctionReturnsNull;
+import com.google.errorprone.bugpatterns.AttemptedNegativeZero;
 import com.google.errorprone.bugpatterns.AutoValueBuilderDefaultsInConstructor;
 import com.google.errorprone.bugpatterns.AutoValueFinalMethods;
 import com.google.errorprone.bugpatterns.AutoValueImmutableFields;
@@ -248,6 +249,7 @@ import com.google.errorprone.bugpatterns.MultipleParallelOrSequentialCalls;
 import com.google.errorprone.bugpatterns.MultipleTopLevelClasses;
 import com.google.errorprone.bugpatterns.MultipleUnaryOperatorsInMethodCall;
 import com.google.errorprone.bugpatterns.MustBeClosedChecker;
+import com.google.errorprone.bugpatterns.MutableGuiceModule;
 import com.google.errorprone.bugpatterns.MutablePublicArray;
 import com.google.errorprone.bugpatterns.NCopiesOfChar;
 import com.google.errorprone.bugpatterns.NamedLikeContextualKeyword;
@@ -823,6 +825,7 @@ public class BuiltInCheckerSuppliers {
           AssertThrowsMultipleStatements.class,
           AssertionFailureIgnored.class,
           AssistedInjectAndInjectOnSameConstructor.class,
+          AttemptedNegativeZero.class,
           AutoValueFinalMethods.class,
           AutoValueImmutableFields.class,
           AutoValueSubclassLeaked.class,
@@ -961,6 +964,7 @@ public class BuiltInCheckerSuppliers {
           ModifySourceCollectionInStream.class,
           MultipleParallelOrSequentialCalls.class,
           MultipleUnaryOperatorsInMethodCall.class,
+          MutableGuiceModule.class,
           MutablePublicArray.class,
           NamedLikeContextualKeyword.class,
           NarrowCalculation.class,
