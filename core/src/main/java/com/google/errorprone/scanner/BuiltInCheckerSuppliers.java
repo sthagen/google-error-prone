@@ -22,6 +22,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugCheckerInfo;
 import com.google.errorprone.bugpatterns.ASTHelpersSuggestions;
+import com.google.errorprone.bugpatterns.AddressSelection;
 import com.google.errorprone.bugpatterns.AlreadyChecked;
 import com.google.errorprone.bugpatterns.AlwaysThrows;
 import com.google.errorprone.bugpatterns.AmbiguousMethodReference;
@@ -271,6 +272,7 @@ import com.google.errorprone.bugpatterns.NullOptional;
 import com.google.errorprone.bugpatterns.NullTernary;
 import com.google.errorprone.bugpatterns.NullableConstructor;
 import com.google.errorprone.bugpatterns.NullableOnContainingClass;
+import com.google.errorprone.bugpatterns.NullableOptional;
 import com.google.errorprone.bugpatterns.NullablePrimitive;
 import com.google.errorprone.bugpatterns.NullablePrimitiveArray;
 import com.google.errorprone.bugpatterns.NullableVoid;
@@ -287,6 +289,7 @@ import com.google.errorprone.bugpatterns.OrphanedFormatString;
 import com.google.errorprone.bugpatterns.OutlineNone;
 import com.google.errorprone.bugpatterns.OverrideThrowableToString;
 import com.google.errorprone.bugpatterns.Overrides;
+import com.google.errorprone.bugpatterns.OverridingMethodInconsistentArgumentNamesChecker;
 import com.google.errorprone.bugpatterns.PackageInfo;
 import com.google.errorprone.bugpatterns.PackageLocation;
 import com.google.errorprone.bugpatterns.ParameterComment;
@@ -815,6 +818,7 @@ public class BuiltInCheckerSuppliers {
       getSuppliers(
           // keep-sorted start
           ASTHelpersSuggestions.class,
+          AddressSelection.class,
           AlmostJavadoc.class,
           AlreadyChecked.class,
           AmbiguousMethodReference.class,
@@ -964,7 +968,6 @@ public class BuiltInCheckerSuppliers {
           ModifySourceCollectionInStream.class,
           MultipleParallelOrSequentialCalls.class,
           MultipleUnaryOperatorsInMethodCall.class,
-          MutableGuiceModule.class,
           MutablePublicArray.class,
           NamedLikeContextualKeyword.class,
           NarrowCalculation.class,
@@ -979,6 +982,7 @@ public class BuiltInCheckerSuppliers {
           NotJavadoc.class,
           NullOptional.class,
           NullableConstructor.class,
+          NullableOptional.class,
           NullablePrimitive.class,
           NullablePrimitiveArray.class,
           NullableVoid.class,
@@ -993,6 +997,7 @@ public class BuiltInCheckerSuppliers {
           OverrideThrowableToString.class,
           Overrides.class,
           OverridesGuiceInjectableMethod.class,
+          OverridingMethodInconsistentArgumentNamesChecker.class,
           ParameterName.class,
           PreconditionsCheckNotNullRepeated.class,
           PrimitiveAtomicReference.class,
@@ -1136,6 +1141,7 @@ public class BuiltInCheckerSuppliers {
           MoreThanOneQualifier.class,
           MultiVariableDeclaration.class,
           MultipleTopLevelClasses.class,
+          MutableGuiceModule.class,
           NoAllocationChecker.class,
           NonCanonicalStaticMemberImport.class,
           PackageLocation.class,

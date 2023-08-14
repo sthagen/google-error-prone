@@ -67,6 +67,7 @@ import com.sun.source.tree.CompoundAssignmentTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.InstanceOfTree;
+import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
@@ -744,11 +745,12 @@ public final class SuggestedFixes {
 
   /** Be warned, only changes method name at the declaration. */
   public static SuggestedFix renameMethod(MethodTree tree, String replacement, VisitorState state) {
-    // Search tokens from beginning of method tree to beginning of method body.
-    int basePos = getStartPosition(tree);
+    // Search tokens from end of return type tree to beginning of method body.
+    int basePos = state.getEndPosition(tree.getReturnType());
     int endPos =
         tree.getBody() != null ? getStartPosition(tree.getBody()) : state.getEndPosition(tree);
     List<ErrorProneToken> methodTokens = state.getOffsetTokens(basePos, endPos);
+
     for (ErrorProneToken token : methodTokens) {
       if (token.kind() == TokenKind.IDENTIFIER && token.name().equals(tree.getName())) {
         return SuggestedFix.replace(token.pos(), token.endPos(), replacement);
@@ -784,6 +786,17 @@ public final class SuggestedFixes {
               "." + replacement);
         }
         return super.visitMemberSelect(tree, null);
+      }
+
+      @Override
+      public Void visitMemberReference(MemberReferenceTree tree, Void unused) {
+        if (sym.equals(getSymbol(tree))) {
+          fix.replace(
+              state.getEndPosition(tree.getQualifierExpression()),
+              state.getEndPosition(tree),
+              "::" + replacement);
+        }
+        return super.visitMemberReference(tree, unused);
       }
     }.scan(state.getPath().getCompilationUnit(), null);
     return fix.build();

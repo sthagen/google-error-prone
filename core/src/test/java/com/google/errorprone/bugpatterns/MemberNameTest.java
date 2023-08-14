@@ -53,6 +53,21 @@ public class MemberNameTest {
   }
 
   @Test
+  public void nameWithUnderscores_findingEmphasisesInitialism() {
+    helper
+        .addSourceLines(
+            "Test.java",
+            "class Test {",
+            "  // BUG: Diagnostic contains: acronyms",
+            "  private int misnamedRPCClient;",
+            "  int get() {",
+            "    return misnamedRPCClient;",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
   public void staticFields() {
     refactoringHelper
         .addInputLines(
@@ -426,6 +441,52 @@ public class MemberNameTest {
             "    // BUG: Diagnostic contains: fooBar",
             "    Function<String, String> f = foo_bar -> foo_bar;",
             "    return f.apply(\"foo\");",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodReference() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "class Test {",
+            "  private void foo_bar() {}",
+            "  private Runnable r = this::foo_bar;",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "class Test {",
+            "  private void fooBar() {}",
+            "  private Runnable r = this::fooBar;",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void methodNameWithMatchingReturnType() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "class Test {",
+            "  private Object Object() {",
+            "    return null;",
+            "  }",
+            "",
+            "  void call() {",
+            "     Object();",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "class Test {",
+            "  private Object object() {",
+            "    return null;",
+            "  }",
+            "",
+            "  void call() {",
+            "     object();",
             "  }",
             "}")
         .doTest();
