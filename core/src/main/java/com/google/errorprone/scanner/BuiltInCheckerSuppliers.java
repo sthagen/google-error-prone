@@ -81,6 +81,7 @@ import com.google.errorprone.bugpatterns.ClassCanBeStatic;
 import com.google.errorprone.bugpatterns.ClassName;
 import com.google.errorprone.bugpatterns.ClassNamedLikeTypeParameter;
 import com.google.errorprone.bugpatterns.ClassNewInstance;
+import com.google.errorprone.bugpatterns.ClosingStandardOutputStreams;
 import com.google.errorprone.bugpatterns.CollectionToArraySafeParameter;
 import com.google.errorprone.bugpatterns.CollectorShouldNotUseState;
 import com.google.errorprone.bugpatterns.ComparableAndComparator;
@@ -319,6 +320,7 @@ import com.google.errorprone.bugpatterns.RemoveUnusedImports;
 import com.google.errorprone.bugpatterns.RequiredModifiersChecker;
 import com.google.errorprone.bugpatterns.RestrictedApiChecker;
 import com.google.errorprone.bugpatterns.RethrowReflectiveOperationExceptionAsLinkageError;
+import com.google.errorprone.bugpatterns.ReturnAtTheEndOfVoidFunction;
 import com.google.errorprone.bugpatterns.ReturnValueIgnored;
 import com.google.errorprone.bugpatterns.ReturnsNullCollection;
 import com.google.errorprone.bugpatterns.RobolectricShadowDirectlyOn;
@@ -367,6 +369,7 @@ import com.google.errorprone.bugpatterns.TransientMisuse;
 import com.google.errorprone.bugpatterns.TreeToString;
 import com.google.errorprone.bugpatterns.TruthAssertExpected;
 import com.google.errorprone.bugpatterns.TruthConstantAsserts;
+import com.google.errorprone.bugpatterns.TruthContainsExactlyElementsInUsage;
 import com.google.errorprone.bugpatterns.TruthGetOrDefault;
 import com.google.errorprone.bugpatterns.TruthSelfEquals;
 import com.google.errorprone.bugpatterns.TryFailRefactoring;
@@ -389,6 +392,7 @@ import com.google.errorprone.bugpatterns.UnnecessarilyFullyQualified;
 import com.google.errorprone.bugpatterns.UnnecessarilyVisible;
 import com.google.errorprone.bugpatterns.UnnecessaryAnonymousClass;
 import com.google.errorprone.bugpatterns.UnnecessaryAssignment;
+import com.google.errorprone.bugpatterns.UnnecessaryAsync;
 import com.google.errorprone.bugpatterns.UnnecessaryBoxedAssignment;
 import com.google.errorprone.bugpatterns.UnnecessaryBoxedVariable;
 import com.google.errorprone.bugpatterns.UnnecessaryDefaultInEnumSwitch;
@@ -851,6 +855,7 @@ public class BuiltInCheckerSuppliers {
           ClassCanBeStatic.class,
           ClassNewInstance.class,
           CloseableProvides.class,
+          ClosingStandardOutputStreams.class,
           CollectionUndefinedEquality.class,
           CollectorShouldNotUseState.class,
           ComparableAndComparator.class,
@@ -1009,6 +1014,7 @@ public class BuiltInCheckerSuppliers {
           ReachabilityFenceUsage.class,
           ReferenceEquality.class,
           RethrowReflectiveOperationExceptionAsLinkageError.class,
+          ReturnAtTheEndOfVoidFunction.class,
           ReturnFromVoid.class,
           RobolectricShadowDirectlyOn.class,
           RxReturnValueIgnored.class,
@@ -1045,6 +1051,7 @@ public class BuiltInCheckerSuppliers {
           UndefinedEquals.class,
           UnicodeEscape.class,
           UnnecessaryAssignment.class,
+          UnnecessaryAsync.class,
           UnnecessaryLambda.class,
           UnnecessaryLongToIntConversion.class,
           UnnecessaryMethodInvocationMatcher.class,
@@ -1178,6 +1185,7 @@ public class BuiltInCheckerSuppliers {
           TimeUnitMismatch.class,
           TooManyParameters.class,
           TransientMisuse.class,
+          TruthContainsExactlyElementsInUsage.class,
           TryFailRefactoring.class,
           TryWithResourcesVariable.class,
           TypeParameterNaming.class,
