@@ -145,7 +145,8 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
           "org.openqa.selenium.support.FindBy",
           "org.openqa.selenium.support.FindBys",
           "org.apache.beam.sdk.transforms.DoFn.TimerId",
-          "org.apache.beam.sdk.transforms.DoFn.StateId");
+          "org.apache.beam.sdk.transforms.DoFn.StateId",
+          "org.springframework.boot.test.mock.mockito.MockBean");
 
   // TODO(ghm): Find a sensible place to dedupe this with UnnecessarilyVisible.
   private static final ImmutableSet<String> ANNOTATIONS_INDICATING_PARAMETERS_SHOULD_BE_CHECKED =
@@ -178,21 +179,24 @@ public final class UnusedVariable extends BugChecker implements CompilationUnitT
 
   @Inject
   UnusedVariable(ErrorProneFlags flags) {
-    ImmutableSet.Builder<String> methodAnnotationsExemptingParameters =
-        ImmutableSet.<String>builder().add("org.robolectric.annotation.Implementation");
-    flags
-        .getList("Unused:methodAnnotationsExemptingParameters")
-        .ifPresent(methodAnnotationsExemptingParameters::addAll);
-    this.methodAnnotationsExemptingParameters = methodAnnotationsExemptingParameters.build();
+    this.methodAnnotationsExemptingParameters =
+        ImmutableSet.<String>builder()
+            .add("org.robolectric.annotation.Implementation")
+            .addAll(flags.getListOrEmpty("Unused:methodAnnotationsExemptingParameters"))
+            .build();
     this.reportInjectedFields = flags.getBoolean("Unused:ReportInjectedFields").orElse(false);
 
-    ImmutableSet.Builder<String> exemptNames = ImmutableSet.<String>builder().add("ignored");
-    flags.getList("Unused:exemptNames").ifPresent(exemptNames::addAll);
-    this.exemptNames = exemptNames.build();
+    this.exemptNames =
+        ImmutableSet.<String>builder()
+            .add("ignored")
+            .addAll(flags.getListOrEmpty("Unused:exemptNames"))
+            .build();
 
-    ImmutableSet.Builder<String> exemptPrefixes = ImmutableSet.<String>builder().add("unused");
-    flags.getSet("Unused:exemptPrefixes").ifPresent(exemptPrefixes::addAll);
-    this.exemptPrefixes = exemptPrefixes.build();
+    this.exemptPrefixes =
+        ImmutableSet.<String>builder()
+            .add("unused")
+            .addAll(flags.getSetOrEmpty("Unused:exemptPrefixes"))
+            .build();
   }
 
   @Override
