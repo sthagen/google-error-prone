@@ -49,44 +49,44 @@ public final class TruthSelfEquals extends BugChecker implements MethodInvocatio
 
   private static final Matcher<MethodInvocationTree> EQUALS_MATCHER =
       allOf(
-          instanceMethod()
-              .onDescendantOf("com.google.common.truth.Subject")
-              .namedAnyOf("isEqualTo", "isSameInstanceAs")
-              .withParameters("java.lang.Object"),
+          instanceMethod().anyClass().namedAnyOf("isEqualTo", "isSameInstanceAs"),
           TruthSelfEquals::receiverSameAsParentsArgument);
 
   private static final Matcher<MethodInvocationTree> NOT_EQUALS_MATCHER =
       allOf(
+          instanceMethod().anyClass().namedAnyOf("isNotEqualTo", "isNotSameInstanceAs"),
+          TruthSelfEquals::receiverSameAsParentsArgument);
+
+  private static final Matcher<MethodInvocationTree> OTHER_MATCHER =
+      allOf(
           instanceMethod()
-              .onDescendantOf("com.google.common.truth.Subject")
-              .namedAnyOf("isNotEqualTo", "isNotSameInstanceAs")
-              .withParameters("java.lang.Object"),
+              .anyClass()
+              .namedAnyOf("containsExactlyElementsIn", "containsAtLeastElementsIn", "areEqualTo"),
           TruthSelfEquals::receiverSameAsParentsArgument);
 
   private static final Matcher<ExpressionTree> ASSERT_THAT =
       anyOf(
-          staticMethod().onClass("com.google.common.truth.Truth").named("assertThat"),
+          staticMethod().anyClass().named("assertThat"),
           instanceMethod().onDescendantOf("com.google.common.truth.TestVerb").named("that"),
           instanceMethod()
               .onDescendantOf("com.google.common.truth.StandardSubjectBuilder")
               .named("that"));
 
   @Override
-  public Description matchMethodInvocation(
-      MethodInvocationTree methodInvocationTree, VisitorState state) {
-    if (methodInvocationTree.getArguments().isEmpty()) {
+  public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
+    if (tree.getArguments().isEmpty()) {
       return NO_MATCH;
     }
-    Description.Builder description = buildDescription(methodInvocationTree);
-    ExpressionTree toReplace = methodInvocationTree.getArguments().get(0);
-    if (EQUALS_MATCHER.matches(methodInvocationTree, state)) {
+    Description.Builder description = buildDescription(tree);
+    ExpressionTree toReplace = tree.getArguments().get(0);
+    if (EQUALS_MATCHER.matches(tree, state)) {
       description
-          .setMessage(
-              generateSummary(getSymbol(methodInvocationTree).getSimpleName().toString(), "passes"))
-          .addFix(suggestEqualsTesterFix(methodInvocationTree, toReplace, state));
-    } else if (NOT_EQUALS_MATCHER.matches(methodInvocationTree, state)) {
-      description.setMessage(
-          generateSummary(getSymbol(methodInvocationTree).getSimpleName().toString(), "fails"));
+          .setMessage(generateSummary(getSymbol(tree).getSimpleName().toString(), "passes"))
+          .addFix(suggestEqualsTesterFix(tree, toReplace, state));
+    } else if (NOT_EQUALS_MATCHER.matches(tree, state)) {
+      description.setMessage(generateSummary(getSymbol(tree).getSimpleName().toString(), "fails"));
+    } else if (OTHER_MATCHER.matches(tree, state)) {
+      description.setMessage(generateSummary(getSymbol(tree).getSimpleName().toString(), "passes"));
     } else {
       return NO_MATCH;
     }
