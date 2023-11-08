@@ -16,14 +16,17 @@
 
 package com.google.errorprone.dataflow.nullnesspropagation;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static javax.lang.model.element.ElementKind.TYPE_PARAMETER;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.util.MoreAnnotations;
 import com.sun.source.tree.AnnotationTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.Symbol;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -69,6 +72,24 @@ public class NullnessAnnotations {
     return fromAnnotationStream(annotations.stream());
   }
 
+  public static boolean annotationsAreAmbiguous(
+      Collection<? extends AnnotationMirror> annotations) {
+    return annotations.stream()
+            .map(a -> simpleName(a).toString())
+            .filter(ANNOTATION_RELEVANT_TO_NULLNESS)
+            .map(NULLABLE_ANNOTATION::test)
+            .distinct()
+            .count()
+        == 2;
+  }
+
+  public static ImmutableList<AnnotationTree> annotationsRelevantToNullness(
+      List<? extends AnnotationTree> annotations) {
+    return annotations.stream()
+        .filter(a -> ANNOTATION_RELEVANT_TO_NULLNESS.test(simpleName(a)))
+        .collect(toImmutableList());
+  }
+
   private static String simpleName(AnnotationTree annotation) {
     Tree annotationType = annotation.getAnnotationType();
     if (annotationType instanceof IdentifierTree) {
@@ -93,11 +114,13 @@ public class NullnessAnnotations {
      * We try to read annotations in two ways:
      *
      * 1. from the TypeMirror: This is how we "should" always read *type-use* annotations, but
-     * we can't rely on it until the fix for JDK-8225377 is widely available.
+     * JDK-8225377 prevents it from working across compilation boundaries.
      *
      * 2. from getRawAttributes(): This works around the problem across compilation boundaries, and
      * it handles declaration annotations (though there are other ways we could handle declaration
-     * annotations).
+     * annotations). But it has a bug of its own with type-use annotations on inner classes
+     * (b/203207989). To reduce the chance that we hit the inner-class bug, we apply it only if the
+     * first approach fails.
      */
     TypeMirror elementType;
     switch (sym.getKind()) {

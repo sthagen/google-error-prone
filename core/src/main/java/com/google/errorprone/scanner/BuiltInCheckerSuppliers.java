@@ -277,8 +277,6 @@ import com.google.errorprone.bugpatterns.NullTernary;
 import com.google.errorprone.bugpatterns.NullableConstructor;
 import com.google.errorprone.bugpatterns.NullableOnContainingClass;
 import com.google.errorprone.bugpatterns.NullableOptional;
-import com.google.errorprone.bugpatterns.NullablePrimitive;
-import com.google.errorprone.bugpatterns.NullablePrimitiveArray;
 import com.google.errorprone.bugpatterns.NullableVoid;
 import com.google.errorprone.bugpatterns.ObjectEqualsForPrimitives;
 import com.google.errorprone.bugpatterns.ObjectToString;
@@ -538,7 +536,12 @@ import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ExtendsObject;
 import com.google.errorprone.bugpatterns.nullness.FieldMissingNullable;
+import com.google.errorprone.bugpatterns.nullness.MultipleNullnessAnnotations;
 import com.google.errorprone.bugpatterns.nullness.NullArgumentForNonNullParameter;
+import com.google.errorprone.bugpatterns.nullness.NullablePrimitive;
+import com.google.errorprone.bugpatterns.nullness.NullablePrimitiveArray;
+import com.google.errorprone.bugpatterns.nullness.NullableTypeParameter;
+import com.google.errorprone.bugpatterns.nullness.NullableWildcard;
 import com.google.errorprone.bugpatterns.nullness.ParameterMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.ReturnMissingNullable;
 import com.google.errorprone.bugpatterns.nullness.UnnecessaryCheckNotNull;
@@ -979,6 +982,7 @@ public class BuiltInCheckerSuppliers {
           ModifyCollectionInEnhancedForLoop.class,
           ModifySourceCollectionInStream.class,
           MultimapKeys.class,
+          MultipleNullnessAnnotations.class,
           MultipleParallelOrSequentialCalls.class,
           MultipleUnaryOperatorsInMethodCall.class,
           MutablePublicArray.class,
@@ -998,7 +1002,9 @@ public class BuiltInCheckerSuppliers {
           NullableOptional.class,
           NullablePrimitive.class,
           NullablePrimitiveArray.class,
+          NullableTypeParameter.class,
           NullableVoid.class,
+          NullableWildcard.class,
           ObjectEqualsForPrimitives.class,
           ObjectToString.class,
           ObjectsHashCodePrimitive.class,
