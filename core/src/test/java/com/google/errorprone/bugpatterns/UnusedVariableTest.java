@@ -263,6 +263,9 @@ public class UnusedVariableTest {
             "      System.out.println(i);",
             "    }",
             "  }",
+            "  private interface Foo {",
+            "    void foo(int a);",
+            "  }",
             "  public void main() {",
             "    test(1, 2);",
             "  }",
@@ -1608,6 +1611,25 @@ public class UnusedVariableTest {
             "        public void foo(int a, int b) {}",
             "    });",
             "    Collections.sort(xs, (a, unused) -> a > a ? 1 : 0);",
+            "  }",
+            "}")
+        .doTest();
+  }
+
+  @Test
+  public void unusedWithinAnotherVariableTree() {
+    helper
+        .addSourceLines(
+            "Test.java",
+            "import java.util.Collections;",
+            "import java.util.Comparator;",
+            "import java.util.List;",
+            "class Test {",
+            "  public void test(List<Integer> xs) {",
+            "    var unusedLocal = ",
+            "        xs.stream().sorted(",
+            "    // BUG: Diagnostic contains: 'b' is never read",
+            "            (a, b) -> a > a ? 1 : 0);",
             "  }",
             "}")
         .doTest();
