@@ -872,4 +872,36 @@ public class CanIgnoreReturnValueSuggesterTest {
         .setArgs("-XepOpt:CanIgnoreReturnValue:ExemptingMethodAnnotations=example.Foo")
         .doTest();
   }
+
+  @Test
+  public void daggerComponentBuilder_b318407972() {
+    helper
+        .addInputLines(
+            "Builder.java",
+            "package com.google.frobber;",
+            "import dagger.Component;",
+            "@Component.Builder",
+            "interface Builder {",
+            "  Builder setName(String name);",
+            "  String build();",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
+
+  @Test
+  public void daggerSubcomponentBuilder_b318407972() {
+    helper
+        .addInputLines(
+            "Builder.java",
+            "package com.google.frobber;",
+            "import dagger.Subcomponent;",
+            "@Subcomponent.Builder",
+            "interface Builder {",
+            "  Builder setName(String name);",
+            "  String build();",
+            "}")
+        .expectUnchanged()
+        .doTest();
+  }
 }
