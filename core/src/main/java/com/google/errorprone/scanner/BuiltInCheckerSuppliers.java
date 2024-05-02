@@ -157,6 +157,7 @@ import com.google.errorprone.bugpatterns.FuzzyEqualsShouldNotBeUsedInEqualsMetho
 import com.google.errorprone.bugpatterns.GetClassOnAnnotation;
 import com.google.errorprone.bugpatterns.GetClassOnClass;
 import com.google.errorprone.bugpatterns.GetClassOnEnum;
+import com.google.errorprone.bugpatterns.GuiceCreateInjectorWithCombineRefactor;
 import com.google.errorprone.bugpatterns.HashtableContains;
 import com.google.errorprone.bugpatterns.HidingField;
 import com.google.errorprone.bugpatterns.ICCProfileGetInstance;
@@ -300,6 +301,7 @@ import com.google.errorprone.bugpatterns.PackageLocation;
 import com.google.errorprone.bugpatterns.ParameterComment;
 import com.google.errorprone.bugpatterns.ParameterName;
 import com.google.errorprone.bugpatterns.ParametersButNotParameterized;
+import com.google.errorprone.bugpatterns.PatternMatchingInstanceof;
 import com.google.errorprone.bugpatterns.PreconditionsCheckNotNullRepeated;
 import com.google.errorprone.bugpatterns.PreconditionsInvalidPlaceholder;
 import com.google.errorprone.bugpatterns.PreferredInterfaceType;
@@ -916,6 +918,7 @@ public class BuiltInCheckerSuppliers {
           FragmentNotInstantiable.class,
           FutureReturnValueIgnored.class,
           GetClassOnEnum.class,
+          GuiceCreateInjectorWithCombineRefactor.class,
           HidingField.class,
           ICCProfileGetInstance.class,
           IdentityHashMapUsage.class,
@@ -1028,6 +1031,7 @@ public class BuiltInCheckerSuppliers {
           OverridesGuiceInjectableMethod.class,
           OverridingMethodInconsistentArgumentNamesChecker.class,
           ParameterName.class,
+          PatternMatchingInstanceof.class,
           PreconditionsCheckNotNullRepeated.class,
           PrimitiveAtomicReference.class,
           ProtectedMembersInFinalClass.class,
