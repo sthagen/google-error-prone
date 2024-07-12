@@ -23,6 +23,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Streams.stream;
+import static com.google.errorprone.VisitorState.memoize;
 import static com.google.errorprone.matchers.JUnitMatchers.JUNIT4_RUN_WITH_ANNOTATION;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
 import static com.sun.tools.javac.code.Scope.LookupKind.NON_RECURSIVE;
@@ -108,7 +109,6 @@ import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
-import com.sun.tools.javac.code.Symbol.CompletionFailure;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.PackageSymbol;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
@@ -913,15 +913,17 @@ public class ASTHelpers {
         .get(
             annotationName,
             name -> {
+              if (name.equals(NULL_MARKED_NAME.get(state))) {
+                /*
+                 * We avoid searching for @Inherited on NullMarked not just because we already know
+                 * the answer but also because the search would cause issues under --release 8 on
+                 * account of NullMarked's use of @Target(MODULE, ...).
+                 */
+                return false;
+              }
               Symbol annotationSym = state.getSymbolFromName(annotationName);
               if (annotationSym == null) {
                 return false;
-              }
-              try {
-                annotationSym.complete();
-              } catch (CompletionFailure e) {
-                /* @Inherited won't work if the annotation isn't on the classpath, but we can still
-                check if it's present directly */
               }
               Symbol inheritedSym = state.getSymtab().inheritedType.tsym;
               return annotationSym.attribute(inheritedSym) != null;
@@ -2829,6 +2831,9 @@ public class ASTHelpers {
       throw new LinkageError(e.getMessage(), e);
     }
   }
+
+  private static final Supplier<Name> NULL_MARKED_NAME =
+      memoize(state -> state.getName("org.jspecify.annotations.NullMarked"));
 
   private ASTHelpers() {}
 }
