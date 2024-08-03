@@ -3657,4 +3657,55 @@ public final class StatementSwitchToExpressionSwitchTest {
         .setArgs("-XepOpt:StatementSwitchToExpressionSwitch:EnableDirectConversion=true")
         .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
   }
+
+  @Test
+  public void mixedExpressionsAndYields() {
+    assumeTrue(RuntimeVersion.isAtLeast14());
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            "public class Test {",
+            "  String f(int x) {",
+            "    switch (x) {",
+            "      case 0:",
+            "        return \"ZERO\";",
+            "      case 1:",
+            "        return \"ONE\";",
+            "      case 2: // hello",
+            "        // world",
+            "        System.err.println();",
+            "        System.err.println();",
+            "        return \"TWO\";",
+            "        // hello",
+            "        // world",
+            "      default:",
+            "        return \"\";",
+            "    }",
+            "  }",
+            "}")
+        .addOutputLines(
+            "Test.java",
+            "public class Test {",
+            "  String f(int x) {",
+            "    return switch (x) {",
+            "      case 0 -> \"ZERO\";",
+            "      case 1 -> \"ONE\";",
+            "      case 2 -> {",
+            "        // hello",
+            "        // world",
+            "        System.err.println();",
+            "        System.err.println();",
+            "        yield \"TWO\";",
+            "      }",
+            "      // hello",
+            "      // world",
+            "      default -> \"\";",
+            "    };",
+            "  }",
+            "}")
+        .setArgs(
+            "-XepOpt:StatementSwitchToExpressionSwitch:EnableDirectConversion=true",
+            "-XepOpt:StatementSwitchToExpressionSwitch:EnableReturnSwitchConversion=true")
+        .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
+  }
 }
