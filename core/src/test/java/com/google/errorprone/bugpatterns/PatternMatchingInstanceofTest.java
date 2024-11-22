@@ -16,8 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.common.truth.TruthJUnit.assume;
-
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -30,7 +28,6 @@ public final class PatternMatchingInstanceofTest {
 
   @Test
   public void positive() {
-    assume().that(Runtime.version().feature()).isAtLeast(21);
     helper
         .addInputLines(
             "Test.java",
@@ -79,7 +76,6 @@ public final class PatternMatchingInstanceofTest {
 
   @Test
   public void moreChecksInIf_stillMatches() {
-    assume().that(Runtime.version().feature()).isAtLeast(21);
     helper
         .addInputLines(
             "Test.java",
@@ -187,8 +183,37 @@ public final class PatternMatchingInstanceofTest {
   }
 
   @Test
+  public void notImmediatelyAssignedToVariable() {
+    helper
+        .addInputLines(
+            "Test.java",
+            """
+            class Test {
+              void test(Object o) {
+                if (o instanceof Test) {
+                  test((Test) o);
+                  test(((Test) o).hashCode());
+                }
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            class Test {
+              void test(Object o) {
+                if (o instanceof Test test) {
+                  test(test);
+                  test(test.hashCode());
+                }
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
   public void genericWithUpperBoundedWildcard() {
-    assume().that(Runtime.version().feature()).isAtLeast(21);
     helper
         .addInputLines(
             "Test.java",
@@ -199,13 +224,11 @@ public final class PatternMatchingInstanceofTest {
               void test(Object object) {
                 if (object instanceof List) {
                   @SuppressWarnings("unchecked")
-                  List<? extends CharSequence> list = (List) object;
-                  System.err.println(list.get(0));
+                  List<? extends CharSequence> xs = (List) object;
                 }
               }
             }
             """)
-        // TODO: b/380054832 - this shouldn't get re-written
         .addOutputLines(
             "Test.java",
             """
@@ -214,7 +237,8 @@ public final class PatternMatchingInstanceofTest {
             class Test {
               void test(Object object) {
                 if (object instanceof List list) {
-                  System.err.println(list.get(0));
+                  @SuppressWarnings("unchecked")
+                  List<? extends CharSequence> xs = list;
                 }
               }
             }
