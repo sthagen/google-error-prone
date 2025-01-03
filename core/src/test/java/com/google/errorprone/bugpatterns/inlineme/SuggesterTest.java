@@ -1389,4 +1389,21 @@ public class Client {
             """)
         .doTest();
   }
+
+  @Test
+  public void deprecatedConstructorSuperCall() {
+    refactoringTestHelper
+        .addInputLines(
+            "ExecutionError.java",
+            """
+            public final class ExecutionError extends Error {
+              @Deprecated
+              public ExecutionError(String message) {
+                super(message);
+              }
+            }
+            """)
+        .expectUnchanged()
+        .doTest();
+  }
 }
