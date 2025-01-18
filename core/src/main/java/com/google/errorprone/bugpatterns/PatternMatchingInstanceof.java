@@ -33,7 +33,9 @@ import com.google.errorprone.fixes.SuggestedFix;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.util.Reachability;
 import com.sun.source.tree.AssignmentTree;
+import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.BlockTree;
+import com.sun.source.tree.ConditionalExpressionTree;
 import com.sun.source.tree.IfTree;
 import com.sun.source.tree.InstanceOfTree;
 import com.sun.source.tree.ParenthesizedTree;
@@ -62,12 +64,13 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
     if (!supportsPatternMatchingInstanceof(state.context)) {
       return NO_MATCH;
     }
+    if (instanceOfTree.getPattern() != null) {
+      return NO_MATCH;
+    }
     var impliedStatements = findImpliedStatements(instanceOfTree, state);
     if (impliedStatements.isEmpty()) {
       return NO_MATCH;
     }
-    // TODO(ghm): Relax the requirement of this being an identical VarSymbol: it would be nice to
-    // support expressions, though we'd then need to worry about their purity.
     if (getSymbol(instanceOfTree.getExpression()) instanceof VarSymbol varSymbol) {
       if (isReassigned(varSymbol, impliedStatements)) {
         return NO_MATCH;
@@ -107,8 +110,6 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
                 .build());
       }
     }
-    // TODO(ghm): Handle things other than just ifs. It'd be great to refactor `foo instanceof Bar
-    // && ((Bar) foo).baz()`.
     return NO_MATCH;
   }
 
@@ -156,10 +157,16 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
           if (negated) {
             return impliedStatements.build();
           }
+          if (((BinaryTree) parent).getLeftOperand() == last) {
+            impliedStatements.add(((BinaryTree) parent).getRightOperand());
+          }
         }
         case CONDITIONAL_OR -> {
           if (!negated) {
             return impliedStatements.build();
+          }
+          if (((BinaryTree) parent).getLeftOperand() == last) {
+            impliedStatements.add(((BinaryTree) parent).getRightOperand());
           }
         }
         case PARENTHESIZED -> {}
@@ -168,7 +175,7 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
         }
         case IF -> {
           var ifTree = (IfTree) parent;
-          if (!(((IfTree) parent).getCondition() == last)) {
+          if (ifTree.getCondition() != last) {
             return impliedStatements.build();
           }
           if (negated) {
@@ -188,6 +195,14 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
           }
           return impliedStatements.build();
         }
+        case CONDITIONAL_EXPRESSION -> {
+          var conditionalExpression = (ConditionalExpressionTree) parent;
+          impliedStatements.add(
+              negated
+                  ? conditionalExpression.getFalseExpression()
+                  : conditionalExpression.getTrueExpression());
+          return impliedStatements.build();
+        }
         default -> {
           return impliedStatements.build();
         }
@@ -197,7 +212,9 @@ public final class PatternMatchingInstanceof extends BugChecker implements Insta
     return impliedStatements.build();
   }
 
-  /** Finds all casts of {@code symbol} which are cast to {@code targetType} within {@code tree}. */
+  /**
+   * Finds all casts of {@code symbol} which are cast to {@code targetType} within {@code trees}.
+   */
   private static ImmutableSet<TreePath> findAllCasts(
       VarSymbol symbol, Iterable<Tree> trees, Type targetType, VisitorState state) {
     var usages = ImmutableSet.<TreePath>builder();
