@@ -115,6 +115,7 @@ import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Type.ArrayType;
 import com.sun.tools.javac.code.Type.ClassType;
 import com.sun.tools.javac.code.Type.TypeVar;
 import com.sun.tools.javac.code.Type.UnionClassType;
@@ -358,7 +359,9 @@ public class ASTHelpers {
 
   /** Returns whether this symbol or any of its owners are private. */
   public static boolean isEffectivelyPrivate(Symbol symbol) {
-    return enclosingElements(symbol).anyMatch(Symbol::isPrivate);
+    return enclosingElements(symbol)
+        .anyMatch(
+            s -> s.isPrivate() || (s instanceof ClassSymbol && s.owner instanceof MethodSymbol));
   }
 
   /** Checks whether an expression requires parentheses. */
@@ -2602,6 +2605,14 @@ public class ASTHelpers {
         if (type instanceof WildcardType other) {
           scan(t.getExtendsBound(), other.getExtendsBound());
           scan(t.getSuperBound(), other.getSuperBound());
+        }
+        return null;
+      }
+
+      @Override
+      public Void visitArrayType(ArrayType t, Type type) {
+        if (type instanceof ArrayType other) {
+          scan(t.getComponentType(), other.getComponentType());
         }
         return null;
       }
