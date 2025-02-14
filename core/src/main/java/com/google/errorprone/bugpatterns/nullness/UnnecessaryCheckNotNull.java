@@ -107,7 +107,7 @@ public class UnnecessaryCheckNotNull extends BugChecker implements MethodInvocat
     ExpressionTree stringLiteralValue = arguments.get(0);
     Fix fix;
     if (arguments.size() == 2) {
-      fix = SuggestedFix.swap(arguments.get(0), arguments.get(1));
+      fix = SuggestedFix.swap(arguments.get(0), arguments.get(1), state);
     } else {
       fix = SuggestedFix.delete(state.getPath().getParentPath().getLeaf());
     }
@@ -198,7 +198,7 @@ public class UnnecessaryCheckNotNull extends BugChecker implements MethodInvocat
     Set<Symbol> symbols = new HashSet<>();
     for (IdentifierTree ident : getVariableUses(tree)) {
       Symbol sym = ASTHelpers.getSymbol(ident);
-      if (ASTHelpers.isLocal(sym)) {
+      if (sym.isDirectlyOrIndirectlyLocal()) {
         symbols.add(sym);
       }
     }
