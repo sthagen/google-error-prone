@@ -16,6 +16,7 @@
 
 package com.google.errorprone.bugpatterns.inlineme;
 
+import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 import static com.google.errorprone.bugpatterns.inlineme.Inliner.PREFIX_FLAG;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
@@ -1372,8 +1373,9 @@ public final class Caller {
         .doTest();
   }
 
+  // b/268215956
   @Test
-  public void varArgs_b268215956() {
+  public void varArgs() {
     refactoringTestHelper
         .addInputLines(
             "Client.java",
@@ -1421,8 +1423,9 @@ public final class Caller {
         .doTest();
   }
 
+  // b/308614050
   @Test
-  public void paramCast_b308614050() {
+  public void paramCast() {
     refactoringTestHelper
         .addInputLines(
             "Client.java",
@@ -1463,16 +1466,16 @@ public final class Caller {
             "public final class Caller {",
             "  public void doTest() {",
             "    Object value = 42L;",
-            // TODO(b/308614050): this is a bug! you can't call doubleValue() on an Object!
-            "    Client.after((Long) value.doubleValue());",
+            "    Client.after(((Long) value).doubleValue());",
             "  }",
             "}")
         .allowBreakingChanges()
         .doTest();
   }
 
+  // b/308614050
   @Test
-  public void math_b308614050() {
+  public void replacementWhichRequiresParens() {
     refactoringTestHelper
         .addInputLines(
             "Client.java",
@@ -1497,22 +1500,24 @@ public final class Caller {
               }
             }
             """)
-        // This is a bug since it now evaluates to 3, not 4!
         .addOutputLines(
             "Caller.java",
             """
             import com.google.foo.Client;
             public final class Caller {
               public void doTest() {
-                long four = 1 + 1 * 2;
+                long four = (1 + 1) * 2;
               }
             }
             """)
         .doTest();
   }
 
+  // b/365094947
+
+  // b/375421323
   @Test
-  public void inlinerReplacesParameterValueInPackageName_b375421323() {
+  public void inlinerReplacesParameterValueInPackageName() {
     refactoringTestHelper
         .addInputLines(
             "Bar.java",
@@ -1613,10 +1618,72 @@ public final class Caller {
                 Runnable r;
                 r = client::instanceAfter;
                 c = Client::instanceAfter;
+
               }
             }
             """)
-        .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
+        .doTest(TEXT_MATCH);
+  }
+
+  // b/399499673
+  @Test
+  public void variableNamesInSubstitutionCollidesWithParameterName() {
+    refactoringTestHelper
+        .addInputLines(
+            "Client.java",
+            """
+            package com.google.foo;
+
+            import com.google.common.collect.ImmutableList;
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Client {
+              @InlineMe(
+                  replacement = "new Client(a, b)",
+                  imports = {"com.google.foo.Client"})
+              @Deprecated
+              public static Client create(String a, ImmutableList<String> b) {
+                return new Client(a, b);
+              }
+
+              public Client(String a, ImmutableList<String> b) {}
+            }
+            """)
+        .expectUnchanged()
+        // TODO(b/399499673): the output has a bug!
+        .allowBreakingChanges()
+        .addInputLines(
+            "Caller.java",
+            """
+            package com.google.foo;
+
+            import com.google.common.collect.ImmutableList;
+
+            public final class Caller {
+              public void doTest() {
+                ImmutableList<String> b = ImmutableList.of("foo", "bar");
+                Client client = Client.create(b.get(0), b.size() == 1 ? ImmutableList.of() : b);
+              }
+            }
+            """)
+        .addOutputLines(
+            "Caller.java",
+            """
+            package com.google.foo;
+
+            import com.google.common.collect.ImmutableList;
+
+            public final class Caller {
+              public void doTest() {
+                ImmutableList<String> b = ImmutableList.of("foo", "bar");
+                Client client =
+                    new Client(
+                        (b.size() == 1 ? ImmutableList.of() : b).get(0),
+                        b.size() == 1 ? ImmutableList.of() : b);
+              }
+            }
+            """)
+        .doTest(TEXT_MATCH);
   }
 
   private BugCheckerRefactoringTestHelper bugCheckerWithPrefixFlag(String prefix) {
@@ -1627,5 +1694,80 @@ public final class Caller {
   private BugCheckerRefactoringTestHelper bugCheckerWithCheckFixCompiles() {
     return BugCheckerRefactoringTestHelper.newInstance(Inliner.class, getClass())
         .setArgs("-XepOpt:InlineMe:CheckFixCompiles=true");
+  }
+
+  // b/308614050
+  @Test
+  public void binaryTree_immediatelyInvoked_requiresParens() {
+    refactoringTestHelper
+        .addInputLines(
+            "Strings.java",
+            """
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Strings {
+              @InlineMe(replacement = "string.repeat(count)")
+              public static String repeat(String string, int count) {
+                return string.repeat(count);
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            class Test {
+              void test() {
+                String s = Strings.repeat("a" + "b", 10);
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            class Test {
+              void test() {
+                String s = ("a" + "b").repeat(10);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void variousInlinings_doesNotAddParensWithinMethodCall() {
+    refactoringTestHelper
+        .addInputLines(
+            "Strings.java",
+            """
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Strings {
+              @InlineMe(replacement = "String.format(\\"%s%s%s\\", x, y, z)")
+              public static String f(String x, String y, String z) {
+                return String.format("%s%s%s", x, y, z);
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            class Test {
+              void test() {
+                String s = Strings.f("a" + "b", "c" + "d", "e" + "f");
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            class Test {
+              void test() {
+                String s = String.format("%s%s%s", "a" + "b", "c" + "d", "e" + "f");
+              }
+            }
+            """)
+        .doTest();
   }
 }
