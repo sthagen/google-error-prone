@@ -106,12 +106,14 @@ public class InlinerTest {
         .expectUnchanged()
         .addInputLines(
             "Caller.java",
-            "public final class Caller {",
-            "  public void doTest() {",
-            "    Client client = new Client();",
-            "    String result = client.before(\"\\\"\");", // "\"" - a single quote character
-            "  }",
-            "}")
+            """
+            public final class Caller {
+              public void doTest() {
+                Client client = new Client();
+                String result = client.before("\\"");
+              }
+            }
+            """)
         .addOutputLines(
             "out/Caller.java",
             """
@@ -1650,8 +1652,6 @@ public final class Caller {
             }
             """)
         .expectUnchanged()
-        // TODO(b/399499673): the output has a bug!
-        .allowBreakingChanges()
         .addInputLines(
             "Caller.java",
             """
@@ -1677,13 +1677,11 @@ public final class Caller {
               public void doTest() {
                 ImmutableList<String> b = ImmutableList.of("foo", "bar");
                 Client client =
-                    new Client(
-                        (b.size() == 1 ? ImmutableList.of() : b).get(0),
-                        b.size() == 1 ? ImmutableList.of() : b);
+                    new Client(b.get(0), b.size() == 1 ? ImmutableList.of() : b);
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   private BugCheckerRefactoringTestHelper bugCheckerWithPrefixFlag(String prefix) {
@@ -1765,6 +1763,45 @@ public final class Caller {
             class Test {
               void test() {
                 String s = String.format("%s%s%s", "a" + "b", "c" + "d", "e" + "f");
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  // b/400398218
+  @Test
+  public void inlinedCodeRequiresParens() {
+    refactoringTestHelper
+        .addInputLines(
+            "I.java",
+            """
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class I {
+              @InlineMe(replacement = "foo + \\"b\\"")
+              public static String ab(String foo) {
+                return foo + "b";
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            class Test {
+              void test(String x) {
+                String abn = I.ab(x).repeat(10);
+              }
+            }
+            """)
+        // Broken! The inlined code requires parens.
+        .addOutputLines(
+            "Test.java",
+            """
+            class Test {
+              void test(String x) {
+                String abn = x + "b".repeat(10);
               }
             }
             """)
