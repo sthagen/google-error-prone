@@ -1193,6 +1193,88 @@ public final class Caller {
   }
 
   @Test
+  public void orderOfOperationsWhenInliningAddition() {
+    refactoringTestHelper
+        .addInputLines(
+            "Client.java",
+            """
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Client {
+              @Deprecated
+              @InlineMe(replacement = "x + y")
+              public int add(int x, int y) {
+                return x + y;
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Caller.java",
+            """
+            public final class Caller {
+              public void doTest() {
+                Client client = new Client();
+                int x = client.add(1, 2) * 3;
+                int y = client.add(1, 2) + 3;
+              }
+            }
+            """)
+        .addOutputLines(
+            "out/Caller.java",
+            """
+            public final class Caller {
+              public void doTest() {
+                Client client = new Client();
+                int x = (1 + 2) * 3;
+                int y = 1 + 2 + 3;
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void orderOfOperationsWhenInliningCasts() {
+    refactoringTestHelper
+        .addInputLines(
+            "Client.java",
+            """
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Client {
+              @Deprecated
+              @InlineMe(replacement = "(int) x")
+              public int cast(long x) {
+                return (int) x;
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Caller.java",
+            """
+            public final class Caller {
+              public void doTest() {
+                Client client = new Client();
+                int x = client.cast(1) * 10;
+              }
+            }
+            """)
+        .addOutputLines(
+            "out/Caller.java",
+            """
+            public final class Caller {
+              public void doTest() {
+                Client client = new Client();
+                int x = (int) 1 * 10;
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
   public void orderOfOperationsWithTrailingOperand() {
     refactoringTestHelper
         .addInputLines(
@@ -1795,13 +1877,12 @@ public final class Caller {
               }
             }
             """)
-        // Broken! The inlined code requires parens.
         .addOutputLines(
             "Test.java",
             """
             class Test {
               void test(String x) {
-                String abn = x + "b".repeat(10);
+                String abn = (x + "b").repeat(10);
               }
             }
             """)
