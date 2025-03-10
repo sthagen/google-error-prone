@@ -95,16 +95,27 @@ public final class MisformattedTestDataTest {
             class Test {
               void method(BugCheckerRefactoringTestHelper h) {
                 h.addInputLines(
-                    "Test.java",
-                    \"""
-                    package foo;
-                    class Test {
-                      void method() {
-                        int a =
-                        1;
-                      }
-                    }
-                    \""");
+                        "Test.java",
+                        \"""
+                        package foo;
+                        class Test {
+                          void method() {
+                            int a =
+                            1;
+                          }
+                        }
+                        \""")
+                    .addOutputLines(
+                        "Test.java",
+                        \"""
+                        package foo;
+                        class Test {
+                          void method() {
+                            int a =
+                            1;
+                          }
+                        }
+                        \""");
               }
             }
             """)
@@ -116,15 +127,62 @@ public final class MisformattedTestDataTest {
             class Test {
               void method(BugCheckerRefactoringTestHelper h) {
                 h.addInputLines(
-                    "Test.java",
+                        "Test.java",
+                        \"""
+                        package foo;
+
+                        class Test {
+                          void method() {
+                            int a = 1;
+                          }
+                        }
+                        \""")
+                  .addOutputLines(
+                        "Test.java",
+                        \"""
+                        package foo;
+
+                        class Test {
+                          void method() {
+                            int a = 1;
+                          }
+                        }
+                        \""");
+               }
+            }
+            """)
+        .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void trailingComments_notIncludedInPrefix() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            """
+            import com.google.errorprone.BugCheckerRefactoringTestHelper;
+
+            class Test {
+              void method(BugCheckerRefactoringTestHelper h) {
+                h.addInputLines(
+                    "Test.java", //
+                    "package foo; class Test {}");
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            import com.google.errorprone.BugCheckerRefactoringTestHelper;
+
+            class Test {
+              void method(BugCheckerRefactoringTestHelper h) {
+                h.addInputLines(
+                    "Test.java", //
                     \"""
                     package foo;
 
-                    class Test {
-                      void method() {
-                        int a = 1;
-                      }
-                    }
+                    class Test {}
                     \""");
                }
             }
