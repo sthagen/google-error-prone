@@ -106,12 +106,10 @@ public final class DataFlow {
                       break;
                     }
                   }
-                  if (methodPath.getLeaf() instanceof LambdaExpressionTree) {
-                    ast =
-                        new UnderlyingAST.CFGLambda(
-                            (LambdaExpressionTree) methodPath.getLeaf(), classTree, methodTree);
-                  } else if (methodPath.getLeaf() instanceof MethodTree) {
-                    methodTree = (MethodTree) methodPath.getLeaf();
+                  if (methodPath.getLeaf() instanceof LambdaExpressionTree lambdaExpressionTree) {
+                    ast = new UnderlyingAST.CFGLambda(lambdaExpressionTree, classTree, methodTree);
+                  } else if (methodPath.getLeaf() instanceof MethodTree mt) {
+                    methodTree = mt;
                     ast = new UnderlyingAST.CFGMethod(methodTree, classTree);
                   } else {
                     // must be an initializer per findEnclosingMethodOrLambdaOrInitializer
@@ -126,8 +124,7 @@ public final class DataFlow {
                 }
               });
 
-  // TODO(b/158869538): remove once we merge jdk8 specific's with core
-  private static <T> @Nullable TreePath findEnclosingMethodOrLambdaOrInitializer(TreePath path) {
+  private static @Nullable TreePath findEnclosingMethodOrLambdaOrInitializer(TreePath path) {
     while (path != null) {
       if (path.getLeaf() instanceof MethodTree) {
         return path;
