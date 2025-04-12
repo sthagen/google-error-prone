@@ -43,6 +43,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Range;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
@@ -261,6 +262,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
     // next case on the left hand side of the arrow when converted to an expression switch.  For
     // example "case A,B -> ..."
     List<Boolean> groupedWithNextCase = new ArrayList<>(Collections.nCopies(cases.size(), false));
+    List<Boolean> isNullCase = new ArrayList<>(Collections.nCopies(cases.size(), false));
 
     // Set of all enum values (names) explicitly listed in a case tree
     Set<String> handledEnumValues = new HashSet<>();
@@ -287,7 +289,26 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
         return DEFAULT_ANALYSIS_RESULT;
       }
       boolean isDefaultCase = caseTree.getExpressions().isEmpty();
+      isNullCase.set(
+          caseIndex,
+          !isDefaultCase
+              && caseTree.getExpressions().stream()
+                  .anyMatch(expressionTree -> expressionTree.getKind() == Kind.NULL_LITERAL));
       hasDefaultCase |= isDefaultCase;
+
+      // Null case can never be grouped with a preceding case
+      if (caseIndex > 0 && groupedWithNextCase.get(caseIndex - 1) && isNullCase.get(caseIndex)) {
+        return DEFAULT_ANALYSIS_RESULT;
+      }
+
+      // Grouping null with default requires Java 21+
+      if (caseIndex > 0
+          && isNullCase.get(caseIndex - 1)
+          && isDefaultCase
+          && !SourceVersion.supportsPatternMatchingSwitch(state.context)) {
+        return DEFAULT_ANALYSIS_RESULT;
+      }
+
       // Accumulate enum values included in this case
       handledEnumValues.addAll(
           caseTree.getExpressions().stream()
@@ -318,13 +339,18 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
       }
       if (isDefaultCase) {
         // The "default" case has distinct semantics; don't allow anything to fall into or out of
-        // default case.  Exception: allowed to fall out of default case if it's the last case
+        // default case.  Exceptions: (1.) allowed to fall out of default case if it's the last case
+        // and (2.) allowed to fall into the default case if the preceding case is null and grouped
+        // with this one.
         boolean fallsIntoDefaultCase = (caseIndex > 0) && groupedWithNextCase.get(caseIndex - 1);
+        boolean precedingCaseIsNull = (caseIndex > 0) && isNullCase.get(caseIndex - 1);
         if (isLastCaseInSwitch) {
-          allCasesHaveDefiniteControlFlow &= !fallsIntoDefaultCase;
+          if (!precedingCaseIsNull) {
+            allCasesHaveDefiniteControlFlow &= !fallsIntoDefaultCase;
+          }
         } else {
           allCasesHaveDefiniteControlFlow &=
-              !fallsIntoDefaultCase
+              (precedingCaseIsNull || !fallsIntoDefaultCase)
                   && caseFallThru.equals(CaseFallThru.DEFINITELY_DOES_NOT_FALL_THRU);
         }
       } else {
@@ -997,7 +1023,7 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
       AnalysisResult analysisResult,
       boolean removeDefault) {
 
-    List<StatementTree> statementsToDelete = new ArrayList<>();
+    List<Range<Integer>> regionsToDelete = new ArrayList<>();
     List<? extends CaseTree> cases = switchTree.getCases();
     ImmutableList<ErrorProneComment> allSwitchComments =
         state.getTokensForNode(switchTree).stream()
@@ -1110,8 +1136,10 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
 
         // If the next statement is not reachable, then none of the following statements in this
         // block are either.  So, we need to delete them all.
-        statementsToDelete.addAll(
-            blockTree.getStatements().subList(indexInBlock + 1, blockTree.getStatements().size()));
+        regionsToDelete.add(
+            Range.closed(
+                state.getEndPosition(blockTree.getStatements().get(indexInBlock)),
+                state.getEndPosition(blockTree)));
       }
     }
 
@@ -1121,7 +1149,8 @@ public final class StatementSwitchToExpressionSwitch extends BugChecker
     }
     suggestedFixBuilder.replace(switchTree, replacementCodeBuilder.toString());
     // Delete dead code, leaving comments where feasible
-    statementsToDelete.forEach(deleteMe -> suggestedFixBuilder.replace(deleteMe, ""));
+    regionsToDelete.forEach(
+        r -> suggestedFixBuilder.replace(r.lowerEndpoint(), r.upperEndpoint(), "}"));
     return suggestedFixBuilder.build();
   }
 
