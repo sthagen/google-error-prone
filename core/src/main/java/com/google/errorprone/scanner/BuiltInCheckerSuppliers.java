@@ -317,6 +317,7 @@ import com.google.errorprone.bugpatterns.ParameterName;
 import com.google.errorprone.bugpatterns.ParametersButNotParameterized;
 import com.google.errorprone.bugpatterns.PatternMatchingInstanceof;
 import com.google.errorprone.bugpatterns.PreconditionsCheckNotNullRepeated;
+import com.google.errorprone.bugpatterns.PreconditionsExpensiveString;
 import com.google.errorprone.bugpatterns.PreconditionsInvalidPlaceholder;
 import com.google.errorprone.bugpatterns.PreferredInterfaceType;
 import com.google.errorprone.bugpatterns.PrimitiveArrayPassedToVarargsMethod;
@@ -479,7 +480,6 @@ import com.google.errorprone.bugpatterns.android.RectIntersectReturnValueIgnored
 import com.google.errorprone.bugpatterns.android.StaticOrDefaultInterfaceMethod;
 import com.google.errorprone.bugpatterns.android.WakelockReleasedDangerously;
 import com.google.errorprone.bugpatterns.apidiff.AndroidJdkLibsChecker;
-import com.google.errorprone.bugpatterns.apidiff.Java7ApiChecker;
 import com.google.errorprone.bugpatterns.apidiff.Java8ApiChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.ArgumentSelectionDefectChecker;
 import com.google.errorprone.bugpatterns.argumentselectiondefects.AssertEqualsArgumentOrderChecker;
@@ -564,6 +564,7 @@ import com.google.errorprone.bugpatterns.javadoc.ReturnFromVoid;
 import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
 import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
+import com.google.errorprone.bugpatterns.nullness.AddNullMarkedToPackageInfo;
 import com.google.errorprone.bugpatterns.nullness.DereferenceWithNullBranch;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
 import com.google.errorprone.bugpatterns.nullness.EqualsMissingNullable;
@@ -1076,6 +1077,7 @@ public class BuiltInCheckerSuppliers {
           ParameterName.class,
           PatternMatchingInstanceof.class,
           PreconditionsCheckNotNullRepeated.class,
+          PreconditionsExpensiveString.class,
           PrimitiveAtomicReference.class,
           ProtectedMembersInFinalClass.class,
           ProtoDurationGetSecondsGetNano.class,
@@ -1163,6 +1165,7 @@ public class BuiltInCheckerSuppliers {
   public static final ImmutableSet<BugCheckerInfo> DISABLED_CHECKS =
       getSuppliers(
           // keep-sorted start
+          AddNullMarkedToPackageInfo.class,
           AndroidJdkLibsChecker.class,
           AnnotationMirrorToString.class,
           AnnotationPosition.class,
@@ -1221,7 +1224,6 @@ public class BuiltInCheckerSuppliers {
           InterruptedExceptionSwallowed.class,
           Interruption.class,
           IterablePathParameter.class,
-          Java7ApiChecker.class,
           Java8ApiChecker.class,
           LambdaFunctionalInterface.class,
           LongLiteralLowerCaseSuffix.class,
