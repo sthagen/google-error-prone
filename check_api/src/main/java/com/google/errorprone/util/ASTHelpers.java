@@ -173,8 +173,8 @@ public class ASTHelpers {
     requireNonNull(expr1);
     requireNonNull(expr2);
     // Throw up our hands if we're not comparing identifiers and/or field accesses.
-    if ((expr1.getKind() != Kind.IDENTIFIER && expr1.getKind() != Kind.MEMBER_SELECT)
-        || (expr2.getKind() != Kind.IDENTIFIER && expr2.getKind() != Kind.MEMBER_SELECT)) {
+    if ((!(expr1 instanceof IdentifierTree) && !(expr1 instanceof MemberSelectTree))
+        || (!(expr2 instanceof IdentifierTree) && !(expr2 instanceof MemberSelectTree))) {
       return false;
     }
 
@@ -186,17 +186,17 @@ public class ASTHelpers {
       throw new IllegalStateException("Couldn't get symbol for " + expr2);
     }
 
-    if (expr1.getKind() == Kind.IDENTIFIER && expr2.getKind() == Kind.IDENTIFIER) {
+    if (expr1 instanceof IdentifierTree && expr2 instanceof IdentifierTree) {
       // foo == foo?
       return sym1.equals(sym2);
-    } else if (expr1.getKind() == Kind.MEMBER_SELECT && expr2.getKind() == Kind.MEMBER_SELECT) {
+    } else if (expr1 instanceof MemberSelectTree && expr2 instanceof MemberSelectTree) {
       // foo.baz.bar == foo.baz.bar?
       return sym1.equals(sym2)
           && sameVariable(((JCFieldAccess) expr1).selected, ((JCFieldAccess) expr2).selected);
     } else {
       // this.foo == foo?
       ExpressionTree selected;
-      if (expr1.getKind() == Kind.IDENTIFIER) {
+      if (expr1 instanceof IdentifierTree) {
         selected = ((JCFieldAccess) expr2).selected;
       } else {
         selected = ((JCFieldAccess) expr1).selected;
@@ -381,8 +381,8 @@ public class ASTHelpers {
       case LAMBDA_EXPRESSION -> {
         // Parenthesizing e.g. `x -> (y -> z)` is unnecessary but helpful
         Tree parent = state.getPath().getParentPath().getLeaf();
-        return parent.getKind().equals(Kind.LAMBDA_EXPRESSION)
-            && stripParentheses(((LambdaExpressionTree) parent).getBody()).equals(expression);
+        return parent instanceof LambdaExpressionTree lambdaExpressionTree
+            && stripParentheses(lambdaExpressionTree.getBody()).equals(expression);
       }
       default -> {
         // continue below
@@ -425,8 +425,8 @@ public class ASTHelpers {
 
   /** Given an ExpressionTree, removes any enclosing parentheses. */
   public static ExpressionTree stripParentheses(ExpressionTree tree) {
-    while (tree instanceof ParenthesizedTree) {
-      tree = ((ParenthesizedTree) tree).getExpression();
+    while (tree instanceof ParenthesizedTree pt) {
+      tree = pt.getExpression();
     }
     return tree;
   }
@@ -719,33 +719,15 @@ public class ASTHelpers {
    * including interfaces.
    */
   public static Set<MethodSymbol> findSuperMethods(MethodSymbol methodSymbol, Types types) {
-    return findSuperMethods(methodSymbol, types, /* skipInterfaces= */ false)
-        .collect(toCollection(LinkedHashSet::new));
+    return streamSuperMethods(methodSymbol, types).collect(toCollection(LinkedHashSet::new));
   }
 
   /** See {@link #findSuperMethods(MethodSymbol, Types)}. */
   public static Stream<MethodSymbol> streamSuperMethods(MethodSymbol methodSymbol, Types types) {
-    return findSuperMethods(methodSymbol, types, /* skipInterfaces= */ false);
-  }
-
-  static Stream<MethodSymbol> findSuperMethods(
-      MethodSymbol methodSymbol, Types types, boolean skipInterfaces) {
     TypeSymbol owner = (TypeSymbol) methodSymbol.owner;
-    Stream<Type> typeStream = types.closure(owner.type).stream();
-    if (skipInterfaces) {
-      typeStream = typeStream.filter(type -> !type.isInterface());
-    }
-    return typeStream
+    return types.closure(owner.type).stream()
         .map(type -> findSuperMethodInType(methodSymbol, type, types))
         .filter(Objects::nonNull);
-  }
-
-  /**
-   * Finds (if it exists) first (in the class hierarchy) non-interface super method of given {@code
-   * method}.
-   */
-  public static Optional<MethodSymbol> findSuperMethod(MethodSymbol methodSymbol, Types types) {
-    return findSuperMethods(methodSymbol, types, /* skipInterfaces= */ true).findFirst();
   }
 
   /**
