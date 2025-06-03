@@ -59,4 +59,22 @@ public class BooleanLiteralTest {
             """)
         .doTest();
   }
+
+  @Test
+  public void methodRef() {
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            """
+            import java.util.function.Predicate;
+
+            class Test {
+              void f() {
+                Predicate<Boolean> p = Boolean.TRUE::equals;
+              }
+            }
+            """)
+        .expectUnchanged()
+        .doTest();
+  }
 }
