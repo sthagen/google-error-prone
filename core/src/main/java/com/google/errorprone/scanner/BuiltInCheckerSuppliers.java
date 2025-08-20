@@ -373,6 +373,7 @@ import com.google.errorprone.bugpatterns.StringCaseLocaleUsage;
 import com.google.errorprone.bugpatterns.StringCharset;
 import com.google.errorprone.bugpatterns.StringConcatToTextBlock;
 import com.google.errorprone.bugpatterns.StringFormatWithLiteral;
+import com.google.errorprone.bugpatterns.StringJoin;
 import com.google.errorprone.bugpatterns.StringSplitter;
 import com.google.errorprone.bugpatterns.StronglyTypeByteString;
 import com.google.errorprone.bugpatterns.SubstringOfZero;
@@ -504,6 +505,7 @@ import com.google.errorprone.bugpatterns.flogger.FloggerLogString;
 import com.google.errorprone.bugpatterns.flogger.FloggerLogVarargs;
 import com.google.errorprone.bugpatterns.flogger.FloggerLogWithCause;
 import com.google.errorprone.bugpatterns.flogger.FloggerMessageFormat;
+import com.google.errorprone.bugpatterns.flogger.FloggerPerWithoutRateLimit;
 import com.google.errorprone.bugpatterns.flogger.FloggerRedundantIsEnabled;
 import com.google.errorprone.bugpatterns.flogger.FloggerRequiredModifiers;
 import com.google.errorprone.bugpatterns.flogger.FloggerSplitLogStatement;
@@ -846,6 +848,7 @@ public class BuiltInCheckerSuppliers {
           SizeGreaterThanOrEqualsZero.class,
           StreamToString.class,
           StringBuilderInitWithChar.class,
+          StringJoin.class,
           SubstringOfZero.class,
           SuppressWarningsDeprecated.class,
           TemporalAccessorGetChronoField.class,
@@ -958,6 +961,7 @@ public class BuiltInCheckerSuppliers {
           FloatingPointAssertionWithinEpsilon.class,
           FloatingPointLiteralPrecision.class,
           FloggerArgumentToString.class,
+          FloggerPerWithoutRateLimit.class,
           FloggerStringConcatenation.class,
           FragmentInjection.class,
           FragmentNotInstantiable.class,
