@@ -174,6 +174,7 @@ import com.google.errorprone.bugpatterns.IdentifierName;
 import com.google.errorprone.bugpatterns.IdentityBinaryExpression;
 import com.google.errorprone.bugpatterns.IdentityHashMapBoxing;
 import com.google.errorprone.bugpatterns.IdentityHashMapUsage;
+import com.google.errorprone.bugpatterns.IfChainToSwitch;
 import com.google.errorprone.bugpatterns.IgnoredPureGetter;
 import com.google.errorprone.bugpatterns.ImmutableMemberCollection;
 import com.google.errorprone.bugpatterns.ImmutableSetForContains;
@@ -575,6 +576,7 @@ import com.google.errorprone.bugpatterns.javadoc.ReturnFromVoid;
 import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
 import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
+import com.google.errorprone.bugpatterns.nullness.AddNullMarkedToClass;
 import com.google.errorprone.bugpatterns.nullness.AddNullMarkedToPackageInfo;
 import com.google.errorprone.bugpatterns.nullness.DereferenceWithNullBranch;
 import com.google.errorprone.bugpatterns.nullness.EqualsBrokenForNull;
@@ -981,6 +983,7 @@ public class BuiltInCheckerSuppliers {
           HidingField.class,
           ICCProfileGetInstance.class,
           IdentityHashMapUsage.class,
+          IfChainToSwitch.class,
           IgnoredPureGetter.class,
           ImmutableAnnotationChecker.class,
           ImmutableEnumChecker.class,
@@ -1188,6 +1191,7 @@ public class BuiltInCheckerSuppliers {
   public static final ImmutableSet<BugCheckerInfo> DISABLED_CHECKS =
       getSuppliers(
           // keep-sorted start
+          AddNullMarkedToClass.class,
           AddNullMarkedToPackageInfo.class,
           AnnotationMirrorToString.class,
           AnnotationPosition.class,
