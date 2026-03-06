@@ -205,4 +205,72 @@ public class AssertThrowsMinimizerTest {
         .expectUnchanged()
         .doTest();
   }
+
+  @Test
+  public void twoAssertions() {
+    compilationHelper
+        .addInputLines(
+            "Test.java",
+            """
+            import static org.junit.Assert.assertThrows;
+
+            class Test {
+              void f() {
+                Bar bar = new Bar();
+                assertThrows(IllegalStateException.class, () -> Foo.builder().setBar(bar));
+                assertThrows(IllegalStateException.class, () -> Foo.builder().setBar(bar));
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            import static org.junit.Assert.assertThrows;
+
+            class Test {
+              void f() {
+                Bar bar = new Bar();
+                Foo.Builder builder = Foo.builder();
+                assertThrows(IllegalStateException.class, () -> builder.setBar(bar));
+                Foo.Builder builder2 = Foo.builder();
+                assertThrows(IllegalStateException.class, () -> builder2.setBar(bar));
+              }
+            }
+            """)
+        .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void rpcClientContextCreate_isNotHoisted() {
+    compilationHelper
+        .addInputLines(
+            "RpcClientContext.java",
+            """
+            package com.google.net.rpc3.client;
+
+            public class RpcClientContext {
+              public static RpcClientContext create() {
+                return null;
+              }
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            import static org.junit.Assert.assertThrows;
+
+            import com.google.net.rpc3.client.RpcClientContext;
+
+            class Test {
+              void consume(RpcClientContext r) {}
+
+              void m() {
+                assertThrows(IllegalArgumentException.class, () -> consume(RpcClientContext.create()));
+              }
+            }
+            """)
+        .expectUnchanged()
+        .doTest();
+  }
 }
