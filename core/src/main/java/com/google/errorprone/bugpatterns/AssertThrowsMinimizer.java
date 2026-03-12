@@ -23,14 +23,18 @@ import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.anyOf;
 import static com.google.errorprone.matchers.method.MethodMatchers.constructor;
 import static com.google.errorprone.matchers.method.MethodMatchers.staticMethod;
+import static com.google.errorprone.util.ASTHelpers.constValue;
 import static com.google.errorprone.util.ASTHelpers.getReceiver;
 import static com.google.errorprone.util.ASTHelpers.getStartPosition;
 import static com.google.errorprone.util.ASTHelpers.getSymbol;
+import static com.google.errorprone.util.ASTHelpers.getThrownExceptions;
 import static com.google.errorprone.util.ASTHelpers.getType;
+import static com.google.errorprone.util.ASTHelpers.isCheckedExceptionType;
 import static java.util.stream.Collectors.toCollection;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.ErrorProneFlags;
@@ -48,13 +52,18 @@ import com.sun.source.tree.ExpressionStatementTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.LambdaExpressionTree;
+import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.NewArrayTree;
 import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.Tree;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -112,6 +121,11 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
     if (!(tree.getArguments().getLast() instanceof LambdaExpressionTree lambdaExpressionTree)) {
       return Optional.empty();
     }
+    Type firstArgumentType = getType(tree.getArguments().get(0));
+    if (firstArgumentType.getTypeArguments().isEmpty()) {
+      return Optional.empty();
+    }
+    Type exceptionType = firstArgumentType.getTypeArguments().get(0);
     MethodInvocationTree runnable;
     switch (lambdaExpressionTree.getBody()) {
       case BlockTree blockTree -> {
@@ -139,7 +153,7 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
                     runnable.getArguments().stream(),
                     getSymbol(runnable).getParameters().stream(),
                     (ExpressionTree a, VarSymbol p) -> new Hoist(a, p.getSimpleName().toString())))
-            .filter(h -> needsHoisting(h.site(), state))
+            .filter(h -> needsHoisting(h.site(), exceptionType, state))
             .collect(toImmutableList());
     if (toHoist.isEmpty()) {
       return Optional.empty();
@@ -153,16 +167,41 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
     if (toFix.isEmpty()) {
       return NO_MATCH;
     }
+
+    ImmutableList<Type> checkedExceptions =
+        toFix.stream()
+            .flatMap(at -> at.toHoist.stream())
+            .flatMap(h -> getThrownExceptions(h.site(), state).stream())
+            .filter(t -> isCheckedExceptionType(t, state))
+            .collect(toImmutableList());
+
     SuggestedFix.Builder fix = SuggestedFix.builder();
+    if (!checkedExceptions.isEmpty()) {
+      Type exceptionType = state.getSymtab().exceptionType;
+      boolean needsThrowable =
+          checkedExceptions.stream()
+              .anyMatch(t -> !state.getTypes().isAssignable(t, exceptionType));
+      addThrows(
+          tree,
+          needsThrowable ? state.getSymtab().throwableType : state.getSymtab().exceptionType,
+          fix,
+          state);
+    }
+
     VariableNamer variableNamer = new VariableNamer(state);
     for (AssertThrows current : toFix) {
       StringBuilder hoistedVariables = new StringBuilder();
       for (Hoist hoist : current.toHoist) {
         String identifier = variableNamer.avoidShadowing(hoist.name());
+        Type type =
+            getType(
+                hoist.site() instanceof NewClassTree newClassTree
+                    ? newClassTree.getIdentifier()
+                    : hoist.site());
         hoistedVariables.append(
             String.format(
                 "%s %s = %s;\n",
-                useVarType ? "var" : SuggestedFixes.qualifyType(state, fix, getType(hoist.site())),
+                useVarType ? "var" : SuggestedFixes.qualifyType(state, fix, type),
                 identifier,
                 state.getSourceForNode(hoist.site())));
         fix.replace(hoist.site(), identifier);
@@ -176,12 +215,26 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
     return describeMatch(toFix.getFirst().parent(), fix.build());
   }
 
+  private void addThrows(
+      MethodTree tree, Type exceptionType, SuggestedFix.Builder fix, VisitorState state) {
+    var types = state.getTypes();
+    if (tree.getThrows().stream().anyMatch(t -> types.isSuperType(getType(t), exceptionType))) {
+      return;
+    }
+    if (tree.getThrows().isEmpty()) {
+      fix.prefixWith(tree.getBody(), " throws " + exceptionType.tsym.getSimpleName());
+    } else {
+      fix.postfixWith(
+          Iterables.getLast(tree.getThrows()), ", " + exceptionType.tsym.getSimpleName());
+    }
+  }
+
   private static String receiverVariableName(ExpressionTree tree) {
     return CaseFormat.UPPER_CAMEL.to(
         CaseFormat.LOWER_CAMEL, getType(tree).asElement().getSimpleName().toString());
   }
 
-  private boolean needsHoisting(ExpressionTree tree, VisitorState state) {
+  private boolean needsHoisting(ExpressionTree tree, Type exceptionType, VisitorState state) {
     if (KNOWN_SAFE.matches(tree, state)) {
       var arguments =
           switch (tree) {
@@ -189,7 +242,7 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
             case NewClassTree newClassTree -> newClassTree.getArguments();
             default -> throw new AssertionError(tree.getKind());
           };
-      if (arguments.stream().noneMatch(a -> needsHoisting(a, state))) {
+      if (arguments.stream().noneMatch(a -> needsHoisting(a, exceptionType, state))) {
         return false;
       }
     }
@@ -204,9 +257,63 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
     if (unqualifiedIdentifier && getSymbol(tree).getKind() == ElementKind.FIELD) {
       return false;
     }
+    if (constValue(tree) != null) {
+      // Allow anything with a compile-time constant value. constantExpressions doesn't cover
+      // constant fields and string concatenation.
+      return false;
+    }
+    if (isCheckedException(exceptionType, state) && !throwsSubtypeOf(tree, exceptionType, state)) {
+      return false;
+    }
+    boolean needsHoisting =
+        switch (tree) {
+          case LambdaExpressionTree lambdaExpressionTree -> false;
+          case MemberReferenceTree memberReferenceTree ->
+              needsHoisting(memberReferenceTree.getQualifierExpression(), exceptionType, state);
+          case NewArrayTree newArrayTree ->
+              Stream.concat(
+                      newArrayTree.getDimensions().stream(),
+                      Optional.ofNullable(newArrayTree.getInitializers())
+                          .map(list -> list.stream())
+                          .orElse(Stream.empty()))
+                  .anyMatch(t -> needsHoisting(t, exceptionType, state));
+          case NewClassTree newClassTree -> newClassTreeNeedsHoisting(newClassTree);
+          default -> true;
+        };
+    if (!needsHoisting) {
+      return false;
+    }
     // This is an imperfect heuristic. These expressions aren't guaranteed not to throw, but may be
     // less valuable to hoist.
     return constantExpressions.constantExpression(tree, state).isEmpty();
+  }
+
+  // Allow anonymous implementations of interfaces
+  private boolean newClassTreeNeedsHoisting(NewClassTree tree) {
+    if (tree.getClassBody() == null) {
+      return true;
+    }
+    Symbol sym = getSymbol(tree.getIdentifier());
+    // New class expressions for non-interfaces could throw in constructors or class initializers
+    if (!sym.isInterface()) {
+      return true;
+    }
+    // Hoist implementations that could throw in constructors or class initializers (in static
+    // blocks or field initializers)
+    return !tree.getClassBody().getMembers().stream().allMatch(m -> m instanceof MethodTree);
+  }
+
+  private static boolean throwsSubtypeOf(
+      ExpressionTree tree, Type exceptionType, VisitorState state) {
+    Types types = state.getTypes();
+    return getThrownExceptions(tree, state).stream()
+        .anyMatch(t -> isCheckedException(t, state) && types.isSubtype(t, exceptionType));
+  }
+
+  private static boolean isCheckedException(Type exception, VisitorState state) {
+    Types types = state.getTypes();
+    return !types.isSubtype(exception, state.getSymtab().runtimeExceptionType)
+        && !types.isSubtype(exception, state.getSymtab().errorType);
   }
 
   private static final Matcher<ExpressionTree> KNOWN_SAFE =
