@@ -306,8 +306,9 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
   private static boolean throwsSubtypeOf(
       ExpressionTree tree, Type exceptionType, VisitorState state) {
     Types types = state.getTypes();
-    return getThrownExceptions(tree, state).stream()
-        .anyMatch(t -> isCheckedException(t, state) && types.isSubtype(t, exceptionType));
+    return types.isSubtype(state.getSymtab().runtimeExceptionType, exceptionType)
+        || getThrownExceptions(tree, state).stream()
+            .anyMatch(t -> isCheckedException(t, state) && types.isSubtype(t, exceptionType));
   }
 
   private static boolean isCheckedException(Type exception, VisitorState state) {
@@ -322,7 +323,12 @@ public class AssertThrowsMinimizer extends BugChecker implements MethodTreeMatch
               .onClass("com.google.net.rpc3.client.RpcClientContext")
               .named("create")
               .withNoParameters(),
+          staticMethod()
+              .onClass("com.google.net.rpc.RpcAuthority")
+              .named("self")
+              .withNoParameters(),
           staticMethod().onClass("java.util.Arrays").named("asList"),
+          // TODO: b/493258197 - immutable collection factories could throw NPEs
           staticMethod()
               .onClassAny(
                   "com.google.common.collect.ImmutableList",

@@ -446,6 +446,10 @@ public class AssertThrowsMinimizerTest {
                 throw new Exception();
               }
 
+              public static Object getThingUnchecked()  {
+                throw new RuntimeException();
+              }
+
               public static Object getOtherThing() throws Throwable {
                 throw new Throwable();
               }
@@ -473,6 +477,10 @@ public class AssertThrowsMinimizerTest {
               void i() throws IllegalStateException {
                 assertThrows(Throwable.class, () -> Hoistable.create(Hoistable.getOtherThing()));
               }
+
+              void j() {
+                assertThrows(Exception.class, () -> Hoistable.create(Hoistable.getThingUnchecked()));
+              }
             }
             """)
         .addOutputLines(
@@ -499,6 +507,11 @@ public class AssertThrowsMinimizerTest {
               void i() throws IllegalStateException, Throwable {
                 Object t = Hoistable.getOtherThing();
                 assertThrows(Throwable.class, () -> Hoistable.create(t));
+              }
+
+              void j() {
+                Object t = Hoistable.getThingUnchecked();
+                assertThrows(Exception.class, () -> Hoistable.create(t));
               }
             }
             """)
@@ -842,6 +855,53 @@ public class AssertThrowsMinimizerTest {
                   super(Test.this);
                 }
               }
+            }
+            """)
+        .doTest(TEXT_MATCH);
+  }
+
+  @Test
+  public void optional() {
+    compilationHelper
+        .addInputLines(
+            "Test.java",
+            """
+            import static org.junit.Assert.assertThrows;
+
+            import java.util.Optional;
+
+            abstract class Test {
+              void f() {
+                // This one should probably have been extracted, since it incorrectly passes!
+                assertThrows(NullPointerException.class, () -> doSomething(Optional.of(null)));
+                assertThrows(NullPointerException.class, () -> doSomething(Optional.of("hi")));
+                assertThrows(NullPointerException.class, () -> doSomething(Optional.of(getString())));
+              }
+
+              abstract void doSomething(Optional<String> string);
+
+              abstract String getString();
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            import static org.junit.Assert.assertThrows;
+
+            import java.util.Optional;
+
+            abstract class Test {
+              void f() {
+                // This one should probably have been extracted, since it incorrectly passes!
+                assertThrows(NullPointerException.class, () -> doSomething(Optional.of(null)));
+                assertThrows(NullPointerException.class, () -> doSomething(Optional.of("hi")));
+                Optional<String> string = Optional.of(getString());
+                assertThrows(NullPointerException.class, () -> doSomething(string));
+              }
+
+              abstract void doSomething(Optional<String> string);
+
+              abstract String getString();
             }
             """)
         .doTest(TEXT_MATCH);
