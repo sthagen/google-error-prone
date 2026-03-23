@@ -267,4 +267,22 @@ public final class AlmostJavadocTest {
             """)
         .doTest();
   }
+
+  @Test
+  public void nonJavadoccablePositionMethod() {
+    helper
+        .addSourceLines(
+            "Test.java",
+            """
+            public class Test {
+              void foo() {
+                class Foo {
+                  /* Foo {@link Test}. */
+                  void bar() {}
+                }
+              }
+            }
+            """)
+        .doTest();
+  }
 }
