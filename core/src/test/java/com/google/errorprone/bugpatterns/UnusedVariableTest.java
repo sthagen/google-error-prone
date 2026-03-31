@@ -15,13 +15,11 @@
 package com.google.errorprone.bugpatterns;
 
 import static com.google.common.truth.TruthJUnit.assume;
-import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.BugCheckerRefactoringTestHelper.FixChoosers;
-import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -665,7 +663,7 @@ public class UnusedVariableTest {
 
             public class UnusedWithComment {}
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -687,7 +685,7 @@ public class UnusedVariableTest {
               public static final int A = 1; // foo
             }
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -712,7 +710,7 @@ public class UnusedVariableTest {
               public static final int A = 1; // foo
             }
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -732,7 +730,7 @@ public class UnusedVariableTest {
             @SuppressWarnings("foo" /* { */)
             public class Test {}
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -816,8 +814,8 @@ public class UnusedVariableTest {
             """
             package unusedvars;
 
-            import java.util.Map;
             import java.util.HashMap;
+            import java.util.Map;
 
             public class Test {
               private int next = 1;
@@ -1681,10 +1679,11 @@ public class UnusedVariableTest {
         .addInputLines(
             "Test.java",
 """
+import static java.util.stream.Collectors.toList;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import static java.util.stream.Collectors.toList;
 
 public class Test {
   public void f(List<List<String>> lists) {
@@ -1697,10 +1696,11 @@ public class Test {
         .addOutputLines(
             "Test.java",
             """
+            import static java.util.stream.Collectors.toList;
+
             import java.util.ArrayList;
             import java.util.Collection;
             import java.util.List;
-            import static java.util.stream.Collectors.toList;
 
             public class Test {
               public void f(List<List<String>> lists) {}
@@ -1716,10 +1716,11 @@ public class Test {
         .addInputLines(
             "Test.java",
 """
+import static java.util.stream.Collectors.toList;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import static java.util.stream.Collectors.toList;
 
 public class Test {
   public void f(List<List<String>> lists) {
@@ -1732,10 +1733,11 @@ public class Test {
         .addOutputLines(
             "Test.java",
             """
+            import static java.util.stream.Collectors.toList;
+
             import java.util.ArrayList;
             import java.util.Collection;
             import java.util.List;
-            import static java.util.stream.Collectors.toList;
 
             public class Test {
               public void f(List<List<String>> lists) {
@@ -2232,6 +2234,6 @@ public class Test {
             }
             """)
         .expectUnchanged()
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 }

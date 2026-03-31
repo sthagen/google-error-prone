@@ -17,7 +17,6 @@
 package com.google.errorprone.bugpatterns;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
-import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.CompilationTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -223,7 +222,7 @@ public final class FieldCanBeLocalTest {
               }
             }
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -596,9 +595,9 @@ public final class FieldCanBeLocalTest {
         .addSourceLines(
             "Test.java",
 """
+import java.util.Collections;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import java.util.Collections;
 
 class Test {
   private Integer a;

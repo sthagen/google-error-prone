@@ -18,7 +18,6 @@ package com.google.errorprone.fixes;
 
 import static com.google.common.collect.Streams.stream;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 import static com.google.errorprone.BugPattern.SeverityLevel.ERROR;
 import static com.google.errorprone.fixes.SuggestedFix.emptyFix;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
@@ -30,7 +29,6 @@ import com.google.common.base.Verify;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
-import com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode;
 import com.google.errorprone.BugPattern;
 import com.google.errorprone.CompilationTestHelper;
 import com.google.errorprone.VisitorState;
@@ -163,8 +161,8 @@ public class SuggestedFixesTest {
         .addInputLines(
             "Test.java",
             """
-            import javax.annotation.Nullable;
             import com.google.errorprone.fixes.SuggestedFixesTest.EditModifiers;
+            import javax.annotation.Nullable;
 
             @EditModifiers(value = "final", kind = EditModifiers.EditKind.ADD)
             class Test {
@@ -177,8 +175,8 @@ public class SuggestedFixesTest {
         .addOutputLines(
             "Test.java",
             """
-            import javax.annotation.Nullable;
             import com.google.errorprone.fixes.SuggestedFixesTest.EditModifiers;
+            import javax.annotation.Nullable;
 
             @EditModifiers(value = "final", kind = EditModifiers.EditKind.ADD)
             class Test {
@@ -188,7 +186,7 @@ public class SuggestedFixesTest {
               }
             }
             """)
-        .doTest(TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1175,6 +1173,7 @@ public class SuggestedFixesTest {
             """
             import static com.google.common.base.Preconditions.checkNotNull;
             import static pkg.Lib.verifyNotNull;
+
             import com.google.common.base.Verify;
 
             class Test {
@@ -1207,6 +1206,7 @@ public class SuggestedFixesTest {
             "Test.java",
             """
             import static com.google.common.base.Preconditions.checkNotNull;
+
             import com.google.common.base.Verify;
 
             class Test {
@@ -1284,7 +1284,7 @@ class Test {
   void foo() {}
 }
 """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   /** A {@link BugChecker} for testing. */
@@ -1431,7 +1431,7 @@ class Test {
               int BEST = 42;
             }
             """)
-        .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1467,7 +1467,7 @@ class Test {
               int BEST = 42;
             }
             """)
-        .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1496,7 +1496,7 @@ public class Test {
   int BEST = 42;
 }
 """)
-        .doTest(BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH);
+        .doTest();
   }
 
   /** A {@link BugChecker} for testing. */
@@ -1528,10 +1528,11 @@ public class Test {
             "Test.java",
             """
             public class Test {
+
               int BEST = 42;
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1555,7 +1556,7 @@ public class Test {
               int BEST = 42;
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1579,7 +1580,7 @@ public class Test {
               int BEST = 42;
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1599,10 +1600,11 @@ public class Test {
             "Test.java",
             """
             public class Test {
+
               int BEST = 42;
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1626,7 +1628,7 @@ public class Test {
               int BEST = 42;
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   /** A {@link BugChecker} for testing. */
@@ -1667,7 +1669,7 @@ public class Test {
               void m() {}
             }
             """)
-        .doTest(TestMode.AST_MATCH);
+        .doTest();
   }
 
   /** A test bugchecker that deletes any field whose removal doesn't break the compilation. */
@@ -2199,7 +2201,7 @@ public class Test {
               Object quux = Collections.<emptyList>singleton(null);
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   /** A {@link BugChecker} for testing. */

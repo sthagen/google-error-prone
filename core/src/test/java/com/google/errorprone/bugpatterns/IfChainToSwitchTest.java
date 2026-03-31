@@ -18,7 +18,6 @@ package com.google.errorprone.bugpatterns;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
-import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
 
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import com.google.errorprone.CompilationTestHelper;
@@ -102,7 +101,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -191,7 +190,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -250,7 +249,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -348,7 +347,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -398,7 +397,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -449,7 +448,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -535,7 +534,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -588,7 +587,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -642,7 +641,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -688,7 +687,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -734,7 +733,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -783,7 +782,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -832,7 +831,7 @@ public final class IfChainToSwitchTest {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -876,7 +875,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -920,7 +919,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -969,7 +968,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1016,7 +1015,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1066,7 +1065,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1118,7 +1117,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1316,7 +1315,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1461,7 +1460,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1767,7 +1766,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1833,7 +1832,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1952,14 +1951,14 @@ class Test {
         .addInputLines(
             "Test.java",
             """
-            import java.lang.Number;
-            import java.util.Optional;
             import java.lang.Integer;
             import java.lang.Long;
+            import java.lang.Number;
             import java.math.BigDecimal;
             import java.time.Duration;
             import java.time.Instant;
             import java.util.Date;
+            import java.util.Optional;
 
             class Test {
               public void foo(Suit s) {
@@ -2009,14 +2008,14 @@ class Test {
         .addOutputLines(
             "Test.java",
             """
-            import java.lang.Number;
-            import java.util.Optional;
             import java.lang.Integer;
             import java.lang.Long;
+            import java.lang.Number;
             import java.math.BigDecimal;
             import java.time.Duration;
             import java.time.Instant;
             import java.util.Date;
+            import java.util.Optional;
 
             class Test {
               public void foo(Suit s) {
@@ -2058,7 +2057,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2106,7 +2105,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2154,7 +2153,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2243,7 +2242,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2331,7 +2330,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2391,7 +2390,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2449,7 +2448,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe=false")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2507,7 +2506,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2662,7 +2661,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2722,7 +2721,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2787,7 +2786,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2841,7 +2840,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -2895,7 +2894,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3018,8 +3017,8 @@ class Test {
             "Test.java",
             """
             import java.lang.Number;
-            import java.util.List;
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
               public void foo(Suit s) {
@@ -3044,8 +3043,8 @@ class Test {
             "Test.java",
 """
 import java.lang.Number;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 class Test {
   public void foo(Suit s) {
@@ -3067,7 +3066,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3078,8 +3077,8 @@ class Test {
             "Test.java",
             """
             import java.lang.Number;
-            import java.util.List;
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
               public void foo(Suit s) {
@@ -3104,8 +3103,8 @@ class Test {
             "Test.java",
 """
 import java.lang.Number;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 class Test {
   public void foo(Suit s) {
@@ -3126,7 +3125,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3137,8 +3136,8 @@ class Test {
             "Test.java",
             """
             import java.lang.Number;
-            import java.util.Map;
             import java.util.HashMap;
+            import java.util.Map;
 
             class Test {
               public void foo(Suit s) {
@@ -3163,8 +3162,8 @@ class Test {
             "Test.java",
 """
 import java.lang.Number;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
 class Test {
   public void foo(Suit s) {
@@ -3186,7 +3185,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3197,8 +3196,8 @@ class Test {
             "Test.java",
             """
             import java.lang.Number;
-            import java.util.Map;
             import java.util.HashMap;
+            import java.util.Map;
 
             class Test {
               public void foo(Suit s) {
@@ -3223,8 +3222,8 @@ class Test {
             "Test.java",
 """
 import java.lang.Number;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
 class Test {
   public void foo(Suit s) {
@@ -3245,7 +3244,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3353,7 +3352,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3401,7 +3400,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3536,7 +3535,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3590,7 +3589,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3643,7 +3642,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3701,7 +3700,7 @@ class Test {
             "--release",
             Integer.toString(Runtime.version().feature()))
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3738,7 +3737,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3779,7 +3778,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3828,7 +3827,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3902,7 +3901,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -3975,7 +3974,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -4034,7 +4033,7 @@ class Test {
             """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -4075,7 +4074,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -4145,7 +4144,7 @@ class Test {
 """)
         .setArgs("-XepOpt:IfChainToSwitch:EnableMain", "-XepOpt:IfChainToSwitch:EnableSafe")
         .setFixChooser(IfChainToSwitchTest::assertOneFixAndChoose)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   /**

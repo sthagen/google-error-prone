@@ -16,8 +16,6 @@
 
 package com.google.errorprone.bugpatterns;
 
-import static com.google.errorprone.BugCheckerRefactoringTestHelper.TestMode.TEXT_MATCH;
-
 import com.google.errorprone.BugCheckerRefactoringTestHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -110,7 +108,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -141,11 +139,12 @@ public class AssertThrowsMinimizerTest {
               void f() {
                 Foo.Builder builder = Foo.builder();
                 Bar bar = new Bar();
-                IllegalStateException ise = assertThrows(IllegalStateException.class, () -> builder.setBar(bar));
+                IllegalStateException ise =
+                    assertThrows(IllegalStateException.class, () -> builder.setBar(bar));
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -155,6 +154,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import com.google.common.collect.ImmutableList;
 
             class Test {
@@ -176,8 +176,9 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
-            import java.util.List;
+
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
               void f() {
@@ -197,8 +198,9 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
-            import java.util.List;
+
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
               List<Integer> list = new ArrayList<>();
@@ -219,8 +221,9 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
-            import java.util.List;
+
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
               List<Integer> list = new ArrayList<>();
@@ -265,7 +268,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -309,6 +312,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -347,7 +351,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -357,6 +361,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -369,6 +374,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -378,7 +384,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -388,6 +394,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -407,6 +414,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -419,6 +427,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import java.io.IOException;
 
             class Test {
@@ -428,7 +437,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -543,6 +552,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import com.google.android.gms.tagmanager.internal.type.StringWrapper;
 
             abstract class Test {
@@ -560,6 +570,7 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
+
             import com.google.android.gms.tagmanager.internal.type.StringWrapper;
 
             abstract class Test {
@@ -584,8 +595,9 @@ public class AssertThrowsMinimizerTest {
             "Test.java",
             """
             import static org.junit.Assert.assertThrows;
-            import java.util.List;
+
             import java.util.ArrayList;
+            import java.util.List;
 
             class Test {
 
@@ -671,7 +683,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -717,7 +729,7 @@ public class AssertThrowsMinimizerTest {
               abstract int getDimension();
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -857,7 +869,7 @@ public class AssertThrowsMinimizerTest {
               }
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -904,7 +916,7 @@ public class AssertThrowsMinimizerTest {
               abstract String getString();
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -948,7 +960,7 @@ public class AssertThrowsMinimizerTest {
               abstract void doSomething(String... strings);
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 
   @Test
@@ -1010,6 +1022,6 @@ public class AssertThrowsMinimizerTest {
               abstract void doSomething(Object o);
             }
             """)
-        .doTest(TEXT_MATCH);
+        .doTest();
   }
 }
