@@ -298,9 +298,13 @@ public final class IfChainToSwitch extends BugChecker implements IfTreeMatcher {
         } else if (instanceOfIr.expression().isPresent()) {
           sb.append(
               printRawTypesAsWildcards(getType(instanceOfIr.type()), state, suggestedFixBuilder));
-          // It's possible that "unused" could conflict with an existing local variable name;
-          // support for unnamed variables gets around this issue, but requires later Java versions
-          sb.append(" unused ");
+          if (SourceVersion.supportsUnnamedVariablesAndPatterns(state.context)) {
+            sb.append(" _ ");
+          } else {
+            // It's possible that "unused" could conflict with an existing local variable name;
+            // support for unnamed variables gets around this, but requires later Java versions
+            sb.append(" unused ");
+          }
         }
         if (caseIr.guardOptional().isPresent()) {
           sb.append("when ").append(state.getSourceForNode(caseIr.guardOptional().get()));
@@ -1857,7 +1861,7 @@ public final class IfChainToSwitch extends BugChecker implements IfTreeMatcher {
               ? getType(rhsInstanceOf.type())
               : getType(rhsInstanceOf.patternVariable().get().getType());
       if (isSubtype(rhsType, lhsType, state)) {
-        // The LHS type is a subtype of the RHS type, so the LHS dominates the RHS
+        // The RHS type is a subtype of the LHS type, so the LHS dominates the RHS
         return true;
       }
     }
