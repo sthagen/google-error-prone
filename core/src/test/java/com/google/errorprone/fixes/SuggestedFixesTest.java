@@ -23,6 +23,7 @@ import static com.google.errorprone.fixes.SuggestedFix.emptyFix;
 import static com.google.errorprone.matchers.Description.NO_MATCH;
 import static com.google.errorprone.matchers.Matchers.isSameType;
 import static com.google.errorprone.matchers.Matchers.staticMethod;
+import static com.google.errorprone.suppliers.Suppliers.typeFromString;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.Verify;
@@ -44,6 +45,7 @@ import com.google.errorprone.bugpatterns.BugChecker.VariableTreeMatcher;
 import com.google.errorprone.bugpatterns.RemoveUnusedImports;
 import com.google.errorprone.matchers.Description;
 import com.google.errorprone.matchers.Matcher;
+import com.google.errorprone.suppliers.Supplier;
 import com.google.errorprone.util.ASTHelpers;
 import com.sun.source.doctree.LinkTree;
 import com.sun.source.tree.AnnotationTree;
@@ -530,7 +532,7 @@ public class SuggestedFixesTest {
   public static class AddAnnotation extends BugChecker implements BugChecker.MethodTreeMatcher {
     @Override
     public Description matchMethod(MethodTree tree, VisitorState state) {
-      Type type = state.getTypeFromString("some.pkg.SomeAnnotation");
+      Type type = SOMEANNOTATION.get(state);
       SuggestedFix.Builder builder = SuggestedFix.builder();
       String qualifiedName = SuggestedFixes.qualifyType(state, builder, type);
       return describeMatch(
@@ -1081,6 +1083,31 @@ public class SuggestedFixesTest {
     }
   }
 
+  @BugPattern(severity = ERROR, summary = "Replaces checkNotNull with pkg.Base.verifyNotNull")
+  public static class ReplaceMethodInvocationsWithBase extends BugChecker
+      implements BugChecker.MethodInvocationTreeMatcher {
+    private static final Matcher<ExpressionTree> CHECK_NOT_NULL =
+        staticMethod().onClass("com.google.common.base.Preconditions").named("checkNotNull");
+
+    @Override
+    public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
+      if (!CHECK_NOT_NULL.matches(tree, state)) {
+        return NO_MATCH;
+      }
+      SuggestedFix.Builder builder = SuggestedFix.builder();
+      String qualifiedName =
+          SuggestedFixes.qualifyStaticImport("pkg.Base.verifyNotNull", builder, state);
+      return describeMatch(
+          tree,
+          builder
+              .replace(
+                  tree,
+                  String.format(
+                      "%s(%s)", qualifiedName, state.getSourceForNode(tree.getArguments().get(0))))
+              .build());
+    }
+  }
+
   @Test
   public void qualifyStaticImport_addsStaticImportAndUsesUnqualifiedName() {
     BugCheckerRefactoringTestHelper.newInstance(ReplaceMethodInvocations.class, getClass())
@@ -1179,6 +1206,91 @@ public class SuggestedFixesTest {
             class Test {
               void test() {
                 verifyNotNull(2);
+                Verify.verifyNotNull(1);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void qualifyStaticImport_whenAlreadyInScope_doesNotAddStaticImport() {
+    BugCheckerRefactoringTestHelper.newInstance(ReplaceMethodInvocationsWithBase.class, getClass())
+        .addInputLines(
+            "Base.java",
+            """
+            package pkg;
+
+            public class Base {
+              public static void verifyNotNull(Object o) {}
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            import static com.google.common.base.Preconditions.checkNotNull;
+
+            import pkg.Base;
+
+            class Test extends Base {
+              void test() {
+                checkNotNull(1);
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            import static com.google.common.base.Preconditions.checkNotNull;
+
+            import pkg.Base;
+
+            class Test extends Base {
+              void test() {
+                verifyNotNull(1);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void qualifyStaticImport_whenDifferentMethodWithSameNameInScope_usesQualifiedName() {
+    BugCheckerRefactoringTestHelper.newInstance(ReplaceMethodInvocations.class, getClass())
+        .addInputLines(
+            "Base.java",
+            """
+            package pkg;
+
+            public class Base {
+              public static void verifyNotNull(int a) {}
+            }
+            """)
+        .expectUnchanged()
+        .addInputLines(
+            "Test.java",
+            """
+            import static com.google.common.base.Preconditions.checkNotNull;
+
+            import pkg.Base;
+
+            class Test extends Base {
+              void test() {
+                checkNotNull(1);
+              }
+            }
+            """)
+        .addOutputLines(
+            "Test.java",
+            """
+            import static com.google.common.base.Preconditions.checkNotNull;
+
+            import com.google.common.base.Verify;
+            import pkg.Base;
+
+            class Test extends Base {
+              void test() {
                 Verify.verifyNotNull(1);
               }
             }
@@ -2701,4 +2813,6 @@ public class Test {
             """)
         .doTest();
   }
+
+  private static final Supplier<Type> SOMEANNOTATION = typeFromString("some.pkg.SomeAnnotation");
 }
