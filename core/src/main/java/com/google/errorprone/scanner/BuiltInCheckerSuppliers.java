@@ -229,6 +229,7 @@ import com.google.errorprone.bugpatterns.JavaUtilDateChecker;
 import com.google.errorprone.bugpatterns.JdkObsolete;
 import com.google.errorprone.bugpatterns.LabelledBreakTarget;
 import com.google.errorprone.bugpatterns.LambdaFunctionalInterface;
+import com.google.errorprone.bugpatterns.ListRemoveAmbiguous;
 import com.google.errorprone.bugpatterns.LiteByteStringUtf8;
 import com.google.errorprone.bugpatterns.LiteEnumValueOf;
 import com.google.errorprone.bugpatterns.LiteProtoToString;
@@ -328,6 +329,7 @@ import com.google.errorprone.bugpatterns.PatternMatchingInstanceof;
 import com.google.errorprone.bugpatterns.PreconditionsCheckNotNullRepeated;
 import com.google.errorprone.bugpatterns.PreconditionsInvalidPlaceholder;
 import com.google.errorprone.bugpatterns.PreferInstanceofOverGetKind;
+import com.google.errorprone.bugpatterns.PreferTestParameter;
 import com.google.errorprone.bugpatterns.PreferredInterfaceType;
 import com.google.errorprone.bugpatterns.PrimitiveArrayPassedToVarargsMethod;
 import com.google.errorprone.bugpatterns.PrimitiveAtomicReference;
@@ -1062,6 +1064,7 @@ public class BuiltInCheckerSuppliers {
           JodaPlusMinusLong.class,
           JodaTimeConverterManager.class,
           JodaWithDurationAddedLong.class,
+          ListRemoveAmbiguous.class,
           LiteEnumValueOf.class,
           LiteProtoToString.class,
           LockNotBeforeTry.class,
@@ -1126,6 +1129,7 @@ public class BuiltInCheckerSuppliers {
           PatternMatchingInstanceof.class,
           PreconditionsCheckNotNullRepeated.class,
           PreferInstanceofOverGetKind.class,
+          PreferTestParameter.class,
           PreferThrowsTag.class,
           PrimitiveAtomicReference.class,
           ProtectedMembersInFinalClass.class,
