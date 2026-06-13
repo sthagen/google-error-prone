@@ -329,7 +329,9 @@ import com.google.errorprone.bugpatterns.ParametersButNotParameterized;
 import com.google.errorprone.bugpatterns.PatternMatchingInstanceof;
 import com.google.errorprone.bugpatterns.PreconditionsCheckNotNullRepeated;
 import com.google.errorprone.bugpatterns.PreconditionsInvalidPlaceholder;
+import com.google.errorprone.bugpatterns.PreferCharsetOverload;
 import com.google.errorprone.bugpatterns.PreferInstanceofOverGetKind;
+import com.google.errorprone.bugpatterns.PreferPreconditions;
 import com.google.errorprone.bugpatterns.PreferTestParameter;
 import com.google.errorprone.bugpatterns.PreferredInterfaceType;
 import com.google.errorprone.bugpatterns.PrimitiveArrayPassedToVarargsMethod;
@@ -1131,7 +1133,9 @@ public class BuiltInCheckerSuppliers {
           ParameterName.class,
           PatternMatchingInstanceof.class,
           PreconditionsCheckNotNullRepeated.class,
+          PreferCharsetOverload.class,
           PreferInstanceofOverGetKind.class,
+          PreferPreconditions.class,
           PreferTestParameter.class,
           PreferThrowsTag.class,
           PrimitiveAtomicReference.class,
