@@ -497,6 +497,9 @@ public final class SuggestedFixes {
         return components.subList(i, components.size()).stream().collect(joining("."));
       }
       // Type already imported or otherwise visible.
+      if (found.getKind().equals(ElementKind.OTHER)) {
+        continue;
+      }
       if (found.getQualifiedName().contentEquals(qualifiedName)) {
         return components.subList(i, components.size()).stream().collect(joining("."));
       }
@@ -1942,7 +1945,7 @@ public final class SuggestedFixes {
   }
 
   /** Helper class for avoiding variable name shadowing. */
-  public static class VariableNamer {
+  public static final class VariableNamer {
     private final Set<String> idents;
 
     private VariableNamer(VisitorState state) {
