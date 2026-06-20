@@ -526,7 +526,6 @@ public final class SuggestedFixes {
         .filter(ClassTree.class::isInstance)
         .map(ClassTree.class::cast)
         .map(ASTHelpers::getSymbol)
-        .filter(s -> s != null)
         .flatMap(
             enclosingClass ->
                 stream(
@@ -1866,10 +1865,10 @@ public final class SuggestedFixes {
   public static Optional<SuggestedFix> replaceVariableType(
       VariableTree tree, String replacementType, VisitorState state) {
     Tree type = tree.getType();
-    if (hasExplicitSource(type, state)) {
+    if (type != null && hasExplicitSource(type, state)) {
       return Optional.of(SuggestedFix.replace(type, replacementType));
     }
-    int pos = getStartPosition(type);
+    int pos = type != null ? getStartPosition(type) : Position.NOPOS;
     if (pos == Position.NOPOS) {
       pos = getStartPosition(tree);
     }
@@ -1902,6 +1901,10 @@ public final class SuggestedFixes {
 
     Visibility(Optional<Modifier> modifier) {
       this.modifier = modifier;
+    }
+
+    public Optional<Modifier> modifier() {
+      return modifier;
     }
 
     public SuggestedFix refactor(Tree tree, VisitorState state) {
