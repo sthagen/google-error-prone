@@ -22,7 +22,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.Streams.stream;
-import static com.google.common.collect.Streams.zip;
 import static com.google.errorprone.VisitorState.memoize;
 import static com.google.errorprone.matchers.JUnitMatchers.JUNIT4_RUN_WITH_ANNOTATION;
 import static com.google.errorprone.matchers.Matchers.isSubtypeOf;
@@ -96,6 +95,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.MethodSymbol;
 import com.sun.tools.javac.code.Symbol.PackageSymbol;
+import com.sun.tools.javac.code.Symbol.RecordComponent;
 import com.sun.tools.javac.code.Symbol.TypeSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Symtab;
@@ -434,6 +434,10 @@ public final class ASTHelpers {
   /**
    * Given a TreePath, finds the first enclosing node of the given type and returns the path from
    * the enclosing node to the top-level {@code CompilationUnitTree}.
+   *
+   * <p>If you are looking for "the enclosing method," consider whether {@link
+   * #findEnclosingMethodPath} would be more appropriate: It avoids crossing class and lambda
+   * boundaries.
    */
   public static <T> @Nullable TreePath findPathFromEnclosingNodeToTopLevel(
       TreePath path, Class<T> klass) {
@@ -457,26 +461,37 @@ public final class ASTHelpers {
   /**
    * Given a TreePath, walks up the tree until it finds a node of the given type. Returns null if no
    * such node is found.
+   *
+   * <p>If you are looking for "the enclosing method," consider whether {@link #findEnclosingMethod}
+   * would be more appropriate: It avoids crossing class and lambda boundaries.
    */
   public static <T> @Nullable T findEnclosingNode(TreePath path, Class<T> klass) {
     path = findPathFromEnclosingNodeToTopLevel(path, klass);
     return (path == null) ? null : klass.cast(path.getLeaf());
   }
 
-  /** Finds the enclosing {@link MethodTree}. Returns {@code null} if no such node found. */
-  public static @Nullable MethodTree findEnclosingMethod(VisitorState state) {
-    for (Tree parent : state.getPath()) {
-      switch (parent.getKind()) {
-        case METHOD -> {
-          return (MethodTree) parent;
-        }
-        case CLASS, LAMBDA_EXPRESSION -> {
-          return null;
-        }
-        default -> {}
+  /**
+   * Finds the {@link TreePath} to the enclosing {@link MethodTree} in the current scope (not
+   * crossing class or lambda boundaries). Returns {@code null} if no such node found.
+   */
+  public static @Nullable TreePath findEnclosingMethodPath(TreePath path) {
+    checkNotNull(path);
+    for (; path != null; path = path.getParentPath()) {
+      Tree leaf = path.getLeaf();
+      if (leaf instanceof MethodTree) {
+        return path;
+      }
+      if (leaf instanceof ClassTree || leaf instanceof LambdaExpressionTree) {
+        return null;
       }
     }
     return null;
+  }
+
+  /** Finds the enclosing {@link MethodTree}. Returns {@code null} if no such node found. */
+  public static @Nullable MethodTree findEnclosingMethod(VisitorState state) {
+    TreePath path = findEnclosingMethodPath(state.getPath());
+    return path == null ? null : (MethodTree) path.getLeaf();
   }
 
   /**
@@ -814,19 +829,39 @@ public final class ASTHelpers {
 
   /** Finds the canonical constructor on a record. */
   public static MethodSymbol canonicalConstructor(ClassSymbol record, VisitorState state) {
-    var fieldTypes =
-        record.getRecordComponents().stream().map(rc -> rc.type).collect(toImmutableList());
+    var recordComponents = record.getRecordComponents();
     return stream(record.members().getSymbols(s -> s.isConstructor()))
         .map(c -> (MethodSymbol) c)
-        .filter(
-            c ->
-                c.getParameters().size() == fieldTypes.size()
-                    && zip(
-                            c.getParameters().stream(),
-                            fieldTypes.stream(),
-                            (a, b) -> isSameType(a.type, b, state))
-                        .allMatch(x -> x))
+        .filter(c -> parametersMatchRecordComponents(c, recordComponents, state))
         .collect(onlyElement());
+  }
+
+  /** Returns whether the given method is a record's canonical constructor. */
+  public static boolean isCanonicalRecordConstructor(MethodSymbol symbol, VisitorState state) {
+    if (!symbol.isConstructor()) {
+      return false;
+    }
+    ClassSymbol enclosingClass = symbol.enclClass();
+    if (enclosingClass == null || enclosingClass.getKind() != ElementKind.RECORD) {
+      return false;
+    }
+    return parametersMatchRecordComponents(symbol, enclosingClass.getRecordComponents(), state);
+  }
+
+  private static boolean parametersMatchRecordComponents(
+      MethodSymbol constructor,
+      List<? extends RecordComponent> recordComponents,
+      VisitorState state) {
+    if (constructor.getParameters().size() != recordComponents.size()) {
+      return false;
+    }
+    for (int i = 0; i < recordComponents.size(); i++) {
+      if (!isSameType(
+          constructor.getParameters().get(i).type, recordComponents.get(i).type, state)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -1926,7 +1961,10 @@ public final class ASTHelpers {
     }
   }
 
-  /** Returns the start position of the node. */
+  /**
+   * Returns the start position of the node. To get the end position of a node, use {@link
+   * VisitorState#getEndPosition}.
+   */
   public static int getStartPosition(Tree tree) {
     return ((JCTree) tree).getStartPosition();
   }

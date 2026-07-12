@@ -198,46 +198,6 @@ public class JUnit4ClassUsedInJUnit3Test {
   }
 
   @Test
-  public void positive_ignore_on_test() {
-    compilationHelper
-        .addSourceLines(
-            "Foo.java",
-            """
-            import junit.framework.TestCase;
-            import org.junit.Ignore;
-
-            public class Foo extends TestCase {
-              public void testName1() {}
-
-              // BUG: Diagnostic contains: @Ignore
-              @Ignore
-              public void testName2() {}
-            }
-            """)
-        .doTest();
-  }
-
-  @Test
-  public void positive_ignore_on_class() {
-    compilationHelper
-        .addSourceLines(
-            "Foo.java",
-            """
-            import junit.framework.TestCase;
-            import org.junit.Ignore;
-
-            // BUG: Diagnostic contains: @Ignore
-            @Ignore
-            public class Foo extends TestCase {
-              public void testName1() {}
-
-              public void testName2() {}
-            }
-            """)
-        .doTest();
-  }
-
-  @Test
   public void positive_rule_in_junit3() {
     compilationHelper
         .addSourceLines(

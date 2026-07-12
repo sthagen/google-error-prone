@@ -587,6 +587,7 @@ import com.google.errorprone.bugpatterns.javadoc.InvalidSnippet;
 import com.google.errorprone.bugpatterns.javadoc.InvalidThrows;
 import com.google.errorprone.bugpatterns.javadoc.InvalidThrowsLink;
 import com.google.errorprone.bugpatterns.javadoc.MalformedInlineTag;
+import com.google.errorprone.bugpatterns.javadoc.MissingJavadoc;
 import com.google.errorprone.bugpatterns.javadoc.MissingSummary;
 import com.google.errorprone.bugpatterns.javadoc.NotJavadoc;
 import com.google.errorprone.bugpatterns.javadoc.PreferThrowsTag;
@@ -1136,7 +1137,6 @@ public final class BuiltInCheckerSuppliers {
           PreconditionsCheckNotNullRepeated.class,
           PreferCharsetOverload.class,
           PreferInstanceofOverGetKind.class,
-          PreferPreconditions.class,
           PreferTestParameter.class,
           PreferThrowsTag.class,
           PrimitiveAtomicReference.class,
@@ -1297,6 +1297,7 @@ public final class BuiltInCheckerSuppliers {
           MethodCanBeStatic.class,
           MissingBraces.class,
           MissingDefault.class,
+          MissingJavadoc.class,
           MissingRuntimeRetention.class,
           MixedArrayDimensions.class,
           MockitoDoSetup.class,
@@ -1312,6 +1313,7 @@ public final class BuiltInCheckerSuppliers {
           ParameterComment.class,
           ParameterMissingNullable.class,
           PreferJavaTimeOverload.class,
+          PreferPreconditions.class,
           PreferredInterfaceType.class,
           PrimitiveArrayPassedToVarargsMethod.class,
           PrivateConstructorForNoninstantiableModule.class,
