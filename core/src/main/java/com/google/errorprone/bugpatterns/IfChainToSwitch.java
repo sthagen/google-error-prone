@@ -1428,6 +1428,25 @@ public final class IfChainToSwitch extends BugChecker implements IfTreeMatcher {
       return Optional.empty();
     }
 
+    // Using a non-null case constant requires the switch subject to be a type in
+    // ALLOWED_SWITCH_CASE_CONSTANT_TYPES
+    if (subject.isPresent()) {
+      Type switchExpressionType = getType(subject.get());
+      if (switchExpressionType != null) {
+        boolean switchSubjectTypeWorksWithConstants =
+            ALLOWED_SWITCH_CASE_CONSTANT_TYPES.stream()
+                .map(state::getTypeFromString)
+                .filter(Objects::nonNull)
+                .anyMatch(t -> types.isSameType(switchExpressionType, t));
+        boolean validConstantSubject =
+            compileTimeConstant.getKind() == Kind.NULL_LITERAL
+                || switchSubjectTypeWorksWithConstants;
+        if (!validConstantSubject) {
+          return Optional.empty();
+        }
+      }
+    }
+
     // The variable being switched on must also be one of the following types; this is
     // an outer bound (relaxed in preview features, which this checker does not yet support)
     if (subject.isPresent()) {

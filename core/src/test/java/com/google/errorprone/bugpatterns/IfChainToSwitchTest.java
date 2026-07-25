@@ -4515,6 +4515,33 @@ class Test {
         .doTest();
   }
 
+  @Test
+  public void ifChain_stringConstantOnObjectSubject_noError() {
+    // String constants are not allowed on Object switch expressions, and more generally, non-null
+    // constants are only allowed with a limited set of types for the switch expression.
+    refactoringHelper
+        .addInputLines(
+            "Test.java",
+            """
+            class Test {
+              public void foo(Object o) {
+                if (o instanceof String) {
+                  System.out.println("string");
+                } else if (o == "a") {
+                  System.out.println("a");
+                } else if (o instanceof Integer) {
+                  System.out.println("integer");
+                } else {
+                  System.out.println("default");
+                }
+              }
+            }
+            """)
+        .expectUnchanged()
+        .setArgs(ENABLE_MAIN, DISABLE_SAFE, MIN_CHAIN_LENGTH_3)
+        .doTest();
+  }
+
   /** Substitute underscore for {@code unused} variables, if supported. */
   private static String maybeChangeToUnnamedVariable(String s) {
     if (Runtime.version().feature() >= 22) {
