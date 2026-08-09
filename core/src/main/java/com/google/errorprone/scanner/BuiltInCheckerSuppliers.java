@@ -243,6 +243,7 @@ import com.google.errorprone.bugpatterns.LongFloatConversion;
 import com.google.errorprone.bugpatterns.LongLiteralLowerCaseSuffix;
 import com.google.errorprone.bugpatterns.LoopConditionChecker;
 import com.google.errorprone.bugpatterns.LoopOverCharArray;
+import com.google.errorprone.bugpatterns.LoopToTestParameter;
 import com.google.errorprone.bugpatterns.LossyPrimitiveCompare;
 import com.google.errorprone.bugpatterns.MathAbsoluteNegative;
 import com.google.errorprone.bugpatterns.MathRoundIntLong;
@@ -592,6 +593,7 @@ import com.google.errorprone.bugpatterns.javadoc.MissingSummary;
 import com.google.errorprone.bugpatterns.javadoc.NotJavadoc;
 import com.google.errorprone.bugpatterns.javadoc.PreferThrowsTag;
 import com.google.errorprone.bugpatterns.javadoc.ReturnFromVoid;
+import com.google.errorprone.bugpatterns.javadoc.TraditionalJavadocToMarkdown;
 import com.google.errorprone.bugpatterns.javadoc.UnescapedEntity;
 import com.google.errorprone.bugpatterns.javadoc.UnrecognisedJavadocTag;
 import com.google.errorprone.bugpatterns.javadoc.UrlInSee;
@@ -1080,6 +1082,7 @@ public final class BuiltInCheckerSuppliers {
           LongDoubleConversion.class,
           LongFloatConversion.class,
           LoopOverCharArray.class,
+          LoopToTestParameter.class,
           MalformedInlineTag.class,
           MathAbsoluteNegative.class,
           MemoizeConstantVisitorStateLookups.class,
@@ -1346,6 +1349,7 @@ public final class BuiltInCheckerSuppliers {
           ThrowsUncheckedException.class,
           TimeUnitMismatch.class,
           TooManyParameters.class,
+          TraditionalJavadocToMarkdown.class,
           TransientMisuse.class,
           TruthContainsExactlyElementsInUsage.class,
           TryFailRefactoring.class,
