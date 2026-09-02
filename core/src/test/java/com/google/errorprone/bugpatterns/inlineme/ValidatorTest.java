@@ -1035,4 +1035,53 @@ public class ValidatorTest {
             """)
         .doTest();
   }
+
+  @Test
+  public void unqualifiedStaticField_valid() {
+    helper
+        .addSourceLines(
+            "Client.java",
+            """
+            package com.google.frobber;
+
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Client {
+              public static final String STR = "kurt";
+
+              @InlineMe(
+                  replacement = "Client.STR.length()",
+                  imports = "com.google.frobber.Client")
+              @Deprecated
+              public int stringLength() {
+                return STR.length();
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void unqualifiedStaticField_missingQualification_fails() {
+    helper
+        .addSourceLines(
+            "Client.java",
+            """
+            package com.google.frobber;
+
+            import com.google.errorprone.annotations.InlineMe;
+
+            public final class Client {
+              public static final String STR = "kurt";
+
+              @InlineMe(replacement = "STR.length()")
+              @Deprecated
+              // BUG: Diagnostic contains: InferredFromBody: Client.STR.length()
+              public int stringLength() {
+                return STR.length();
+              }
+            }
+            """)
+        .doTest();
+  }
 }

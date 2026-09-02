@@ -171,6 +171,7 @@ import com.google.errorprone.bugpatterns.GetClassOnAnnotation;
 import com.google.errorprone.bugpatterns.GetClassOnClass;
 import com.google.errorprone.bugpatterns.GetClassOnEnum;
 import com.google.errorprone.bugpatterns.GuiceNestedCombine;
+import com.google.errorprone.bugpatterns.HashCodeInObjectsHash;
 import com.google.errorprone.bugpatterns.HashtableContains;
 import com.google.errorprone.bugpatterns.HidingField;
 import com.google.errorprone.bugpatterns.ICCProfileGetInstance;
@@ -483,6 +484,7 @@ import com.google.errorprone.bugpatterns.UnusedTypeParameter;
 import com.google.errorprone.bugpatterns.UnusedVariable;
 import com.google.errorprone.bugpatterns.UseCorrectAssertInTests;
 import com.google.errorprone.bugpatterns.UseEnumSwitch;
+import com.google.errorprone.bugpatterns.ValueClassIdentity;
 import com.google.errorprone.bugpatterns.VarChecker;
 import com.google.errorprone.bugpatterns.VarTypeName;
 import com.google.errorprone.bugpatterns.VarWithPrimitive;
@@ -746,6 +748,7 @@ public final class BuiltInCheckerSuppliers {
           CollectionIncompatibleType.class,
           CollectionToArraySafeParameter.class,
           ComparableType.class,
+          CompareToZero.class,
           ComparingThisWithNull.class,
           ComparisonOutOfRange.class,
           CompatibleWithMisuse.class,
@@ -964,7 +967,6 @@ public final class BuiltInCheckerSuppliers {
           CollectionUndefinedEquality.class,
           CollectorShouldNotUseState.class,
           ComparableAndComparator.class,
-          CompareToZero.class,
           ComplexBooleanConstant.class,
           DateChecker.class,
           DateFormatConstant.class,
@@ -1014,6 +1016,7 @@ public final class BuiltInCheckerSuppliers {
           FutureTransformAsync.class,
           GetClassOnEnum.class,
           GuiceNestedCombine.class,
+          HashCodeInObjectsHash.class,
           HidingField.class,
           ICCProfileGetInstance.class,
           IdentityHashMapUsage.class,
@@ -1377,6 +1380,7 @@ public final class BuiltInCheckerSuppliers {
           UseCorrectAssertInTests.class,
           UseEnumSwitch.class,
           UsingJsr305CheckReturnValue.class,
+          ValueClassIdentity.class,
           VarChecker.class,
           VarWithPrimitive.class,
           Varifier.class,
