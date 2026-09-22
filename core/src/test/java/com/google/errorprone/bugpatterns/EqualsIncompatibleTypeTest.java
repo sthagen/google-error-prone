@@ -681,6 +681,66 @@ public class EqualsIncompatibleTypeRecursiveTypes {
   }
 
   @Test
+  public void unrelatedRecordsCannotBeEqual() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            """
+            public class Test {
+              record UserId(long id) {}
+
+              record OrderId(long id) {}
+
+              public void test(UserId userId, OrderId orderId) {
+                // BUG: Diagnostic contains: incompatible types
+                userId.equals(orderId);
+                // BUG: Diagnostic contains: incompatible types
+                orderId.equals(userId);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void sameRecordCanBeEqual() {
+    compilationHelper
+        .addSourceLines(
+            "Test.java",
+            """
+            public class Test {
+              record UserId(long id) {}
+
+              public boolean test(UserId a, UserId b) {
+                return a.equals(b);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
+  public void unrelatedRecordsCanBeEqualWhenFlagDisabled() {
+    compilationHelper
+        .setArgs("-XepOpt:TypeCompatibility:TreatRecordsAsIncomparable=false")
+        .addSourceLines(
+            "Test.java",
+            """
+            public class Test {
+              record UserId(long id) {}
+
+              record OrderId(long id) {}
+
+              public void test(UserId userId, OrderId orderId) {
+                userId.equals(orderId);
+                orderId.equals(userId);
+              }
+            }
+            """)
+        .doTest();
+  }
+
+  @Test
   public void protoBuildersCannotBeEqual() {
     compilationHelper
         .addSourceLines(
